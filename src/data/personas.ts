@@ -1,4 +1,4 @@
 import { Persona } from '../types/dashboard';
-import { demoAdminCredentials } from './admin-credentials';
+import { demoAdminCredentials, demoMemberCredentials } from './admin-credentials';
 
-export const personas: Persona[] = [demoAdminCredentials];
+export const personas: Persona[] = [demoAdminCredentials, demoMemberCredentials];

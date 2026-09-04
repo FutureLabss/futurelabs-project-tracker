@@ -8,6 +8,7 @@ export interface Persona {
   id: string;
   name: string;
   email: string;
+  password: string;
   role: UserRole;
   title: string;
 }

@@ -1,10 +1,7 @@
 import {
   IconAlertTriangle,
-  IconCalendarEvent,
   IconChartBar,
-  IconChecklist,
   IconClipboardCheck,
-  IconClockHour4,
   IconLayoutDashboard,
   IconReportAnalytics,
   IconShieldCheck,
@@ -16,65 +13,20 @@ export const roleDashboards: Record<UserRole, DashboardLayoutConfig> = {
   member: {
     role: 'member',
     roleLabel: 'Member',
-    title: 'My delivery queue',
-    subtitle: 'Track assigned work, upcoming deadlines, blockers, and recent submissions.',
-    navigation: [
-      { label: 'My tasks', icon: IconChecklist, active: true },
-      { label: 'Deadlines', icon: IconCalendarEvent },
-      { label: 'Blockers', icon: IconAlertTriangle },
-      { label: 'History', icon: IconClockHour4 },
-    ],
-    metrics: [
-      { label: 'Open tasks', value: '6', trend: '2 due this week', tone: 'blue' },
-      { label: 'Accepted this month', value: '9', trend: '+3 from last month', tone: 'teal' },
-      { label: 'Blocked work', value: '1', trend: 'Awaiting manager assist', tone: 'orange' },
-      { label: 'Deadline risk', value: '2', trend: 'Needs update today', tone: 'red' },
-    ],
-    primaryActions: [
-      { label: 'Submit work', icon: IconClipboardCheck },
-      { label: 'Raise blocker', icon: IconAlertTriangle },
-    ],
+    title: '',
+    subtitle: '',
+    navigation: [],
+    metrics: [],
+    primaryActions: [],
     focusPanel: {
-      title: 'Priority work',
-      description: 'Personal queue ordered by deadline pressure and dependency risk.',
-      items: [
-        {
-          title: 'Role-Based Route Guards',
-          meta: 'IAM v2 - Submitted Aug 31',
-          status: 'In review',
-          tone: 'violet',
-        },
-        {
-          title: 'Implement SMS 2FA Fallback',
-          meta: 'IAM v2 - Due Aug 25',
-          status: 'Overdue',
-          tone: 'red',
-        },
-        {
-          title: 'Fix Production Token Leak',
-          meta: 'IAM v2 - Unplanned',
-          status: 'Active',
-          tone: 'blue',
-        },
-      ],
+      title: '',
+      description: '',
+      items: [],
     },
     secondaryPanel: {
-      title: 'Signals',
-      description: 'Personal delivery signals for quick standup preparation.',
-      items: [
-        {
-          title: 'WebAuthn Passkeys deadline is close',
-          meta: 'Due Sep 3 - High complexity',
-          status: 'Watch',
-          tone: 'orange',
-        },
-        {
-          title: 'No leave windows scheduled',
-          meta: 'Availability clear for next 10 working days',
-          status: 'Clear',
-          tone: 'teal',
-        },
-      ],
+      title: '',
+      description: '',
+      items: [],
     },
   },
   manager: {
@@ -206,5 +158,3 @@ export const roleDashboards: Record<UserRole, DashboardLayoutConfig> = {
     },
   },
 };
-
-

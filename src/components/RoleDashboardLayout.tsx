@@ -58,6 +58,9 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
   const ToggleIcon = isNavigationCollapsed
     ? IconLayoutSidebarLeftExpand
     : IconLayoutSidebarLeftCollapse;
+  const panels = [config.focusPanel, config.secondaryPanel].filter(
+    (panel) => panel.title || panel.description || panel.items.length > 0,
+  );
 
   return (
     <AppShell
@@ -138,35 +141,37 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
             )}
           </Box>
 
-          <Stack gap={4} w="100%">
-            {config.navigation.map((item) => {
-              const NavigationIcon = item.icon;
-              const navItem = (
-                <UnstyledButton
-                  aria-label={item.label}
-                  className={item.active ? 'nav-item nav-item-active' : 'nav-item'}
-                  key={item.label}
-                >
-                  <Group gap="sm" justify={isNavigationCollapsed ? 'center' : 'flex-start'} wrap="nowrap">
-                    <NavigationIcon size={18} />
-                    {!isNavigationCollapsed && (
-                      <Text size="sm" fw={600}>
-                        {item.label}
-                      </Text>
-                    )}
-                  </Group>
-                </UnstyledButton>
-              );
+          {config.navigation.length > 0 && (
+            <Stack gap={4} w="100%">
+              {config.navigation.map((item) => {
+                const NavigationIcon = item.icon;
+                const navItem = (
+                  <UnstyledButton
+                    aria-label={item.label}
+                    className={item.active ? 'nav-item nav-item-active' : 'nav-item'}
+                    key={item.label}
+                  >
+                    <Group gap="sm" justify={isNavigationCollapsed ? 'center' : 'flex-start'} wrap="nowrap">
+                      <NavigationIcon size={18} />
+                      {!isNavigationCollapsed && (
+                        <Text size="sm" fw={600}>
+                          {item.label}
+                        </Text>
+                      )}
+                    </Group>
+                  </UnstyledButton>
+                );
 
-              return isNavigationCollapsed ? (
-                <Tooltip key={item.label} label={item.label} position="right">
-                  {navItem}
-                </Tooltip>
-              ) : (
-                navItem
-              );
-            })}
-          </Stack>
+                return isNavigationCollapsed ? (
+                  <Tooltip key={item.label} label={item.label} position="right">
+                    {navItem}
+                  </Tooltip>
+                ) : (
+                  navItem
+                );
+              })}
+            </Stack>
+          )}
         </Stack>
       </AppShell.Navbar>
 
@@ -175,50 +180,61 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
           <Group justify="space-between" align="flex-start" gap="lg">
             <Box maw={760}>
               <Badge className={roleToneClassNames[config.role]}>{config.roleLabel}</Badge>
-              <Title order={1} mt="sm">
-                {config.title}
-              </Title>
-              <Text c="dimmed" mt={6}>
-                {config.subtitle}
-              </Text>
+              {config.title && (
+                <Title order={1} mt="sm">
+                  {config.title}
+                </Title>
+              )}
+              {config.subtitle && (
+                <Text c="dimmed" mt={6}>
+                  {config.subtitle}
+                </Text>
+              )}
             </Box>
 
-            <Group gap="xs">
-              {config.primaryActions.map((action) => {
-                const ActionIconComponent = action.icon;
+            {config.primaryActions.length > 0 && (
+              <Group gap="xs">
+                {config.primaryActions.map((action) => {
+                  const ActionIconComponent = action.icon;
 
-                return (
-                  <Button key={action.label} leftSection={<ActionIconComponent size={16} />}>
-                    {action.label}
-                  </Button>
-                );
-              })}
-            </Group>
+                  return (
+                    <Button key={action.label} leftSection={<ActionIconComponent size={16} />}>
+                      {action.label}
+                    </Button>
+                  );
+                })}
+              </Group>
+            )}
           </Group>
 
-          <SimpleGrid cols={{ base: 1, xs: 2, lg: 4 }} spacing="md">
-            {config.metrics.map((metric) => (
-              <Card className="metric-card" key={metric.label}>
-                <Group justify="space-between" align="flex-start" wrap="nowrap">
-                  <Box>
-                    <Text size="xs" fw={700} c="dimmed" tt="uppercase">
-                      {metric.label}
-                    </Text>
-                    <Text className="metric-value">{metric.value}</Text>
-                  </Box>
-                  <span className={`metric-dot ${toneClassNames[metric.tone]}`} />
-                </Group>
-                <Text size="sm" c="dimmed" mt="sm">
-                  {metric.trend}
-                </Text>
-              </Card>
-            ))}
-          </SimpleGrid>
+          {config.metrics.length > 0 && (
+            <SimpleGrid cols={{ base: 1, xs: 2, lg: 4 }} spacing="md">
+              {config.metrics.map((metric) => (
+                <Card className="metric-card" key={metric.label}>
+                  <Group justify="space-between" align="flex-start" wrap="nowrap">
+                    <Box>
+                      <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+                        {metric.label}
+                      </Text>
+                      <Text className="metric-value">{metric.value}</Text>
+                    </Box>
+                    <span className={`metric-dot ${toneClassNames[metric.tone]}`} />
+                  </Group>
+                  <Text size="sm" c="dimmed" mt="sm">
+                    {metric.trend}
+                  </Text>
+                </Card>
+              ))}
+            </SimpleGrid>
+          )}
 
-          <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
-            <DashboardPanel panel={config.focusPanel} />
-            <DashboardPanel panel={config.secondaryPanel} />
-          </SimpleGrid>
+          {panels.length > 0 && (
+            <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
+              {panels.map((panel) => (
+                <DashboardPanel key={panel.title} panel={panel} />
+              ))}
+            </SimpleGrid>
+          )}
         </Stack>
       </AppShell.Main>
     </AppShell>

@@ -14,11 +14,11 @@ import {
 } from '@mantine/core';
 import { IconAlertCircle, IconLock, IconLogin2, IconMail, IconShieldCheck } from '@tabler/icons-react';
 import { FormEvent, useState } from 'react';
-import { demoAdminCredentials } from '../data/admin-credentials';
+import { Persona, UserRole } from '../types/dashboard';
 
 interface LoginScreenProps {
-  credentials: typeof demoAdminCredentials;
-  onLogin: () => void;
+  credentials: Persona[];
+  onLogin: (role: UserRole) => void;
 }
 
 export function LoginScreen({ credentials, onLogin }: LoginScreenProps) {
@@ -30,18 +30,23 @@ export function LoginScreen({ credentials, onLogin }: LoginScreenProps) {
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (email.trim().toLowerCase() !== credentials.email || password !== credentials.password) {
-      setError('Invalid email or password. Use the demo admin credentials shown on this screen.');
+    const normalizedEmail = email.trim().toLowerCase();
+    const matchingCredentials = credentials.find(
+      (credential) => credential.email === normalizedEmail && credential.password === password,
+    );
+
+    if (!matchingCredentials) {
+      setError('Invalid email or password. Use one of the sample credentials shown on this screen.');
       return;
     }
 
     setError('');
-    onLogin();
+    onLogin(matchingCredentials.role);
   };
 
-  const fillDemoCredentials = () => {
-    setEmail(credentials.email);
-    setPassword(credentials.password);
+  const fillDemoCredentials = (credential: Persona) => {
+    setEmail(credential.email);
+    setPassword(credential.password);
     setError('');
   };
 
@@ -58,38 +63,50 @@ export function LoginScreen({ credentials, onLogin }: LoginScreenProps) {
                 </Text>
               </Group>
 
-              <Title order={1}>Admin sign in</Title>
+              <Title order={1}>Dashboard sign in</Title>
               <Text c="dimmed" mt="sm" size="lg" maw={480}>
-                Access the portfolio operations dashboard with the demo administrator account.
+                Access role-based dashboards with the sample administrator or member account.
               </Text>
             </Box>
 
             <Card className="demo-login-box">
               <Group justify="space-between" gap="sm" mb="sm">
                 <Text size="xs" fw={800} c="dimmed" tt="uppercase">
-                  Demo admin credentials
+                  Sample login credentials
                 </Text>
-                <Button size="compact-xs" variant="light" onClick={fillDemoCredentials}>
-                  Fill demo
+                <Button size="compact-xs" variant="light" onClick={() => fillDemoCredentials(credentials[0])}>
+                  Fill admin
                 </Button>
               </Group>
-              <Stack gap={6}>
-                <Group justify="space-between" gap="md" wrap="nowrap">
-                  <Text size="sm" c="dimmed">
-                    Email
-                  </Text>
-                  <Anchor size="sm" fw={700} component="button" type="button" onClick={() => setEmail(credentials.email)}>
-                    {credentials.email}
-                  </Anchor>
-                </Group>
-                <Group justify="space-between" gap="md" wrap="nowrap">
-                  <Text size="sm" c="dimmed">
-                    Password
-                  </Text>
-                  <Anchor size="sm" fw={700} component="button" type="button" onClick={() => setPassword(credentials.password)}>
-                    {credentials.password}
-                  </Anchor>
-                </Group>
+              <Stack gap="sm">
+                {credentials.map((credential) => (
+                  <Stack key={credential.id} gap={6}>
+                    <Group justify="space-between" gap="sm" wrap="nowrap">
+                      <Text size="xs" fw={800} c="dimmed" tt="uppercase">
+                        {credential.role} account
+                      </Text>
+                      <Anchor size="xs" fw={700} component="button" type="button" onClick={() => fillDemoCredentials(credential)}>
+                        Fill
+                      </Anchor>
+                    </Group>
+                    <Group justify="space-between" gap="md" wrap="nowrap">
+                      <Text size="sm" c="dimmed">
+                        Email
+                      </Text>
+                      <Anchor size="sm" fw={700} component="button" type="button" onClick={() => setEmail(credential.email)}>
+                        {credential.email}
+                      </Anchor>
+                    </Group>
+                    <Group justify="space-between" gap="md" wrap="nowrap">
+                      <Text size="sm" c="dimmed">
+                        Password
+                      </Text>
+                      <Anchor size="sm" fw={700} component="button" type="button" onClick={() => setPassword(credential.password)}>
+                        {credential.password}
+                      </Anchor>
+                    </Group>
+                  </Stack>
+                ))}
               </Stack>
             </Card>
           </Stack>
@@ -102,7 +119,7 @@ export function LoginScreen({ credentials, onLogin }: LoginScreenProps) {
                     Sign in to dashboard
                   </Title>
                   <Text size="sm" c="dimmed" mt={6}>
-                    Admin access only is enabled for this demo.
+                    Use a sample account to open the matching dashboard.
                   </Text>
                 </Box>
 

@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { LoginScreen } from './components/LoginScreen';
 import { RoleDashboardLayout } from './components/RoleDashboardLayout';
-import { demoAdminCredentials } from './data/admin-credentials';
+import { demoCredentials } from './data/admin-credentials';
 import { roleDashboards } from './data/dashboard-layouts';
+import { UserRole } from './types/dashboard';
 
 export function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activeRole, setActiveRole] = useState<UserRole | null>(null);
 
-  if (!isAuthenticated) {
-    return <LoginScreen credentials={demoAdminCredentials} onLogin={() => setIsAuthenticated(true)} />;
+  if (!activeRole) {
+    return <LoginScreen credentials={demoCredentials} onLogin={(role) => setActiveRole(role)} />;
   }
 
-  return <RoleDashboardLayout config={roleDashboards.admin} onLogout={() => setIsAuthenticated(false)} />;
+  return <RoleDashboardLayout config={roleDashboards[activeRole]} onLogout={() => setActiveRole(null)} />;
 }
