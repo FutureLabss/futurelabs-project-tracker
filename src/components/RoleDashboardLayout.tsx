@@ -29,6 +29,7 @@ import {
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { DashboardLayoutConfig, DashboardPanel as DashboardPanelConfig, DashboardTone } from '../types/dashboard';
+import MemberPage from './horizons/member/page';
 
 interface RoleDashboardLayoutProps {
   config: DashboardLayoutConfig;
@@ -52,6 +53,7 @@ const roleToneClassNames: Record<DashboardLayoutConfig['role'], string> = {
   manager: toneClassNames.violet,
   member: toneClassNames.blue,
 };
+
 
 export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutProps) {
   const [isNavigationCollapsed, setIsNavigationCollapsed] = useState(false);
@@ -176,6 +178,11 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
       </AppShell.Navbar>
 
       <AppShell.Main className="app-main">
+         {config.role === 'member' ? (
+    <MemberPage />
+  ) : (
+    
+  
         <Stack gap="xl" className="dashboard-shell">
           <Group justify="space-between" align="flex-start" gap="lg">
             <Box maw={760}>
@@ -236,6 +243,7 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
             </SimpleGrid>
           )}
         </Stack>
+        )}
       </AppShell.Main>
     </AppShell>
   );

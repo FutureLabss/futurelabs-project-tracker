@@ -5,7 +5,7 @@ import '@mantine/core/styles.css';
 import { App } from './App';
 import { appTheme } from './theme';
 import './styles.css';
-
+import './theme/index.css';
 const rootElement = document.getElementById('root');
 
 if (rootElement) {

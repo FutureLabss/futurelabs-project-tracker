@@ -16,10 +16,13 @@
     "@mantine/dates": "^7.17.8",
     "@mantine/hooks": "^7.17.8",
     "@tabler/icons-react": "^3.46.0",
+    "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.102.8",
     "dayjs": "^1.11.23",
+    "lucide-react": "^1.39.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@babel/core": "^8.0.1",
