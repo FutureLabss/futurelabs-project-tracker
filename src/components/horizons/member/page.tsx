@@ -5,6 +5,7 @@ import MemberHeader from "./MemberHeader";
 import MemberSummaryCards from "./MemberSummaryCards";
 import MemberTaskSection from "./MemberTaskSection";
 import MemberWorkTabs from "./MemberWorkTabs";
+import AcceptedDeliverables from "./AcceptedDeliverables";
 
 
 
@@ -32,6 +33,9 @@ export default function MemberPage() {
         <div className="mt-5">
           <MemberTaskSection />
         </div>
+        <div className="mt-6">
+  <AcceptedDeliverables />
+</div>
       </div>
     </main>
   );
