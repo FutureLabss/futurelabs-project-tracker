@@ -6,6 +6,8 @@ import {
   IconReportAnalytics,
   IconShieldCheck,
   IconUsers,
+  IconUser,
+  IconHistory,
 } from '@tabler/icons-react';
 import { DashboardLayoutConfig, UserRole } from '../types/dashboard';
 
@@ -15,7 +17,11 @@ export const roleDashboards: Record<UserRole, DashboardLayoutConfig> = {
     roleLabel: 'Member',
     title: '',
     subtitle: '',
-    navigation: [],
+    navigation: [
+      { label: 'Work', icon: IconUser, memberView: 'work', active: true },
+      { label: "Tasks", icon: IconUsers, memberView: 'tasks' },
+      { label: 'History', icon: IconHistory, memberView: 'history' },
+    ],
     metrics: [],
     primaryActions: [],
     focusPanel: {
