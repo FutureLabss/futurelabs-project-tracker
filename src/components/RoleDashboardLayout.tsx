@@ -28,7 +28,7 @@ import {
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
-import { DashboardLayoutConfig, DashboardPanel as DashboardPanelConfig, DashboardTone } from '../types/dashboard';
+import { DashboardLayoutConfig, DashboardPanel as DashboardPanelConfig, DashboardTone, MemberView } from '../types/dashboard';
 import MemberPage from './horizons/member/page';
 
 interface RoleDashboardLayoutProps {
@@ -57,6 +57,7 @@ const roleToneClassNames: Record<DashboardLayoutConfig['role'], string> = {
 
 export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutProps) {
   const [isNavigationCollapsed, setIsNavigationCollapsed] = useState(false);
+  const [memberView, setMemberView] = useState<MemberView>('my-work');
   const ToggleIcon = isNavigationCollapsed
     ? IconLayoutSidebarLeftExpand
     : IconLayoutSidebarLeftCollapse;
@@ -147,10 +148,15 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
             <Stack gap={4} w="100%">
               {config.navigation.map((item) => {
                 const NavigationIcon = item.icon;
+                const isActive = config.role === 'member' ? item.memberView === memberView : item.active;
                 const navItem = (
                   <UnstyledButton
                     aria-label={item.label}
-                    className={item.active ? 'nav-item nav-item-active' : 'nav-item'}
+                    aria-current={isActive ? 'page' : undefined}
+                    onClick={() => {
+                      if (item.memberView) setMemberView(item.memberView);
+                    }}
+                    className={isActive ? 'nav-item nav-item-active' : 'nav-item'}
                     key={item.label}
                   >
                     <Group gap="sm" justify={isNavigationCollapsed ? 'center' : 'flex-start'} wrap="nowrap">
@@ -179,7 +185,7 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
 
       <AppShell.Main className="app-main">
          {config.role === 'member' ? (
-    <MemberPage />
+    <MemberPage activeView={memberView} onViewChange={setMemberView} />
   ) : (
     
   

@@ -2,6 +2,8 @@ import { TablerIcon } from '@tabler/icons-react';
 
 export type UserRole = 'member' | 'manager' | 'admin';
 
+export type MemberView = 'my-work' | 'team' | 'completed';
+
 export type DashboardTone = 'teal' | 'blue' | 'orange' | 'red' | 'violet' | 'gray';
 
 export interface Persona {
@@ -26,6 +28,7 @@ export interface DashboardAction {
 }
 
 export interface DashboardNavigationItem {
+  memberView?: MemberView;
   label: string;
   icon: TablerIcon;
   active?: boolean;
