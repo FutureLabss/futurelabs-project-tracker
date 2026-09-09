@@ -1,12 +1,12 @@
 // "use client";
 
 // import {
-//   CalendarDays,
-//   ChevronDown,
-//   ChevronLeft,
-//   FastForward,
-//   RotateCcw,
-// } from "lucide-react";
+//   IconCalendar,
+//   IconChevronDown,
+//   IconChevronLeft,
+//   IconPlayerTrackNext,
+//   IconRotateClockwise,
+// } from "@tabler/icons-react";
 
 // export default function MemberTopHeader() {
 //   return (
@@ -35,9 +35,9 @@
 //         <div className="hidden items-center gap-2 rounded-[11px] border border-slate-200 bg-white px-3 py-2 shadow-[0_1px_4px_rgba(0,0,0,0.10)] xl:flex">
 //           {/* Calendar / Label */}
 //           <div className="flex items-center gap-2 pr-2">
-//             <CalendarDays
+//             <IconCalendar
 //               size={19}
-//               strokeWidth={1.8}
+//               stroke={1.8}
 //               className="text-[#08aa7c]"
 //             />
 
@@ -55,7 +55,7 @@
 //             type="button"
 //             className="flex h-[29px] w-[29px] items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100"
 //           >
-//             <ChevronLeft size={17} />
+//             <IconChevronLeft size={17} />
 //           </button>
 
 //           {/* +1 Day */}
@@ -64,7 +64,7 @@
 //             className="flex h-[31px] items-center gap-1 rounded-[8px] bg-[#e7f8f3] px-3 text-[12px] font-semibold text-[#079b72] transition hover:bg-[#d9f3eb]"
 //           >
 //             +1 Day
-//             <ChevronDown size={13} className="rotate-[-90deg]" />
+//             <IconChevronDown size={13} className="rotate-[-90deg]" />
 //           </button>
 
 //           {/* +1 Week */}
@@ -73,7 +73,7 @@
 //             className="flex h-[31px] items-center gap-1 rounded-[8px] bg-[#e7f8f3] px-3 text-[12px] font-semibold text-[#079b72] transition hover:bg-[#d9f3eb]"
 //           >
 //             +1 Week
-//             <FastForward size={13} />
+//             <IconPlayerTrackNext size={13} />
 //           </button>
 
 //           {/* Date Input */}
@@ -88,7 +88,7 @@
 //             type="button"
 //             className="flex h-[35px] items-center gap-2 rounded-[9px] border border-[#ff5a5a] px-3 text-[12px] font-semibold text-[#ff4141] transition hover:bg-red-50"
 //           >
-//             <RotateCcw size={14} />
+//             <IconRotateClockwise size={14} />
 //             Reset Seed
 //           </button>
 //         </div>
@@ -111,7 +111,7 @@
 //               <option value="john">John Smith (STAFF)</option>
 //             </select>
 
-//             <ChevronDown
+//             <IconChevronDown
 //               size={15}
 //               className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
 //             />
@@ -119,7 +119,7 @@
 
 //           {/* Role Badge */}
 //           <span className="hidden rounded-[6px] bg-[#e9f4ff] px-2.5 py-1.5 text-[11px] font-bold text-[#2187dd] md:inline-block">
-//             MEMBER 
+//             MEMBER
 //           </span>
 //         </div>
 //       </div>

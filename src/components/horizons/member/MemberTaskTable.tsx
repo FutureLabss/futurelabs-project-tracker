@@ -1,50 +1,41 @@
-"use client";
-
-import { memberTasks } from "./memberMockData";
+import { Table, Text } from "@mantine/core";
+import type { MemberTask } from "../../../types/member-task";
 import MemberTaskRow from "./MemberTaskRow";
 
-export default function MemberTaskTable() {
+export default function MemberTaskTable({ tasks }: { tasks: MemberTask[] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[1350px] border-collapse">
-        <thead>
-          <tr className="border-b border-slate-200">
-            <th className="px-3 pb-4 pt-1 text-left text-[14px] font-bold text-slate-900">
-              Task Title &amp; Overview
-            </th>
-
-            <th className="px-3 pb-4 pt-1 text-left text-[14px] font-bold text-slate-900">
-              Assigned Teammate
-            </th>
-
-            <th className="px-3 pb-4 pt-1 text-left text-[14px] font-bold text-slate-900">
-              Project
-            </th>
-
-            <th className="px-3 pb-4 pt-1 text-left text-[14px] font-bold text-slate-900">
-              Complexity
-            </th>
-
-            <th className="px-3 pb-4 pt-1 text-left text-[14px] font-bold text-slate-900">
-              Due Date
-            </th>
-
-            <th className="px-3 pb-4 pt-1 text-left text-[14px] font-bold text-slate-900">
-              Status
-            </th>
-
-            <th className="px-3 pb-4 pt-1 text-left text-[14px] font-bold text-slate-900">
-              Access Mode
-            </th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {memberTasks.map((task) => (
+    <Table.ScrollContainer minWidth={1350}>
+      <Table verticalSpacing="md" horizontalSpacing="sm">
+        <Table.Thead>
+          <Table.Tr>
+            {[
+              "Task Title & Overview",
+              "Assigned Teammate",
+              "Project",
+              "Complexity",
+              "Due Date",
+              "Status",
+              "Access Mode",
+            ].map((label) => (
+              <Table.Th key={label}>{label}</Table.Th>
+            ))}
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {tasks.map((task) => (
             <MemberTaskRow key={task.id} task={task} />
           ))}
-        </tbody>
-      </table>
-    </div>
+          {tasks.length === 0 && (
+            <Table.Tr>
+              <Table.Td colSpan={7}>
+                <Text ta="center" c="dimmed" p="lg">
+                  No shared tasks.
+                </Text>
+              </Table.Td>
+            </Table.Tr>
+          )}
+        </Table.Tbody>
+      </Table>
+    </Table.ScrollContainer>
   );
 }

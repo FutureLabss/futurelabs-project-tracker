@@ -14,7 +14,7 @@ import {
   Title,
   Tooltip,
   UnstyledButton,
-} from '@mantine/core';
+} from "@mantine/core";
 import {
   IconBell,
   IconCalendarEvent,
@@ -25,14 +25,22 @@ import {
   IconLayoutSidebarLeftExpand,
   IconSearch,
   IconSettings,
-} from '@tabler/icons-react';
-import dayjs from 'dayjs';
-import { useMemo, useState } from 'react';
-import { DashboardLayoutConfig, DashboardPanel as DashboardPanelConfig, DashboardTone, MemberView } from '../types/dashboard';
-import MemberPage from './horizons/member/page';
+} from "@tabler/icons-react";
+import dayjs from "dayjs";
+import { useMemo, useState } from "react";
+import {
+  DashboardLayoutConfig,
+  DashboardPanel as DashboardPanelConfig,
+  DashboardTone,
+  MemberView,
+} from "../types/dashboard";
+import MemberPage from "./horizons/member/page";
 
 interface RoleDashboardLayoutProps {
   config: DashboardLayoutConfig;
+  personId: string;
+  personName?: string;
+  initialDate?: string;
   onLogout: () => void;
 }
 
@@ -40,24 +48,30 @@ const expandedNavbarWidth = 252;
 const collapsedNavbarWidth = 76;
 
 const toneClassNames: Record<DashboardTone, string> = {
-  blue: 'tone-blue',
-  gray: 'tone-gray',
-  orange: 'tone-orange',
-  red: 'tone-red',
-  teal: 'tone-teal',
-  violet: 'tone-violet',
+  blue: "tone-blue",
+  gray: "tone-gray",
+  orange: "tone-orange",
+  red: "tone-red",
+  teal: "tone-teal",
+  violet: "tone-violet",
 };
 
-const roleToneClassNames: Record<DashboardLayoutConfig['role'], string> = {
+const roleToneClassNames: Record<DashboardLayoutConfig["role"], string> = {
   admin: toneClassNames.teal,
   manager: toneClassNames.violet,
   member: toneClassNames.blue,
 };
 
-
-export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutProps) {
+export function RoleDashboardLayout({
+  config,
+  onLogout,
+  personId,
+  personName,
+  initialDate = "2026-09-01",
+}: RoleDashboardLayoutProps) {
   const [isNavigationCollapsed, setIsNavigationCollapsed] = useState(false);
-  const [memberView, setMemberView] = useState<MemberView>('my-work');
+  const [activeDate, setActiveDate] = useState(initialDate);
+  const [memberView, setMemberView] = useState<MemberView>("my-work");
   const ToggleIcon = isNavigationCollapsed
     ? IconLayoutSidebarLeftExpand
     : IconLayoutSidebarLeftCollapse;
@@ -69,17 +83,34 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
     <AppShell
       header={{ height: { base: 152, sm: 112, xl: 64 } }}
       navbar={{
-        width: isNavigationCollapsed ? collapsedNavbarWidth : expandedNavbarWidth,
-        breakpoint: 'sm',
+        width: isNavigationCollapsed
+          ? collapsedNavbarWidth
+          : expandedNavbarWidth,
+        breakpoint: "sm",
       }}
       padding={0}
     >
       <AppShell.Header className="app-header">
-        <Group className="app-header-content" px="lg" justify="space-between" wrap="wrap">
+        <Group
+          className="app-header-content"
+          px="lg"
+          justify="space-between"
+          wrap="wrap"
+        >
           <Group gap="sm" wrap="nowrap">
-            <Tooltip label={isNavigationCollapsed ? 'Expand navigation' : 'Collapse navigation'}>
+            <Tooltip
+              label={
+                isNavigationCollapsed
+                  ? "Expand navigation"
+                  : "Collapse navigation"
+              }
+            >
               <ActionIcon
-                aria-label={isNavigationCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+                aria-label={
+                  isNavigationCollapsed
+                    ? "Expand navigation"
+                    : "Collapse navigation"
+                }
                 aria-pressed={isNavigationCollapsed}
                 onClick={() => setIsNavigationCollapsed((current) => !current)}
                 size="lg"
@@ -97,7 +128,10 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
             </Box>
           </Group>
 
-          <TimeMachineBar />
+          <TimeMachineBar
+            activeDate={activeDate}
+            setActiveDate={setActiveDate}
+          />
 
           <Group gap="xs" wrap="nowrap">
             <Tooltip label="Search">
@@ -123,14 +157,24 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
       </AppShell.Header>
 
       <AppShell.Navbar
-        className={isNavigationCollapsed ? 'app-navbar app-navbar-collapsed' : 'app-navbar'}
+        className={
+          isNavigationCollapsed
+            ? "app-navbar app-navbar-collapsed"
+            : "app-navbar"
+        }
         p="md"
       >
-        <Stack gap="lg" h="100%" align={isNavigationCollapsed ? 'center' : 'stretch'}>
+        <Stack
+          gap="lg"
+          h="100%"
+          align={isNavigationCollapsed ? "center" : "stretch"}
+        >
           <Box className="sidebar-heading">
             {isNavigationCollapsed ? (
               <Tooltip label={`${config.roleLabel} workspace`} position="right">
-                <Badge className={roleToneClassNames[config.role]}>{config.roleLabel.charAt(0)}</Badge>
+                <Badge className={roleToneClassNames[config.role]}>
+                  {config.roleLabel.charAt(0)}
+                </Badge>
               </Tooltip>
             ) : (
               <>
@@ -148,18 +192,27 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
             <Stack gap={4} w="100%">
               {config.navigation.map((item) => {
                 const NavigationIcon = item.icon;
-                const isActive = config.role === 'member' ? item.memberView === memberView : item.active;
+                const isActive =
+                  config.role === "member"
+                    ? item.memberView === memberView
+                    : item.active;
                 const navItem = (
                   <UnstyledButton
                     aria-label={item.label}
-                    aria-current={isActive ? 'page' : undefined}
+                    aria-current={isActive ? "page" : undefined}
                     onClick={() => {
                       if (item.memberView) setMemberView(item.memberView);
                     }}
-                    className={isActive ? 'nav-item nav-item-active' : 'nav-item'}
+                    className={
+                      isActive ? "nav-item nav-item-active" : "nav-item"
+                    }
                     key={item.label}
                   >
-                    <Group gap="sm" justify={isNavigationCollapsed ? 'center' : 'flex-start'} wrap="nowrap">
+                    <Group
+                      gap="sm"
+                      justify={isNavigationCollapsed ? "center" : "flex-start"}
+                      wrap="nowrap"
+                    >
                       <NavigationIcon size={18} />
                       {!isNavigationCollapsed && (
                         <Text size="sm" fw={600}>
@@ -184,83 +237,108 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
       </AppShell.Navbar>
 
       <AppShell.Main className="app-main">
-         {config.role === 'member' ? (
-    <MemberPage activeView={memberView} onViewChange={setMemberView} />
-  ) : (
-    
-  
-        <Stack gap="xl" className="dashboard-shell">
-          <Group justify="space-between" align="flex-start" gap="lg">
-            <Box maw={760}>
-              <Badge className={roleToneClassNames[config.role]}>{config.roleLabel}</Badge>
-              {config.title && (
-                <Title order={1} mt="sm">
-                  {config.title}
-                </Title>
-              )}
-              {config.subtitle && (
-                <Text c="dimmed" mt={6}>
-                  {config.subtitle}
-                </Text>
-              )}
-            </Box>
-
-            {config.primaryActions.length > 0 && (
-              <Group gap="xs">
-                {config.primaryActions.map((action) => {
-                  const ActionIconComponent = action.icon;
-
-                  return (
-                    <Button key={action.label} leftSection={<ActionIconComponent size={16} />}>
-                      {action.label}
-                    </Button>
-                  );
-                })}
-              </Group>
-            )}
-          </Group>
-
-          {config.metrics.length > 0 && (
-            <SimpleGrid cols={{ base: 1, xs: 2, lg: 4 }} spacing="md">
-              {config.metrics.map((metric) => (
-                <Card className="metric-card" key={metric.label}>
-                  <Group justify="space-between" align="flex-start" wrap="nowrap">
-                    <Box>
-                      <Text size="xs" fw={700} c="dimmed" tt="uppercase">
-                        {metric.label}
-                      </Text>
-                      <Text className="metric-value">{metric.value}</Text>
-                    </Box>
-                    <span className={`metric-dot ${toneClassNames[metric.tone]}`} />
-                  </Group>
-                  <Text size="sm" c="dimmed" mt="sm">
-                    {metric.trend}
+        {config.role === "member" ? (
+          <MemberPage
+            personId={personId}
+            personName={personName}
+            date={activeDate}
+            activeView={memberView}
+            onViewChange={setMemberView}
+          />
+        ) : (
+          <Stack gap="xl" className="dashboard-shell">
+            <Group justify="space-between" align="flex-start" gap="lg">
+              <Box maw={760}>
+                <Badge className={roleToneClassNames[config.role]}>
+                  {config.roleLabel}
+                </Badge>
+                {config.title && (
+                  <Title order={1} mt="sm">
+                    {config.title}
+                  </Title>
+                )}
+                {config.subtitle && (
+                  <Text c="dimmed" mt={6}>
+                    {config.subtitle}
                   </Text>
-                </Card>
-              ))}
-            </SimpleGrid>
-          )}
+                )}
+              </Box>
 
-          {panels.length > 0 && (
-            <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
-              {panels.map((panel) => (
-                <DashboardPanel key={panel.title} panel={panel} />
-              ))}
-            </SimpleGrid>
-          )}
-        </Stack>
+              {config.primaryActions.length > 0 && (
+                <Group gap="xs">
+                  {config.primaryActions.map((action) => {
+                    const ActionIconComponent = action.icon;
+
+                    return (
+                      <Button
+                        key={action.label}
+                        leftSection={<ActionIconComponent size={16} />}
+                      >
+                        {action.label}
+                      </Button>
+                    );
+                  })}
+                </Group>
+              )}
+            </Group>
+
+            {config.metrics.length > 0 && (
+              <SimpleGrid cols={{ base: 1, xs: 2, lg: 4 }} spacing="md">
+                {config.metrics.map((metric) => (
+                  <Card className="metric-card" key={metric.label}>
+                    <Group
+                      justify="space-between"
+                      align="flex-start"
+                      wrap="nowrap"
+                    >
+                      <Box>
+                        <Text size="xs" fw={700} c="dimmed" tt="uppercase">
+                          {metric.label}
+                        </Text>
+                        <Text className="metric-value">{metric.value}</Text>
+                      </Box>
+                      <span
+                        className={`metric-dot ${toneClassNames[metric.tone]}`}
+                      />
+                    </Group>
+                    <Text size="sm" c="dimmed" mt="sm">
+                      {metric.trend}
+                    </Text>
+                  </Card>
+                ))}
+              </SimpleGrid>
+            )}
+
+            {panels.length > 0 && (
+              <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
+                {panels.map((panel) => (
+                  <DashboardPanel key={panel.title} panel={panel} />
+                ))}
+              </SimpleGrid>
+            )}
+          </Stack>
         )}
       </AppShell.Main>
     </AppShell>
   );
 }
 
-function TimeMachineBar() {
-  const [activeDate, setActiveDate] = useState('2026-09-01');
-  const readableDate = useMemo(() => dayjs(activeDate).format('ddd, MMM D, YYYY'), [activeDate]);
+function TimeMachineBar({
+  activeDate,
+  setActiveDate,
+}: {
+  activeDate: string;
+  setActiveDate: React.Dispatch<React.SetStateAction<string>>;
+}) {
+  const readableDate = useMemo(
+    () => dayjs(activeDate).format("ddd, MMM D, YYYY"),
+    [activeDate],
+  );
 
   const shiftDate = (days: number) => {
-    setActiveDate((currentDate) => dayjs(currentDate).add(days, 'day').format('YYYY-MM-DD'));
+    setActiveDate((currentDate) =>
+      dayjs(currentDate).add(days, "day").format("YYYY-MM-DD"),
+    );
   };
 
   return (
@@ -276,15 +354,27 @@ function TimeMachineBar() {
       </Group>
 
       <Tooltip label="Move back one day">
-        <ActionIcon aria-label="Move time machine back one day" onClick={() => shiftDate(-1)} size="sm">
+        <ActionIcon
+          aria-label="Move time machine back one day"
+          onClick={() => shiftDate(-1)}
+          size="sm"
+        >
           <IconChevronLeft size={17} />
         </ActionIcon>
       </Tooltip>
 
-      <Button className="time-machine-step" onClick={() => shiftDate(1)} rightSection={<IconChevronRight size={15} />}>
+      <Button
+        className="time-machine-step"
+        onClick={() => shiftDate(1)}
+        rightSection={<IconChevronRight size={15} />}
+      >
         +1 Day
       </Button>
-      <Button className="time-machine-step" onClick={() => shiftDate(7)} rightSection={<IconChevronsRight size={15} />}>
+      <Button
+        className="time-machine-step"
+        onClick={() => shiftDate(7)}
+        rightSection={<IconChevronsRight size={15} />}
+      >
         +1 Week
       </Button>
 
