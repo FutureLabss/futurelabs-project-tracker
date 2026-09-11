@@ -1,27 +1,21 @@
-export default function AcceptedDeliverables() {
-  const deliverables = [
-    {
-      name: "OAuth2 Authorization Server Config",
-      project: "Identity & Access Engine (IAM v2)",
-      complexity: "HIGH (3 PTS)",
-      complexityColor: "text-fuchsia-500 border-fuchsia-400",
-      acceptedOn: "8/18/2026",
-    },
-    {
-      name: "Audit Log DynamoDB Exporter",
-      project: "Identity & Access Engine (IAM v2)",
-      complexity: "MID (2 PTS)",
-      complexityColor: "text-blue-500 border-blue-400",
-      acceptedOn: "8/28/2026",
-    },
-  ];
+import { initialAcceptedDeliverables } from '../../../data/mockData';
+import { AcceptedDeliverable } from '../../../types/dashboard';
 
+interface AcceptedDeliverablesProps {
+  deliverables?: AcceptedDeliverable[];
+  onSelectDeliverable?: (item: AcceptedDeliverable) => void;
+}
+
+export default function AcceptedDeliverables({
+  deliverables = initialAcceptedDeliverables,
+  onSelectDeliverable,
+}: AcceptedDeliverablesProps) {
   return (
     <section className="rounded-lg border border-gray-200 bg-white shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-5">
         <h2 className="text-base font-bold text-gray-900">
-          Accepted Deliverables Track Record (2)
+          Accepted Deliverables Track Record ({deliverables.length})
         </h2>
 
         <p className="text-xs text-gray-400">
@@ -60,7 +54,8 @@ export default function AcceptedDeliverables() {
             {deliverables.map((deliverable) => (
               <tr
                 key={deliverable.name}
-                className="cursor-pointer border-b border-gray-200 last:border-b-0 hover:bg-gray-50"
+                onClick={() => onSelectDeliverable?.(deliverable)}
+                className="cursor-pointer border-b border-gray-200 last:border-b-0 hover:bg-gray-50 transition-colors"
               >
                 {/* Deliverable */}
                 <td className="px-2 py-3">
@@ -100,6 +95,13 @@ export default function AcceptedDeliverables() {
                 </td>
               </tr>
             ))}
+            {deliverables.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-6 text-center text-sm text-gray-400">
+                  No accepted deliverables recorded yet.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

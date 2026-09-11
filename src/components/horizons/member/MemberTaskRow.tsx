@@ -1,51 +1,49 @@
-"use client";
-
-import { Eye, TriangleAlert } from "lucide-react";
-import type { MemberTask } from "./memberMockData";
+import React from 'react';
+import { Eye, TriangleAlert } from 'lucide-react';
+import { MemberTask } from './memberMockData';
 
 interface MemberTaskRowProps {
+  key?: React.Key;
   task: MemberTask;
+  onInspect?: (task: MemberTask) => void;
 }
 
-function complexityClasses(complexity: MemberTask["complexity"]) {
+function complexityClasses(complexity: MemberTask['complexity']) {
   switch (complexity) {
-    case "LOW":
-      return "border-[#10b98a] bg-[#f5fffc] text-[#08a67d]";
-
-    case "MID":
-      return "border-[#168cf0] bg-[#f7fbff] text-[#168cf0]";
-
-    case "HIGH":
-      return "border-[#d849ef] bg-[#fff8ff] text-[#c93ae4]";
-
+    case 'LOW':
+      return 'border-[#10b98a] bg-[#f5fffc] text-[#08a67d]';
+    case 'MID':
+      return 'border-[#168cf0] bg-[#f7fbff] text-[#168cf0]';
+    case 'HIGH':
+      return 'border-[#d849ef] bg-[#fff8ff] text-[#c93ae4]';
     default:
-      return "";
+      return '';
   }
 }
 
-function statusClasses(status: MemberTask["status"]) {
+function statusClasses(status: MemberTask['status']) {
   switch (status) {
-    case "NOT STARTED":
-      return "bg-slate-100 text-slate-400";
-
-    case "IN PROGRESS":
-      return "bg-[#eaf5ff] text-[#2087dc]";
-
-    case "BLOCKED":
-      return "bg-[#fff0f0] text-[#ff4b4b]";
-
+    case 'NOT STARTED':
+      return 'bg-slate-100 text-slate-400';
+    case 'IN PROGRESS':
+      return 'bg-[#eaf5ff] text-[#2087dc]';
+    case 'BLOCKED':
+      return 'bg-[#fff0f0] text-[#ff4b4b]';
     default:
-      return "";
+      return '';
   }
 }
 
-export default function MemberTaskRow({ task }: MemberTaskRowProps) {
+export default function MemberTaskRow({ task, onInspect }: MemberTaskRowProps) {
   return (
-    <tr className="border-b border-slate-200 last:border-b-0">
+    <tr
+      onClick={() => onInspect?.(task)}
+      className="cursor-pointer border-b border-slate-200 last:border-b-0 hover:bg-slate-50/80 transition-colors"
+    >
       {/* Task */}
       <td className="min-w-[360px] px-3 py-4 align-middle">
         <div>
-          <p className="text-[16px] font-semibold text-slate-900">
+          <p className="text-[16px] font-semibold text-slate-900 hover:text-[#08b486] transition-colors">
             {task.title}
           </p>
 
@@ -57,7 +55,7 @@ export default function MemberTaskRow({ task }: MemberTaskRowProps) {
 
       {/* Assigned Teammate */}
       <td className="min-w-[180px] px-3 py-4 align-middle">
-        {task.assignee === "UNASSIGNED" ? (
+        {task.assignee === 'UNASSIGNED' ? (
           <span className="inline-flex items-center rounded-[5px] border border-slate-300 bg-white px-2 py-1 text-[11px] font-bold text-slate-500">
             <span className="mr-1.5 h-[6px] w-[6px] rounded-full bg-slate-400" />
             UNASSIGNED
@@ -95,7 +93,7 @@ export default function MemberTaskRow({ task }: MemberTaskRowProps) {
             task.complexity
           )}`}
         >
-          {task.complexity} ({task.points} PT{task.points > 1 ? "S" : ""})
+          {task.complexity} ({task.points} PT{task.points > 1 ? 'S' : ''})
         </span>
       </td>
 
@@ -104,7 +102,7 @@ export default function MemberTaskRow({ task }: MemberTaskRowProps) {
         <div className="flex items-center gap-2">
           <span
             className={`text-[14px] font-semibold ${
-              task.overdue ? "text-[#ff4141]" : "text-slate-700"
+              task.overdue ? 'text-[#ff4141]' : 'text-slate-700'
             }`}
           >
             {task.dueDate}
@@ -129,7 +127,7 @@ export default function MemberTaskRow({ task }: MemberTaskRowProps) {
             {task.status}
           </span>
 
-          {task.status === "BLOCKED" && (
+          {task.status === 'BLOCKED' && (
             <span className="inline-flex items-center gap-1 rounded-[5px] bg-[#ffe8e8] px-2 py-1 text-[10px] font-bold text-[#ff4c4c]">
               <TriangleAlert size={11} />
               BLOCKED

@@ -1,48 +1,61 @@
-"use client";
-
+import React from 'react';
 import {
   ClipboardList,
   Flame,
   Clock3,
   Trophy,
-} from "lucide-react";
+} from 'lucide-react';
 
-const summaryCards = [
-  {
-    title: "ACTIVE TASKS",
-    value: "4",
-    description: "In queue",
-    icon: ClipboardList,
-    iconBg: "bg-[#e8f4ff]",
-    iconColor: "text-[#1597f5]",
-  },
-  {
-    title: "SIZE-WEIGHTED LOAD",
-    value: "9 pts",
-    description: "Complexity sum (1/2/3)",
-    icon: Flame,
-    iconBg: "bg-[#f8eaff]",
-    iconColor: "text-[#ca48e8]",
-  },
-  {
-    title: "OVERDUE TASKS",
-    value: "4",
-    description: "Action needed",
-    icon: Clock3,
-    iconBg: "bg-[#ffe9e9]",
-    iconColor: "text-[#ff4c4c]",
-  },
-  {
-    title: "ACCEPTED THIS MONTH",
-    value: "0",
-    description: "0 complexity pts",
-    icon: Trophy,
-    iconBg: "bg-[#e6f8f2]",
-    iconColor: "text-[#10b98a]",
-  },
-];
+interface MemberSummaryCardsProps {
+  activeCount?: number;
+  sizeWeightedPoints?: number;
+  overdueCount?: number;
+  acceptedMonthCount?: number;
+  acceptedMonthPoints?: number;
+}
 
-export default function MemberSummaryCards() {
+export default function MemberSummaryCards({
+  activeCount = 4,
+  sizeWeightedPoints = 9,
+  overdueCount = 4,
+  acceptedMonthCount = 0,
+  acceptedMonthPoints = 0,
+}: MemberSummaryCardsProps) {
+  const summaryCards = [
+    {
+      title: 'ACTIVE TASKS',
+      value: activeCount.toString(),
+      description: 'In queue',
+      icon: ClipboardList,
+      iconBg: 'bg-[#e8f4ff]',
+      iconColor: 'text-[#1597f5]',
+    },
+    {
+      title: 'SIZE-WEIGHTED LOAD',
+      value: `${sizeWeightedPoints} pts`,
+      description: 'Complexity sum (1/2/3)',
+      icon: Flame,
+      iconBg: 'bg-[#f8eaff]',
+      iconColor: 'text-[#ca48e8]',
+    },
+    {
+      title: 'OVERDUE TASKS',
+      value: overdueCount.toString(),
+      description: 'Action needed',
+      icon: Clock3,
+      iconBg: 'bg-[#ffe9e9]',
+      iconColor: 'text-[#ff4c4c]',
+    },
+    {
+      title: 'ACCEPTED THIS MONTH',
+      value: acceptedMonthCount.toString(),
+      description: `${acceptedMonthPoints} complexity pts`,
+      icon: Trophy,
+      iconBg: 'bg-[#e6f8f2]',
+      iconColor: 'text-[#10b98a]',
+    },
+  ];
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {summaryCards.map((card) => {
@@ -54,7 +67,7 @@ export default function MemberSummaryCards() {
             className="relative min-h-[130px] rounded-[10px] border border-slate-200 bg-white px-5 py-5 shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
           >
             <div className="pr-14">
-              <p className="text-[13px] font-medium tracking-[0.2px] text-slate-500">
+              <p className="text-[13px] font-medium tracking-[0.2px] text-slate-500 uppercase">
                 {card.title}
               </p>
 

@@ -1,10 +1,22 @@
-"use client";
+import React, { useState } from 'react';
+import { Eye, UsersRound } from 'lucide-react';
+import MemberTaskFilters from './MemberTaskFilters';
+import MemberTaskTable from './MemberTaskTable';
+import { MemberTask } from './memberMockData';
 
-import { Eye, UsersRound } from "lucide-react";
-import MemberTaskFilters from "./MemberTaskFilters";
-import MemberTaskTable from "./MemberTaskTable";
+interface MemberTaskSectionProps {
+  tasks: MemberTask[];
+  onInspect?: (task: MemberTask) => void;
+}
 
-export default function MemberTaskSection() {
+export default function MemberTaskSection({ tasks, onInspect }: MemberTaskSectionProps) {
+  const [selectedProject, setSelectedProject] = useState('all');
+
+  const filteredTasks =
+    selectedProject === 'all'
+      ? tasks
+      : tasks.filter((t) => t.project === selectedProject);
+
   return (
     <section className="rounded-[10px] border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
       {/* Section Header */}
@@ -21,7 +33,7 @@ export default function MemberTaskSection() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-[18px] font-bold text-slate-950">
-                Teammates&apos; Tasks &amp; Shared Work (4)
+                Teammates&apos; Tasks &amp; Shared Work ({filteredTasks.length})
               </h2>
 
               <span className="inline-flex items-center gap-1.5 rounded-[5px] bg-[#e9f5ff] px-2 py-1 text-[10px] font-bold tracking-wide text-[#2187dd]">
@@ -37,12 +49,15 @@ export default function MemberTaskSection() {
           </div>
         </div>
 
-        <MemberTaskFilters />
+        <MemberTaskFilters
+          selectedProject={selectedProject}
+          onProjectChange={setSelectedProject}
+        />
       </div>
 
       {/* Table */}
       <div className="mt-6">
-        <MemberTaskTable />
+        <MemberTaskTable tasks={filteredTasks} onInspect={onInspect} />
       </div>
     </section>
   );

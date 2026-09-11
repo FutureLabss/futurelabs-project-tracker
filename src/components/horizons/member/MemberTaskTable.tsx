@@ -1,9 +1,13 @@
-"use client";
+import React from 'react';
+import MemberTaskRow from './MemberTaskRow';
+import { MemberTask } from './memberMockData';
 
-import { memberTasks } from "./memberMockData";
-import MemberTaskRow from "./MemberTaskRow";
+interface MemberTaskTableProps {
+  tasks: MemberTask[];
+  onInspect?: (task: MemberTask) => void;
+}
 
-export default function MemberTaskTable() {
+export default function MemberTaskTable({ tasks, onInspect }: MemberTaskTableProps) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[1350px] border-collapse">
@@ -40,9 +44,16 @@ export default function MemberTaskTable() {
         </thead>
 
         <tbody>
-          {memberTasks.map((task) => (
-            <MemberTaskRow key={task.id} task={task} />
+          {tasks.map((task) => (
+            <MemberTaskRow key={task.id} task={task} onInspect={onInspect} />
           ))}
+          {tasks.length === 0 && (
+            <tr>
+              <td colSpan={7} className="py-8 text-center text-slate-400">
+                No teammate tasks match the selected filter.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
