@@ -144,3 +144,83 @@ test("demo reset restores seed without touching other applications storage", asy
   assert.equal((await taskService.getTaskById("task-1")).status, "in_progress");
   assert.equal(values.get("fl_tracker_tasks"), "reference project data");
 });
+
+test("admin project membership persists, blocks unsafe removal, and closes only finished projects", async () => {
+  const { projectService, taskService, reportingService, storage } = setup();
+  const project = await projectService.createProject({
+    name: "Admin test",
+    goal: "Deliver",
+    startDate: "2026-09-01",
+    targetDate: "2026-10-01",
+    managerId: "p-david",
+    actorId: "p-sarah",
+  });
+  await assert.rejects(
+    projectService.setProjectMember(project.id, "p-alex", true, "p-alex"),
+    /Administrator/,
+  );
+  await projectService.setProjectMember(project.id, "p-alex", true, "p-sarah");
+  const task = await taskService.createTask({
+    projectId: project.id,
+    title: "Delivery",
+    description: "",
+    assigneeId: "p-alex",
+    complexity: "low",
+    origin: "planned",
+    dueDate: "2026-09-20",
+    actorId: "p-sarah",
+  });
+  await assert.rejects(
+    projectService.closeProject(project.id, "p-sarah"),
+    /open tasks/,
+  );
+  await assert.rejects(
+    projectService.setProjectMember(project.id, "p-alex", false, "p-sarah"),
+    /Reassign/,
+  );
+  await taskService.updateTaskStatus(task.id, "cancelled", "p-sarah");
+  await projectService.setProjectMember(project.id, "p-alex", false, "p-sarah");
+  await projectService.closeProject(project.id, "p-sarah");
+  const reloaded = createTrackerServices(new MockLocalStorageApi(storage));
+  assert.equal(
+    (await reloaded.projectService.getProjectById(project.id)).state,
+    "closed",
+  );
+  assert.ok(
+    !(await reloaded.projectService.getProjectMembers()).some(
+      (m) => m.projectId === project.id,
+    ),
+  );
+  assert.ok(
+    (await reportingService.getLedger({ subjectId: project.id })).some(
+      (r) => r.type === "project_closed",
+    ),
+  );
+});
+
+test("reporting excludes acceptance after the chosen reporting date", async () => {
+  const { taskService, reportingService } = setup();
+  const before = await reportingService.getDerivedSignals("2026-09-01");
+  await taskService.submitTask("task-1", "p-alex", "Ready");
+  await taskService.acceptTask("task-1", "p-david");
+  const after = await reportingService.getDerivedSignals("2026-09-01");
+  assert.equal(
+    after.orgMetrics.acceptedThroughput30d,
+    before.orgMetrics.acceptedThroughput30d,
+  );
+  assert.equal(
+    after.orgMetrics.acceptedThroughput6m,
+    before.orgMetrics.acceptedThroughput6m,
+  );
+});
+
+test("CSV export escapes content and neutralizes spreadsheet formulas", () => {
+  const { toCsv } = require("../src/components/horizons/admin/admin-utils.ts");
+  const csv = toCsv([
+    ["Plain", 'A "quote", comma', "=HYPERLINK(1)", "  +cmd", "line\nnext"],
+  ]);
+  assert.equal(
+    csv,
+    '"Plain","A ""quote"", comma","\'=HYPERLINK(1)","\'  +cmd","line\nnext"',
+  );
+});

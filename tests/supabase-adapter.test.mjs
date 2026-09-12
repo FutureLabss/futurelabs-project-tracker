@@ -176,3 +176,46 @@ test("missing details map to null and profile lookup maps the authenticated iden
   );
   assert.equal((await auth.getProfile("member-id")).name, "Member");
 });
+
+test("admin project service uses scoped RPC and never sends a caller identity", async () => {
+  const { ProjectService } = require("../src/services/project-service.ts");
+  const projectRow = {
+    id: "project-id",
+    name: "Project",
+    goal: "",
+    start_date: "2026-09-01",
+    target_date: "2026-09-30",
+    manager_id: null,
+    state: "closed",
+    created_at: "2026-09-01T00:00:00Z",
+  };
+  const { api, requests } = setup((request) =>
+    request.url.pathname.endsWith("/project_members")
+      ? json([{ project_id: "project-id", lms_user_id: "member-id" }])
+      : json(
+          request.body.operation === "close_project"
+            ? projectRow
+            : { included: true },
+        ),
+  );
+  const service = new ProjectService(api);
+  assert.deepEqual(await service.getProjectMembers(), [
+    { projectId: "project-id", personId: "member-id" },
+  ]);
+  await service.setProjectMember(
+    "project-id",
+    "member-id",
+    true,
+    "forged-admin",
+  );
+  assert.equal(
+    (await service.closeProject("project-id", "forged-admin")).state,
+    "closed",
+  );
+  for (const request of requests.slice(1)) {
+    assert.ok(request.url.pathname.endsWith("/rpc/tracker_admin_mutate"));
+    assert.ok(!JSON.stringify(request.body).includes("forged-admin"));
+  }
+  assert.equal(requests[1].body.operation, "set_project_member");
+  assert.equal(requests[2].body.operation, "close_project");
+});

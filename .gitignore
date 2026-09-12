@@ -48,3 +48,6 @@ Thumbs.db
 !.yarn/sdks
 !.yarn/versions
 node_modules/
+
+# Local browser verification artifacts
+/test-results/
