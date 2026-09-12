@@ -1,3 +1,4 @@
+import { TextEncoder } from "node:util";
 import { URL } from "node:url";
 import { Buffer } from "node:buffer";
 import assert from "node:assert/strict";
