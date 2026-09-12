@@ -1,10 +1,20 @@
-import { TablerIcon } from '@tabler/icons-react';
+import { TablerIcon } from "@tabler/icons-react";
 
-export type UserRole = 'member' | 'manager' | 'admin';
+export type UserRole = "member" | "manager" | "admin";
 
-export type MemberView = 'my-work' | 'team' | 'completed';
+export type AdminView =
+  | "portfolio"
+  | "analytics"
+  | "governance"
+  | "risks"
+  | "tasks"
+  | "people"
+  | "ledger";
 
-export type DashboardTone = 'teal' | 'blue' | 'orange' | 'red' | 'violet' | 'gray';
+export type MemberView = "my-work" | "team" | "completed";
+
+export type DashboardTone =
+  "teal" | "blue" | "orange" | "red" | "violet" | "gray";
 
 export interface Persona {
   id: string;
@@ -19,7 +29,7 @@ export interface DashboardMetric {
   label: string;
   value: string;
   trend: string;
-  tone: Exclude<DashboardTone, 'gray'>;
+  tone: Exclude<DashboardTone, "gray">;
 }
 
 export interface DashboardAction {
@@ -28,6 +38,7 @@ export interface DashboardAction {
 }
 
 export interface DashboardNavigationItem {
+  adminView?: AdminView;
   memberView?: MemberView;
   label: string;
   icon: TablerIcon;

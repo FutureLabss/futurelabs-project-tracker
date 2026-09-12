@@ -125,87 +125,24 @@ export const roleDashboards: Record<UserRole, DashboardLayoutConfig> = {
     role: "admin",
     roleLabel: "Admin",
     title: "Portfolio operations",
-    subtitle:
-      "Monitor delivery health, unmanaged work, and organization-level risk trends.",
+    subtitle: "",
     navigation: [
-      { label: "Portfolio", icon: IconReportAnalytics, active: true },
-      { label: "Health analytics", icon: IconChartBar },
-      { label: "Governance", icon: IconShieldCheck },
-      { label: "Org risks", icon: IconAlertTriangle },
+      {
+        label: "Portfolio",
+        icon: IconReportAnalytics,
+        adminView: "portfolio",
+        active: true,
+      },
+      { label: "Health analytics", icon: IconChartBar, adminView: "analytics" },
+      { label: "Governance", icon: IconShieldCheck, adminView: "governance" },
+      { label: "Org risks", icon: IconAlertTriangle, adminView: "risks" },
+      { label: "All tasks", icon: IconClipboardCheck, adminView: "tasks" },
+      { label: "Team directory", icon: IconUsers, adminView: "people" },
+      { label: "Activity ledger", icon: IconHistory, adminView: "ledger" },
     ],
-    metrics: [
-      {
-        label: "Active initiatives",
-        value: "12",
-        trend: "8 green - 3 amber - 1 red",
-        tone: "teal",
-      },
-      {
-        label: "Unmanaged projects",
-        value: "2",
-        trend: "Lead assignment needed",
-        tone: "red",
-      },
-      {
-        label: "Delivery confidence",
-        value: "74%",
-        trend: "-6% week over week",
-        tone: "orange",
-      },
-      {
-        label: "Review pass rate",
-        value: "88%",
-        trend: "+4% improvement",
-        tone: "blue",
-      },
-    ],
-    primaryActions: [
-      { label: "Assign leads", icon: IconUsers },
-      { label: "Export report", icon: IconReportAnalytics },
-    ],
-    focusPanel: {
-      title: "Portfolio risks",
-      description:
-        "Organization-level risks that require executive or governance action.",
-      items: [
-        {
-          title: "Mobile SDK Onboarding",
-          meta: "No manager assigned - Target Aug 28",
-          status: "Red",
-          tone: "red",
-        },
-        {
-          title: "Data Ingestion & Analytics Pipeline",
-          meta: "Aging WIP concentration in backend stream",
-          status: "Amber",
-          tone: "orange",
-        },
-        {
-          title: "Identity & Access Engine",
-          meta: "Blocked by external certificates",
-          status: "Amber",
-          tone: "orange",
-        },
-      ],
-    },
-    secondaryPanel: {
-      title: "Governance queue",
-      description:
-        "High-level controls and process signals for portfolio hygiene.",
-      items: [
-        {
-          title: "Manager coverage audit",
-          meta: "2 active projects lack designated leads",
-          status: "Action",
-          tone: "red",
-        },
-        {
-          title: "Acceptance gate trend",
-          meta: "Return rate stable under threshold",
-          status: "Healthy",
-          tone: "teal",
-        },
-      ],
-    },
+    metrics: [],
+    primaryActions: [],
+    focusPanel: { title: "", description: "", items: [] },
+    secondaryPanel: { title: "", description: "", items: [] },
   },
 };

@@ -27,13 +27,16 @@ import {
   IconSettings,
 } from "@tabler/icons-react";
 import dayjs from "dayjs";
+import { useMediaQuery } from "@mantine/hooks";
 import { useMemo, useState } from "react";
 import {
   DashboardLayoutConfig,
   DashboardPanel as DashboardPanelConfig,
   DashboardTone,
   MemberView,
+  AdminView,
 } from "../types/dashboard";
+import AdminDashboard from "./horizons/admin/AdminDashboard";
 import MemberPage from "./horizons/member/page";
 
 interface RoleDashboardLayoutProps {
@@ -70,9 +73,15 @@ export function RoleDashboardLayout({
   initialDate = "2026-09-01",
 }: RoleDashboardLayoutProps) {
   const [isNavigationCollapsed, setIsNavigationCollapsed] = useState(false);
+  const [mobileNavigationOpened, setMobileNavigationOpened] = useState(false);
+  const isMobile = useMediaQuery("(max-width: 47.99em)");
+  const navigationHidden = isMobile
+    ? !mobileNavigationOpened
+    : isNavigationCollapsed;
   const [activeDate, setActiveDate] = useState(initialDate);
+  const [adminView, setAdminView] = useState<AdminView>("portfolio");
   const [memberView, setMemberView] = useState<MemberView>("my-work");
-  const ToggleIcon = isNavigationCollapsed
+  const ToggleIcon = navigationHidden
     ? IconLayoutSidebarLeftExpand
     : IconLayoutSidebarLeftCollapse;
   const panels = [config.focusPanel, config.secondaryPanel].filter(
@@ -87,6 +96,7 @@ export function RoleDashboardLayout({
           ? collapsedNavbarWidth
           : expandedNavbarWidth,
         breakpoint: "sm",
+        collapsed: { mobile: !mobileNavigationOpened },
       }}
       padding={0}
     >
@@ -100,19 +110,19 @@ export function RoleDashboardLayout({
           <Group gap="sm" wrap="nowrap">
             <Tooltip
               label={
-                isNavigationCollapsed
-                  ? "Expand navigation"
-                  : "Collapse navigation"
+                navigationHidden ? "Expand navigation" : "Collapse navigation"
               }
             >
               <ActionIcon
                 aria-label={
-                  isNavigationCollapsed
-                    ? "Expand navigation"
-                    : "Collapse navigation"
+                  navigationHidden ? "Expand navigation" : "Collapse navigation"
                 }
-                aria-pressed={isNavigationCollapsed}
-                onClick={() => setIsNavigationCollapsed((current) => !current)}
+                aria-expanded={!navigationHidden}
+                onClick={() => {
+                  if (isMobile)
+                    setMobileNavigationOpened((current) => !current);
+                  else setIsNavigationCollapsed((current) => !current);
+                }}
                 size="lg"
               >
                 <ToggleIcon size={20} />
@@ -134,21 +144,25 @@ export function RoleDashboardLayout({
           />
 
           <Group gap="xs" wrap="nowrap">
-            <Tooltip label="Search">
-              <ActionIcon aria-label="Search" size="lg">
-                <IconSearch size={20} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Notifications">
-              <ActionIcon aria-label="Notifications" size="lg">
-                <IconBell size={20} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Settings">
-              <ActionIcon aria-label="Settings" size="lg">
-                <IconSettings size={20} />
-              </ActionIcon>
-            </Tooltip>
+            {config.role !== "admin" && (
+              <>
+                <Tooltip label="Search">
+                  <ActionIcon aria-label="Search" size="lg">
+                    <IconSearch size={20} />
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label="Notifications">
+                  <ActionIcon aria-label="Notifications" size="lg">
+                    <IconBell size={20} />
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label="Settings">
+                  <ActionIcon aria-label="Settings" size="lg">
+                    <IconSettings size={20} />
+                  </ActionIcon>
+                </Tooltip>
+              </>
+            )}
             <Button variant="light" onClick={onLogout}>
               Sign out
             </Button>
@@ -195,13 +209,17 @@ export function RoleDashboardLayout({
                 const isActive =
                   config.role === "member"
                     ? item.memberView === memberView
-                    : item.active;
+                    : config.role === "admin"
+                      ? item.adminView === adminView
+                      : item.active;
                 const navItem = (
                   <UnstyledButton
                     aria-label={item.label}
                     aria-current={isActive ? "page" : undefined}
                     onClick={() => {
                       if (item.memberView) setMemberView(item.memberView);
+                      if (item.adminView) setAdminView(item.adminView);
+                      setMobileNavigationOpened(false);
                     }}
                     className={
                       isActive ? "nav-item nav-item-active" : "nav-item"
@@ -237,7 +255,14 @@ export function RoleDashboardLayout({
       </AppShell.Navbar>
 
       <AppShell.Main className="app-main">
-        {config.role === "member" ? (
+        {config.role === "admin" ? (
+          <AdminDashboard
+            actorId={personId}
+            date={activeDate}
+            view={adminView}
+            onViewChange={setAdminView}
+          />
+        ) : config.role === "member" ? (
           <MemberPage
             personId={personId}
             personName={personName}
