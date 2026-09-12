@@ -18,6 +18,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 export type ProfileRow = {
+  status: "active" | "inactive";
   id: string;
   name: string;
   email: string;
@@ -92,6 +93,19 @@ export type Database = {
   public: {
     Tables: {
       profiles: Table<ProfileRow>;
+      tracker_auth_links: Table<{
+        auth_user_id: string;
+        profile_id: string;
+        created_at: string;
+      }>;
+      project_members: Table<{ project_id: string; lms_user_id: string }>;
+      tracker_sessions: Table<{
+        id: string;
+        lms_user_id: string;
+        expires_at: string;
+        revoked_at: string | null;
+        created_at: string;
+      }>;
       projects: Table<ProjectRow>;
       tasks: Table<TaskRow>;
       blockers: Table<BlockerRow>;
@@ -100,6 +114,11 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      tracker_admin_mutate: {
+        Args: { operation: string; payload: Json };
+        Returns: Json;
+      };
+      tracker_logout: { Args: Record<string, never>; Returns: undefined };
       tracker_mutate: {
         Args: { operation: string; payload: Json };
         Returns: Json;

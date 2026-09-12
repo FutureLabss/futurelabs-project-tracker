@@ -1,4 +1,5 @@
--- Single-organization tracker. Access requires a provisioned Auth user/profile.
+-- Initial schema. Apply ALL migrations in filename order before provisioning accounts.
+-- Later migrations replace the legacy Auth trigger with explicit dual-login account links.
 create schema if not exists private;
 revoke all on schema private from public;
 grant usage on schema private to authenticated;
@@ -112,7 +113,7 @@ declare table_name text;
 begin
   foreach table_name in array array['profiles', 'projects', 'tasks', 'blockers', 'availability', 'ledger_records'] loop
     execute format('alter table public.%I enable row level security', table_name);
-    execute format('revoke all on public.%I from anon, authenticated', table_name);
+    execute format('revoke all on public.%I from public, anon, authenticated', table_name);
     execute format('grant select on public.%I to authenticated', table_name);
     execute format('create policy tracker_member_read on public.%I for select to authenticated using ((select private.is_tracker_member()))', table_name);
   end loop;
