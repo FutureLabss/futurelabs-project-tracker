@@ -13,7 +13,6 @@ comment on column public.profiles.id is 'Stable Tracker profile UUID; existing L
 -- function uses service_role to resolve profiles and create application sessions.
 grant usage on schema public to service_role;
 grant select on public.profiles to service_role;
-ccccccp
 -- Supabase may grant new functions directly to API roles via default privileges.
 -- Revoking PUBLIC alone does not remove those direct grants. Only the two RLS
 -- predicates need to be callable; business helpers must remain behind the RPCs.
