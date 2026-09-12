@@ -1,4 +1,5 @@
 export const STORAGE_KEYS = {
+  PROJECT_MEMBERS: "futurelabs_tracker_v1_project_members",
   PERSONS: "futurelabs_tracker_v1_persons",
   PROJECTS: "futurelabs_tracker_v1_projects",
   TASKS: "futurelabs_tracker_v1_tasks",

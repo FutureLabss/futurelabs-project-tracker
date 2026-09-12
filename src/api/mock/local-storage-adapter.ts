@@ -15,6 +15,112 @@ import { getInitialSeedDataset } from "../../domain/seed/initial-dataset";
 import { calculateOperationalSignals } from "../../domain/calculations/derived-signals";
 
 export class MockLocalStorageApi implements ITrackerApi {
+  async getProjectMembers(): Promise<
+    import("../../entities/project-member.entity").ProjectMember[]
+  > {
+    this.ensureInitialized();
+    const stored = this.storage.getItem(STORAGE_KEYS.PROJECT_MEMBERS);
+    if (stored) return JSON.parse(stored);
+    const rows = this.getCollection<Task>(STORAGE_KEYS.TASKS)
+      .filter((t) => t.assigneeId)
+      .map((t) => ({ projectId: t.projectId, personId: t.assigneeId! }));
+    const unique = [
+      ...new Map(
+        rows.map((row) => [`${row.projectId}:${row.personId}`, row]),
+      ).values(),
+    ];
+    this.setCollection(STORAGE_KEYS.PROJECT_MEMBERS, unique);
+    return unique;
+  }
+  private requireAdmin(actorId: string) {
+    if (
+      !this.getCollection<Person>(STORAGE_KEYS.PERSONS).some(
+        (p) => p.id === actorId && p.role === "admin",
+      )
+    )
+      throw new Error("Administrator access is required.");
+  }
+  async setProjectMember(
+    projectId: string,
+    personId: string,
+    included: boolean,
+    actorId: string,
+  ): Promise<void> {
+    this.requireAdmin(actorId);
+    const project = await this.getProjectById(projectId);
+    if (!project || project.state !== "active")
+      throw new Error("An active project is required.");
+    if (
+      !this.getCollection<Person>(STORAGE_KEYS.PERSONS).some(
+        (p) => p.id === personId && (!included || p.status !== "inactive"),
+      )
+    )
+      throw new Error("Select an active person.");
+    const tasks = this.getCollection<Task>(STORAGE_KEYS.TASKS).filter(
+      (t) => t.projectId === projectId,
+    );
+    if (
+      !included &&
+      (tasks.some(
+        (t) =>
+          t.assigneeId === personId &&
+          !["accepted", "cancelled"].includes(t.status),
+      ) ||
+        this.getCollection<Blocker>(STORAGE_KEYS.BLOCKERS).some(
+          (b) =>
+            b.ownerId === personId &&
+            !b.clearedAt &&
+            tasks.some((t) => t.id === b.taskId),
+        ))
+    )
+      throw new Error(
+        "Reassign open tasks and resolve owned blockers before removing access.",
+      );
+    const rows = (await this.getProjectMembers()).filter(
+      (m) => m.projectId !== projectId || m.personId !== personId,
+    );
+    if (included) rows.push({ projectId, personId });
+    this.setCollection(STORAGE_KEYS.PROJECT_MEMBERS, rows);
+    this.appendLedgerRecord({
+      subjectId: projectId,
+      subjectType: "project",
+      actorId,
+      type: included ? "project_member_added" : "project_member_removed",
+      fromValue: included ? null : personId,
+      toValue: included ? personId : null,
+      reason: "Project access updated",
+    });
+  }
+  async closeProject(projectId: string, actorId: string): Promise<Project> {
+    this.requireAdmin(actorId);
+    const projects = this.getCollection<Project>(STORAGE_KEYS.PROJECTS);
+    const project = projects.find((p) => p.id === projectId);
+    if (!project || project.state !== "active")
+      throw new Error("An active project is required.");
+    if (
+      this.getCollection<Task>(STORAGE_KEYS.TASKS).some(
+        (t) =>
+          t.projectId === projectId &&
+          !["accepted", "cancelled"].includes(t.status),
+      )
+    )
+      throw new Error(
+        "Accept or cancel all open tasks before closing this project.",
+      );
+    project.state = "closed";
+    this.setCollection(STORAGE_KEYS.PROJECTS, projects);
+    this.appendLedgerRecord({
+      subjectId: projectId,
+      subjectType: "project",
+      actorId,
+      type: "project_closed",
+      fromValue: "active",
+      toValue: "closed",
+      reason: "Project completed",
+    });
+    return project;
+  }
+
   constructor(
     private readonly storageOverride?: Pick<Storage, "getItem" | "setItem">,
   ) {}
@@ -41,6 +147,19 @@ export class MockLocalStorageApi implements ITrackerApi {
 
   private resetStorageToSeed(): void {
     const seed = getInitialSeedDataset();
+    this.storage.setItem(
+      STORAGE_KEYS.PROJECT_MEMBERS,
+      JSON.stringify([
+        ...new Map(
+          seed.tasks
+            .filter((t) => t.assigneeId)
+            .map((t) => [
+              `${t.projectId}:${t.assigneeId}`,
+              { projectId: t.projectId, personId: t.assigneeId! },
+            ]),
+        ).values(),
+      ]),
+    );
     this.storage.setItem(STORAGE_KEYS.PERSONS, JSON.stringify(seed.persons));
     this.storage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(seed.projects));
     this.storage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(seed.tasks));

@@ -411,13 +411,15 @@ export function calculateOperationalSignals(
     (t) =>
       t.status === "accepted" &&
       t.acceptedAt &&
-      dayjs(t.acceptedAt).isSameOrAfter(window30d),
+      dayjs(t.acceptedAt).isSameOrAfter(window30d) &&
+      !dayjs(t.acceptedAt).isAfter(simDay, "day"),
   );
   const accepted6m = tasks.filter(
     (t) =>
       t.status === "accepted" &&
       t.acceptedAt &&
-      dayjs(t.acceptedAt).isSameOrAfter(window6m),
+      dayjs(t.acceptedAt).isSameOrAfter(window6m) &&
+      !dayjs(t.acceptedAt).isAfter(simDay, "day"),
   );
 
   const acceptedWeight30d = accepted30d.reduce(

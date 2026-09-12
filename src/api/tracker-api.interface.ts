@@ -11,6 +11,16 @@ import { CreateProjectDto } from "../dtos/create-project.dto";
 import { RecordLeaveDto } from "../dtos/record-leave.dto";
 
 export interface ITrackerApi {
+  getProjectMembers(): Promise<
+    import("../entities/project-member.entity").ProjectMember[]
+  >;
+  setProjectMember(
+    projectId: string,
+    personId: string,
+    included: boolean,
+    actorId: string,
+  ): Promise<void>;
+  closeProject(projectId: string, actorId: string): Promise<Project>;
   // Projects
   getProjects(): Promise<Project[]>;
   getProjectById(id: string): Promise<Project | null>;

@@ -19,6 +19,40 @@ import { calculateOperationalSignals } from "../../domain/calculations/derived-s
 
 export class SupabaseTrackerApi implements ITrackerApi {
   constructor(private readonly client: SupabaseClient<Database>) {}
+  async getProjectMembers() {
+    return (
+      await this.all((from, to) =>
+        this.client
+          .from("project_members")
+          .select("*")
+          .order("project_id")
+          .order("lms_user_id")
+          .range(from, to),
+      )
+    ).map((row) => ({ projectId: row.project_id, personId: row.lms_user_id }));
+  }
+  async setProjectMember(
+    projectId: string,
+    personId: string,
+    included: boolean,
+    _actorId: string,
+  ) {
+    const { error } = await this.client.rpc("tracker_admin_mutate", {
+      operation: "set_project_member",
+      payload: { project_id: projectId, person_id: personId, included },
+    });
+    if (error) throw new Error(error.message);
+  }
+  async closeProject(projectId: string, _actorId: string) {
+    const { data, error } = await this.client.rpc("tracker_admin_mutate", {
+      operation: "close_project",
+      payload: { project_id: projectId },
+    });
+    if (error) throw new Error(error.message);
+    if (!data || typeof data !== "object" || Array.isArray(data))
+      throw new Error("No project returned.");
+    return mapProject(data as ProjectRow);
+  }
 
   private async all<T>(
     fetchPage: (

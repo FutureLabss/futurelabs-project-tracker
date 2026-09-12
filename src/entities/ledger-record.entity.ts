@@ -1,6 +1,8 @@
 export type LedgerSubjectType = "project" | "task" | "blocker" | "availability";
 
 export type LedgerChangeType =
+  | "project_member_added"
+  | "project_member_removed"
   | "project_created"
   | "project_closed"
   | "manager_assigned"
