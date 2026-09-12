@@ -24,3 +24,6 @@ enable_signup = false
 [auth.email]
 enable_signup = false
 enable_confirmations = true
+
+[functions.consume-project-tracker-sso]
+verify_jwt = false

@@ -5,6 +5,7 @@ export interface Person {
   name: string;
   email: string;
   role: UserRole;
+  status?: "active" | "inactive";
   avatarUrl?: string;
   title?: string;
 }

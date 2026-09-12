@@ -17,6 +17,7 @@ export const mapProfile = (r: ProfileRow): Person => ({
   name: r.name,
   email: r.email,
   role: r.role,
+  status: r.status,
   avatarUrl: r.avatar_url ?? undefined,
   title: r.title ?? undefined,
 });

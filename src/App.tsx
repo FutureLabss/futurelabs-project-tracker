@@ -1,3 +1,4 @@
+import { Alert } from "@mantine/core";
 import { useState } from "react";
 import { LoginScreen } from "./components/LoginScreen";
 import { RoleDashboardLayout } from "./components/RoleDashboardLayout";
@@ -9,6 +10,16 @@ import { backendConfig } from "./lib/supabase/client";
 import { SupabaseApp } from "./app/SupabaseApp";
 
 export function App() {
+  if (
+    backendConfig.backend === "invalid" ||
+    (window.location.pathname === "/auth/callback" &&
+      backendConfig.backend !== "supabase")
+  )
+    return (
+      <Alert color="red" m="lg">
+        Project Tracker sign-in is not configured. Contact your administrator.
+      </Alert>
+    );
   return backendConfig.backend === "supabase" ? <SupabaseApp /> : <DemoApp />;
 }
 

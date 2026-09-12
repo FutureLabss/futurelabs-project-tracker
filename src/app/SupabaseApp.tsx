@@ -2,8 +2,7 @@ import dayjs from "dayjs";
 import { useState } from "react";
 import { Alert, Button, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
-import { AuthService } from "../services/auth-service";
-import { supabase } from "../lib/supabase/client";
+import { authService } from "../services";
 import { SupabaseLoginScreen } from "../features/auth/SupabaseLoginScreen";
 import { useSupabaseSession } from "../features/auth/use-supabase-session";
 import { RoleDashboardLayout } from "../components/RoleDashboardLayout";
@@ -11,8 +10,8 @@ import { roleDashboards } from "../data/dashboard-layouts";
 
 export function SupabaseApp() {
   const [auth] = useState(() => {
-    if (!supabase) throw new Error("Supabase is not configured.");
-    return new AuthService(supabase);
+    if (!authService) throw new Error("Supabase is not configured.");
+    return authService;
   });
   const { session, pending, error } = useSupabaseSession(auth);
   const [logoutError, setLogoutError] = useState("");
@@ -20,6 +19,7 @@ export function SupabaseApp() {
     queryKey: ["auth-profile", session?.user.id],
     queryFn: () => auth.getProfile(session!.user.id),
     enabled: Boolean(session),
+    refetchInterval: 30_000,
   });
   async function logout() {
     setLogoutError("");
@@ -34,14 +34,19 @@ export function SupabaseApp() {
   if (pending)
     return (
       <Text p="lg" role="status">
-        Restoring your session...
+        Signing you into Project Tracker...
       </Text>
     );
   if (!session)
     return (
       <>
-        <SupabaseLoginScreen auth={auth} />
+        <SupabaseLoginScreen
+          onSignIn={(email, password) =>
+            auth.signInWithPassword(email, password)
+          }
+        />
         {error && <Alert color="red">{error.message}</Alert>}
+        {logoutError && <Alert color="red">{logoutError}</Alert>}
       </>
     );
   if (profile.isError)
