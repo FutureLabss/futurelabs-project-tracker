@@ -28,14 +28,9 @@ import {
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
-import { AcceptedDeliverable, DashboardLayoutConfig, DashboardPanel as DashboardPanelConfig, DashboardTone, LeaveRecord, MemberTask, MemberView, PersonalTask } from '../types/dashboard';
-import MemberPage from './horizons/member/Memberpage';
-import TaskInspectorDrawer from './horizons/member/Modals/TaskInspectorDrawer';
-import RescheduleModal from './horizons/member/Modals/RescheduleModal';
-import RecordLeaveModal from './horizons/member/Modals/RecordLeaveModal';
-import CreateTaskModal from './horizons/member/Modals/CreateTaskModal';
-import { CheckCircle2 } from 'lucide-react';
-import { initialAcceptedDeliverables, initialPersonalTasks, memberTasks } from '../data/mockData';
+import {  DashboardLayoutConfig, DashboardPanel as DashboardPanelConfig, DashboardTone,  MemberView, } from '../types/dashboard';
+
+import MemberDashboard from './horizons/member/MemberDashboard';
 
 interface RoleDashboardLayoutProps {
   config: DashboardLayoutConfig;
@@ -72,384 +67,384 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
 
   );
 
-  const [activeView, setActiveView] = useState<MemberView>('my-work');
-  const [currentDate, setCurrentDate] = useState('2026-09-01');
+  // const [activeView, setActiveView] = useState<MemberView>('my-work');
+  // const [currentDate, setCurrentDate] = useState('2026-09-01');
 
-  // Datasets
-  const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>(
-    JSON.parse(JSON.stringify(initialPersonalTasks))
-  );
-  const [teamTasks, setTeamTasks] = useState<MemberTask[]>(
-    JSON.parse(JSON.stringify(memberTasks))
-  );
-  const [acceptedDeliverables, setAcceptedDeliverables] = useState<
-    AcceptedDeliverable[]
-  >(JSON.parse(JSON.stringify(initialAcceptedDeliverables)));
-  const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
+  // // Datasets
+  // const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>(
+  //   JSON.parse(JSON.stringify(initialPersonalTasks))
+  // );
+  // const [teamTasks, setTeamTasks] = useState<MemberTask[]>(
+  //   JSON.parse(JSON.stringify(memberTasks))
+  // );
+  // const [acceptedDeliverables, setAcceptedDeliverables] = useState<
+  //   AcceptedDeliverable[]
+  // >(JSON.parse(JSON.stringify(initialAcceptedDeliverables)));
+  // const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
 
-  // Modals & Drawers state
-  const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
-  const [isRecordLeaveOpen, setIsRecordLeaveOpen] = useState(false);
-  const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
-  const [taskToReschedule, setTaskToReschedule] = useState<PersonalTask | null>(
-    null
-  );
-  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<PersonalTask | null>(null);
+  // // Modals & Drawers state
+  // const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
+  // const [isRecordLeaveOpen, setIsRecordLeaveOpen] = useState(false);
+  // const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
+  // const [taskToReschedule, setTaskToReschedule] = useState<PersonalTask | null>(
+  //   null
+  // );
+  // const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+  // const [selectedTask, setSelectedTask] = useState<PersonalTask | null>(null);
 
-  // Toast Notification
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // // Toast Notification
+  // const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage((prev) => (prev === msg ? null : prev));
-    }, 3500);
-  };
+  // const showToast = (msg: string) => {
+  //   setToastMessage(msg);
+  //   setTimeout(() => {
+  //     setToastMessage((prev) => (prev === msg ? null : prev));
+  //   }, 3500);
+  // };
 
  
   
 
-  // Dynamically evaluate overdue status based on current Time Machine date
-  const processedPersonalTasks = useMemo(() => {
-    return personalTasks.map((task) => {
-      const isOverdue =
-        task.status !== 'ACCEPTED' &&
-        task.dueDate < currentDate;
-      return {
-        ...task,
-        overdue: isOverdue,
-      };
-    });
-  }, [personalTasks, currentDate]);
+  // // Dynamically evaluate overdue status based on current Time Machine date
+  // const processedPersonalTasks = useMemo(() => {
+  //   return personalTasks.map((task) => {
+  //     const isOverdue =
+  //       task.status !== 'ACCEPTED' &&
+  //       task.dueDate < currentDate;
+  //     return {
+  //       ...task,
+  //       overdue: isOverdue,
+  //     };
+  //   });
+  // }, [personalTasks, currentDate]);
 
-  // Statistics calculation
-  const activeTasks = processedPersonalTasks.filter(
-    (t) => t.status !== 'ACCEPTED'
-  );
-  const activeCount = activeTasks.length;
-  const sizeWeightedPoints = activeTasks.reduce(
-    (sum, t) => sum + (t.points || 0),
-    0
-  );
-  const overdueCount = activeTasks.filter((t) => t.overdue).length;
+  // // Statistics calculation
+  // const activeTasks = processedPersonalTasks.filter(
+  //   (t) => t.status !== 'ACCEPTED'
+  // );
+  // const activeCount = activeTasks.length;
+  // const sizeWeightedPoints = activeTasks.reduce(
+  //   (sum, t) => sum + (t.points || 0),
+  //   0
+  // );
+  // const overdueCount = activeTasks.filter((t) => t.overdue).length;
 
-  // Accepted in the current simulation month
-  const currentMonthPrefix = currentDate.slice(0, 7); // e.g. "2026-09"
-  const acceptedMonthTasks = processedPersonalTasks.filter(
-    (t) => t.status === 'ACCEPTED' && t.acceptedAt?.startsWith(currentMonthPrefix)
-  );
-  const acceptedMonthCount = acceptedMonthTasks.length;
-  const acceptedMonthPoints = acceptedMonthTasks.reduce(
-    (sum, t) => sum + (t.points || 0),
-    0
-  );
+  // // Accepted in the current simulation month
+  // const currentMonthPrefix = currentDate.slice(0, 7); // e.g. "2026-09"
+  // const acceptedMonthTasks = processedPersonalTasks.filter(
+  //   (t) => t.status === 'ACCEPTED' && t.acceptedAt?.startsWith(currentMonthPrefix)
+  // );
+  // const acceptedMonthCount = acceptedMonthTasks.length;
+  // const acceptedMonthPoints = acceptedMonthTasks.reduce(
+  //   (sum, t) => sum + (t.points || 0),
+  //   0
+  // );
 
-  // Handlers
-  const handleCreateTask = (
-    taskData: Omit<PersonalTask, 'id' | 'slips' | 'events' | 'createdAt'>
-  ) => {
-    const newId = `task-${Date.now().toString().slice(-4)}`;
-    const nowTimestamp = new Date().toLocaleString('en-US', {
-      month: 'numeric',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    });
+  // // Handlers
+  // const handleCreateTask = (
+  //   taskData: Omit<PersonalTask, 'id' | 'slips' | 'events' | 'createdAt'>
+  // ) => {
+  //   const newId = `task-${Date.now().toString().slice(-4)}`;
+  //   const nowTimestamp = new Date().toLocaleString('en-US', {
+  //     month: 'numeric',
+  //     day: 'numeric',
+  //     year: 'numeric',
+  //     hour: 'numeric',
+  //     minute: '2-digit',
+  //     second: '2-digit',
+  //     hour12: true,
+  //   });
 
-    const newTask: PersonalTask = {
-      ...taskData,
-      id: newId,
-      createdAt: nowTimestamp,
-      slips: [],
-      events: [
-        {
-          id: `ev-${Date.now()}`,
-          type: 'init',
-          title: 'Task Initialized',
-          author: 'ALEX CHEN',
-          timestamp: nowTimestamp,
-          note:
-            taskData.origin === 'UNPLANNED'
-              ? 'Note: High-priority unplanned triage task'
-              : undefined,
-        },
-      ],
-    };
+  //   const newTask: PersonalTask = {
+  //     ...taskData,
+  //     id: newId,
+  //     createdAt: nowTimestamp,
+  //     slips: [],
+  //     events: [
+  //       {
+  //         id: `ev-${Date.now()}`,
+  //         type: 'init',
+  //         title: 'Task Initialized',
+  //         author: 'ALEX CHEN',
+  //         timestamp: nowTimestamp,
+  //         note:
+  //           taskData.origin === 'UNPLANNED'
+  //             ? 'Note: High-priority unplanned triage task'
+  //             : undefined,
+  //       },
+  //     ],
+  //   };
 
-    setPersonalTasks((prev) => [newTask, ...prev]);
-    showToast(`Created task: ${newTask.title}`);
-  };
+  //   setPersonalTasks((prev) => [newTask, ...prev]);
+  //   showToast(`Created task: ${newTask.title}`);
+  // };
 
-  const handleRecordLeave = (
-    leaveData: Omit<LeaveRecord, 'id' | 'createdAt'>
-  ) => {
-    const newRecord: LeaveRecord = {
-      ...leaveData,
-      id: `leave-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-    };
-    setLeaves((prev) => [newRecord, ...prev]);
-    showToast(
-      `Leave recorded for ${leaveData.member} (${leaveData.fromDate} to ${leaveData.toDate})`
-    );
-  };
+  // const handleRecordLeave = (
+  //   leaveData: Omit<LeaveRecord, 'id' | 'createdAt'>
+  // ) => {
+  //   const newRecord: LeaveRecord = {
+  //     ...leaveData,
+  //     id: `leave-${Date.now()}`,
+  //     createdAt: new Date().toISOString(),
+  //   };
+  //   setLeaves((prev) => [newRecord, ...prev]);
+  //   showToast(
+  //     `Leave recorded for ${leaveData.member} (${leaveData.fromDate} to ${leaveData.toDate})`
+  //   );
+  // };
 
-  const handleOpenReschedule = (task: PersonalTask) => {
-    setTaskToReschedule(task);
-    setIsRescheduleOpen(true);
-  };
+  // const handleOpenReschedule = (task: PersonalTask) => {
+  //   setTaskToReschedule(task);
+  //   setIsRescheduleOpen(true);
+  // };
 
-  const handleConfirmReschedule = (
-    taskId: string,
-    newDate: string,
-    reason: string
-  ) => {
-    const nowTimestamp = new Date().toLocaleString('en-US', {
-      month: 'numeric',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    });
+  // const handleConfirmReschedule = (
+  //   taskId: string,
+  //   newDate: string,
+  //   reason: string
+  // ) => {
+  //   const nowTimestamp = new Date().toLocaleString('en-US', {
+  //     month: 'numeric',
+  //     day: 'numeric',
+  //     year: 'numeric',
+  //     hour: 'numeric',
+  //     minute: '2-digit',
+  //     second: '2-digit',
+  //     hour12: true,
+  //   });
 
-    const slip = {
-      id: `slip-${Date.now()}`,
-      oldDate: selectedTask?.dueDate || newDate,
-      newDate,
-      reason,
-      author: 'Alex Chen',
-      timestamp: nowTimestamp,
-    };
+  //   const slip = {
+  //     id: `slip-${Date.now()}`,
+  //     oldDate: selectedTask?.dueDate || newDate,
+  //     newDate,
+  //     reason,
+  //     author: 'Alex Chen',
+  //     timestamp: nowTimestamp,
+  //   };
 
-    const event = {
-      id: `ev-${Date.now()}`,
-      type: 'reschedule' as const,
-      title: 'Schedule Revised',
-      author: 'ALEX CHEN',
-      timestamp: nowTimestamp,
-      note: `Due date rescheduled to ${newDate}. Reason: ${reason}`,
-    };
+  //   const event = {
+  //     id: `ev-${Date.now()}`,
+  //     type: 'reschedule' as const,
+  //     title: 'Schedule Revised',
+  //     author: 'ALEX CHEN',
+  //     timestamp: nowTimestamp,
+  //     note: `Due date rescheduled to ${newDate}. Reason: ${reason}`,
+  //   };
 
-    // Update personalTasks if matching
-    setPersonalTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === taskId) {
-          const updated = {
-            ...t,
-            dueDate: newDate,
-            slips: [slip, ...t.slips],
-            events: [event, ...t.events],
-          };
+  //   // Update personalTasks if matching
+  //   setPersonalTasks((prev) =>
+  //     prev.map((t) => {
+  //       if (t.id === taskId) {
+  //         const updated = {
+  //           ...t,
+  //           dueDate: newDate,
+  //           slips: [slip, ...t.slips],
+  //           events: [event, ...t.events],
+  //         };
 
-          if (selectedTask?.id === taskId) {
-            setSelectedTask(updated);
-          }
+  //         if (selectedTask?.id === taskId) {
+  //           setSelectedTask(updated);
+  //         }
 
-          return updated;
-        }
-        return t;
-      })
-    );
+  //         return updated;
+  //       }
+  //       return t;
+  //     })
+  //   );
 
-    // Also update acceptedDeliverables if an accepted task was rescheduled
-    setAcceptedDeliverables((prev) =>
-      prev.map((item) => {
-        if (item.taskData && item.taskData.id === taskId) {
-          const updatedTaskData = {
-            ...item.taskData,
-            dueDate: newDate,
-            slips: [slip, ...item.taskData.slips],
-            events: [event, ...item.taskData.events],
-          };
-          if (selectedTask?.id === taskId) {
-            setSelectedTask(updatedTaskData);
-          }
-          return {
-            ...item,
-            taskData: updatedTaskData,
-          };
-        }
-        return item;
-      })
-    );
+  //   // Also update acceptedDeliverables if an accepted task was rescheduled
+  //   setAcceptedDeliverables((prev) =>
+  //     prev.map((item) => {
+  //       if (item.taskData && item.taskData.id === taskId) {
+  //         const updatedTaskData = {
+  //           ...item.taskData,
+  //           dueDate: newDate,
+  //           slips: [slip, ...item.taskData.slips],
+  //           events: [event, ...item.taskData.events],
+  //         };
+  //         if (selectedTask?.id === taskId) {
+  //           setSelectedTask(updatedTaskData);
+  //         }
+  //         return {
+  //           ...item,
+  //           taskData: updatedTaskData,
+  //         };
+  //       }
+  //       return item;
+  //     })
+  //   );
 
-    showToast('Schedule slip recorded to immutable audit ledger.');
-  };
+  //   showToast('Schedule slip recorded to immutable audit ledger.');
+  // };
 
-  const handleSubmitForGate = (taskId: string) => {
-    const nowTimestamp = new Date().toLocaleString('en-US', {
-      month: 'numeric',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    });
+  // const handleSubmitForGate = (taskId: string) => {
+  //   const nowTimestamp = new Date().toLocaleString('en-US', {
+  //     month: 'numeric',
+  //     day: 'numeric',
+  //     year: 'numeric',
+  //     hour: 'numeric',
+  //     minute: '2-digit',
+  //     second: '2-digit',
+  //     hour12: true,
+  //   });
 
-    setPersonalTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === taskId) {
-          const event = {
-            id: `ev-${Date.now()}`,
-            type: 'submit' as const,
-            title: 'Submitted for Acceptance Gate',
-            author: 'ALEX CHEN',
-            timestamp: nowTimestamp,
-            note: 'PR ready for peer code review and security acceptance gate',
-          };
+  //   setPersonalTasks((prev) =>
+  //     prev.map((t) => {
+  //       if (t.id === taskId) {
+  //         const event = {
+  //           id: `ev-${Date.now()}`,
+  //           type: 'submit' as const,
+  //           title: 'Submitted for Acceptance Gate',
+  //           author: 'ALEX CHEN',
+  //           timestamp: nowTimestamp,
+  //           note: 'PR ready for peer code review and security acceptance gate',
+  //         };
 
-          const updated = {
-            ...t,
-            status: 'SUBMITTED' as const,
-            events: [event, ...t.events],
-          };
+  //         const updated = {
+  //           ...t,
+  //           status: 'SUBMITTED' as const,
+  //           events: [event, ...t.events],
+  //         };
 
-          if (selectedTask?.id === taskId) {
-            setSelectedTask(updated);
-          }
+  //         if (selectedTask?.id === taskId) {
+  //           setSelectedTask(updated);
+  //         }
 
-          return updated;
-        }
-        return t;
-      })
-    );
+  //         return updated;
+  //       }
+  //       return t;
+  //     })
+  //   );
 
-    showToast('Task submitted for Acceptance Gate review.');
-  };
+  //   showToast('Task submitted for Acceptance Gate review.');
+  // };
 
-  const handleToggleBlocker = (taskId: string) => {
-    const nowTimestamp = new Date().toLocaleString('en-US', {
-      month: 'numeric',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    });
+  // const handleToggleBlocker = (taskId: string) => {
+  //   const nowTimestamp = new Date().toLocaleString('en-US', {
+  //     month: 'numeric',
+  //     day: 'numeric',
+  //     year: 'numeric',
+  //     hour: 'numeric',
+  //     minute: '2-digit',
+  //     second: '2-digit',
+  //     hour12: true,
+  //   });
 
-    setPersonalTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === taskId) {
-          const isCurrentlyBlocked = t.status === 'BLOCKED';
-          const newStatus = isCurrentlyBlocked ? 'IN PROGRESS' : 'BLOCKED';
+  //   setPersonalTasks((prev) =>
+  //     prev.map((t) => {
+  //       if (t.id === taskId) {
+  //         const isCurrentlyBlocked = t.status === 'BLOCKED';
+  //         const newStatus = isCurrentlyBlocked ? 'IN PROGRESS' : 'BLOCKED';
 
-          const event = {
-            id: `ev-${Date.now()}`,
-            type: isCurrentlyBlocked ? ('unblocked' as const) : ('blocked' as const),
-            title: isCurrentlyBlocked ? 'Blocker Cleared' : 'Blocker Raised',
-            author: 'ALEX CHEN',
-            timestamp: nowTimestamp,
-            note: isCurrentlyBlocked
-              ? 'External dependency resolved'
-              : 'Blocked on external dependency or review bottleneck',
-          };
+  //         const event = {
+  //           id: `ev-${Date.now()}`,
+  //           type: isCurrentlyBlocked ? ('unblocked' as const) : ('blocked' as const),
+  //           title: isCurrentlyBlocked ? 'Blocker Cleared' : 'Blocker Raised',
+  //           author: 'ALEX CHEN',
+  //           timestamp: nowTimestamp,
+  //           note: isCurrentlyBlocked
+  //             ? 'External dependency resolved'
+  //             : 'Blocked on external dependency or review bottleneck',
+  //         };
 
-          const updated = {
-            ...t,
-            status: newStatus as PersonalTask['status'],
-            events: [event, ...t.events],
-          };
+  //         const updated = {
+  //           ...t,
+  //           status: newStatus as PersonalTask['status'],
+  //           events: [event, ...t.events],
+  //         };
 
-          if (selectedTask?.id === taskId) {
-            setSelectedTask(updated);
-          }
+  //         if (selectedTask?.id === taskId) {
+  //           setSelectedTask(updated);
+  //         }
 
-          return updated;
-        }
-        return t;
-      })
-    );
+  //         return updated;
+  //       }
+  //       return t;
+  //     })
+  //   );
 
-    showToast('Task blocker status updated.');
-  };
+  //   showToast('Task blocker status updated.');
+  // };
 
-  const handleSelectTask = (task: PersonalTask) => {
-    setSelectedTask(task);
-    setIsInspectorOpen(true);
-  };
+  // const handleSelectTask = (task: PersonalTask) => {
+  //   setSelectedTask(task);
+  //   setIsInspectorOpen(true);
+  // };
 
-  const handleInspectTeamTask = (t: MemberTask) => {
-    // Adapt team task into inspector view format
-    const adapted: PersonalTask = {
-      id: `TASK-${t.id}`,
-      title: t.title,
-      description: t.description,
-      project: t.project,
-      complexity: t.complexity,
-      points: t.points,
-      dueDate: t.dueDate,
-      status: t.status,
-      origin: 'PLANNED',
-      assignee: t.assignee,
-      assigneeInitial: t.assigneeInitial || '?',
-      assigneeRole: t.assigneeRole || 'member',
-      createdAt: '8/20/2026, 10:00:00 AM',
-      wipDays: 3,
-      wipMaxDays: t.points * 3,
-      slips: [],
-      events: [
-        {
-          id: 'ev-team-1',
-          type: 'init',
-          title: 'Task Initialized',
-          author: t.assignee.toUpperCase(),
-          timestamp: '8/20/2026, 10:00:00 AM',
-        },
-      ],
-    };
-    setSelectedTask(adapted);
-    setIsInspectorOpen(true);
-  };
+  // const handleInspectTeamTask = (t: MemberTask) => {
+  //   // Adapt team task into inspector view format
+  //   const adapted: PersonalTask = {
+  //     id: `TASK-${t.id}`,
+  //     title: t.title,
+  //     description: t.description,
+  //     project: t.project,
+  //     complexity: t.complexity,
+  //     points: t.points,
+  //     dueDate: t.dueDate,
+  //     status: t.status,
+  //     origin: 'PLANNED',
+  //     assignee: t.assignee,
+  //     assigneeInitial: t.assigneeInitial || '?',
+  //     assigneeRole: t.assigneeRole || 'member',
+  //     createdAt: '8/20/2026, 10:00:00 AM',
+  //     wipDays: 3,
+  //     wipMaxDays: t.points * 3,
+  //     slips: [],
+  //     events: [
+  //       {
+  //         id: 'ev-team-1',
+  //         type: 'init',
+  //         title: 'Task Initialized',
+  //         author: t.assignee.toUpperCase(),
+  //         timestamp: '8/20/2026, 10:00:00 AM',
+  //       },
+  //     ],
+  //   };
+  //   setSelectedTask(adapted);
+  //   setIsInspectorOpen(true);
+  // };
 
-  const handleSelectDeliverable = (deliverable: AcceptedDeliverable) => {
-    if (deliverable.taskData) {
-      setSelectedTask(deliverable.taskData);
-      setIsInspectorOpen(true);
-    } else {
-      // Fallback if taskData not populated
-      const fallbackTask: PersonalTask = {
-        id: deliverable.id || 'TASK-HIST-1',
-        title: deliverable.name,
-        description: 'Verified deliverable with review sign-off.',
-        project: deliverable.project,
-        complexity: deliverable.complexity.includes('HIGH')
-          ? 'HIGH'
-          : deliverable.complexity.includes('LOW')
-          ? 'LOW'
-          : 'MID',
-        points: deliverable.points || 2,
-        dueDate: deliverable.acceptedOn,
-        status: 'ACCEPTED',
-        origin: 'PLANNED',
-        overdue: false,
-        assignee: 'Alex Chen (You)',
-        assigneeInitial: 'A',
-        createdAt: '8/10/2026, 10:00:00 AM',
-        slips: [],
-        events: [
-          {
-            id: 'ev-hist-fall',
-            type: 'accepted',
-            title: 'Deliverable Accepted',
-            author: 'DAVID KIM',
-            timestamp: `${deliverable.acceptedOn}, 11:00:00 AM`,
-            transition: 'submitted → accepted',
-            note: 'Note: Passed review verification gate',
-          },
-        ],
-      };
-      setSelectedTask(fallbackTask);
-      setIsInspectorOpen(true);
-    }
-  };
+  // const handleSelectDeliverable = (deliverable: AcceptedDeliverable) => {
+  //   if (deliverable.taskData) {
+  //     setSelectedTask(deliverable.taskData);
+  //     setIsInspectorOpen(true);
+  //   } else {
+  //     // Fallback if taskData not populated
+  //     const fallbackTask: PersonalTask = {
+  //       id: deliverable.id || 'TASK-HIST-1',
+  //       title: deliverable.name,
+  //       description: 'Verified deliverable with review sign-off.',
+  //       project: deliverable.project,
+  //       complexity: deliverable.complexity.includes('HIGH')
+  //         ? 'HIGH'
+  //         : deliverable.complexity.includes('LOW')
+  //         ? 'LOW'
+  //         : 'MID',
+  //       points: deliverable.points || 2,
+  //       dueDate: deliverable.acceptedOn,
+  //       status: 'ACCEPTED',
+  //       origin: 'PLANNED',
+  //       overdue: false,
+  //       assignee: 'Alex Chen (You)',
+  //       assigneeInitial: 'A',
+  //       createdAt: '8/10/2026, 10:00:00 AM',
+  //       slips: [],
+  //       events: [
+  //         {
+  //           id: 'ev-hist-fall',
+  //           type: 'accepted',
+  //           title: 'Deliverable Accepted',
+  //           author: 'DAVID KIM',
+  //           timestamp: `${deliverable.acceptedOn}, 11:00:00 AM`,
+  //           transition: 'submitted → accepted',
+  //           note: 'Note: Passed review verification gate',
+  //         },
+  //       ],
+  //     };
+  //     setSelectedTask(fallbackTask);
+  //     setIsInspectorOpen(true);
+  //   }
+  // };
 
 
   return (
@@ -572,73 +567,8 @@ export function RoleDashboardLayout({ config, onLogout }: RoleDashboardLayoutPro
 
       <AppShell.Main className="app-main">
         {config.role === 'member' ? (
-          <>
-            <MemberPage
-              activeView={activeView}
-              onViewChange={setActiveView}
-              personalTasks={processedPersonalTasks}
-              teamTasks={teamTasks}
-              acceptedDeliverables={acceptedDeliverables}
-              onOpenRecordLeave={() => setIsRecordLeaveOpen(true)}
-              onOpenNewTask={() => setIsCreateTaskOpen(true)}
-              onSelectTask={handleSelectTask}
-              onSelectDeliverable={handleSelectDeliverable}
-              onInspectTeamTask={handleInspectTeamTask}
-              onSubmitForGate={handleSubmitForGate}
-              onToggleBlocker={handleToggleBlocker}
-              onOpenReschedule={handleOpenReschedule}
-              activeCount={activeCount}
-              sizeWeightedPoints={sizeWeightedPoints}
-              overdueCount={overdueCount}
-              acceptedMonthCount={acceptedMonthCount}
-              acceptedMonthPoints={acceptedMonthPoints}
-            />
+            <MemberDashboard />
 
-            {/* Modals & Drawers */}
-            <CreateTaskModal
-              isOpen={isCreateTaskOpen}
-              onClose={() => setIsCreateTaskOpen(false)}
-              onCreateTask={handleCreateTask}
-              currentDate={currentDate}
-            />
-
-            <RecordLeaveModal
-              isOpen={isRecordLeaveOpen}
-              onClose={() => setIsRecordLeaveOpen(false)}
-              onRecordLeave={handleRecordLeave}
-              defaultDate={currentDate}
-            />
-
-            <RescheduleModal
-              isOpen={isRescheduleOpen}
-              task={taskToReschedule}
-              onClose={() => {
-                setIsRescheduleOpen(false);
-                setTaskToReschedule(null);
-              }}
-              onConfirmReschedule={handleConfirmReschedule}
-            />
-
-            <TaskInspectorDrawer
-              isOpen={isInspectorOpen}
-              task={selectedTask}
-              onClose={() => {
-                setIsInspectorOpen(false);
-                setSelectedTask(null);
-              }}
-              onSubmitForGate={handleSubmitForGate}
-              onToggleBlocker={handleToggleBlocker}
-              onOpenReschedule={handleOpenReschedule}
-            />
-
-            {/* Toast Notification */}
-            {toastMessage && (
-              <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-xl transition-all">
-                <CheckCircle2 size={18} className="text-[#08b486]" />
-                <span>{toastMessage}</span>
-              </div>
-            )}
-          </>
         ) : (
     
   

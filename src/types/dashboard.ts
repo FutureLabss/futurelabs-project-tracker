@@ -66,12 +66,6 @@ export interface DashboardLayoutConfig {
 }
 
 
-export type TaskStatus =
-  | 'NOT STARTED'
-  | 'IN PROGRESS'
-  | 'BLOCKED'
-  | 'SUBMITTED'
-  | 'ACCEPTED';
 
 
 export interface ScheduleSlip {
@@ -107,56 +101,10 @@ export interface LifecycleEvent {
   note?: string;
 }
 
-export interface PersonalTask {
-  id: string;
-  title: string;
-  description: string;
-  project: string;
-  complexity: TaskComplexity;
-  points: number;
-  dueDate: string;
-  originalDueDate?: string;
-  status: TaskStatus;
-  origin: TaskOrigin;
-  overdue?: boolean;
-  acceptedAt?: string | null;
-  assignee: string;
-  assigneeInitial?: string;
-  assigneeRole?: string;
-  createdAt: string;
-  wipDays?: number;
-  wipMaxDays?: number;
-  slips: ScheduleSlip[];
-  events: LifecycleEvent[];
-  artifact?: DeliverableArtifact;
-}
 
-export interface MemberTask {
-  id: string;
-  title: string;
-  description: string;
-  assignee: string;
-  assigneeInitial?: string;
-  assigneeRole?: string;
-  project: string;
-  complexity: TaskComplexity;
-  points: number;
-  dueDate: string;
-  status: 'NOT STARTED' | 'IN PROGRESS' | 'BLOCKED';
-  overdue: boolean;
-  accessMode: 'INSPECT (READ-ONLY)';
-}
 
-export interface AcceptedDeliverable {
-  id: string;
-  name: string;
-  project: string;
-  complexity: string;
-  complexityColor: string;
-  acceptedOn: string;
-  points?: number;
-  taskData?: PersonalTask;
-}
+
+
 
 export interface LeaveRecord {
   id: string;
