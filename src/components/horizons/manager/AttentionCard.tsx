@@ -7,7 +7,7 @@ import {
   Clock,
 } from "lucide-react";
 
-import type { AttentionItem } from "../../../data/mockData";
+import type { AttentionItem  } from "../../../data/mockData";
 
 type AttentionCardProps = {
   item: AttentionItem;
