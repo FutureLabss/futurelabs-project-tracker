@@ -1,34 +1,68 @@
-import { Button, Text, Title } from "@mantine/core";
-import { IconCalendarOff, IconPlus } from "@tabler/icons-react";
+import { Button, Group, Stack, Text, Title } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import { IconCalendarEvent, IconPlus } from "@tabler/icons-react";
+import { CreateTaskModal } from "./CreateTaskModal";
+import { RecordLeaveModal } from "./RecordLeaveModal";
+import { MemberView } from "../../../types/dashboard";
 
-export default function MemberHeader({
-  name = "Alex Chen",
-}: {
-  name?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-      <div>
-        <Title order={1} size={26}>
-          {name} — Member Horizon (IC)
-        </Title>
-        <Text mt={4} size="sm" c="dimmed">
-          Personal execution queue, peer task visibility, and accomplishment
-          ledger
-        </Text>
-      </div>
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <Button
-          variant="default"
-          h={44}
-          leftSection={<IconCalendarOff size={17} stroke={1.8} />}
-        >
-          Record Leave / Out of Office
-        </Button>
-        <Button h={44} leftSection={<IconPlus size={19} stroke={2.2} />}>
-          New Task
-        </Button>
-      </div>
-    </div>
-  );
+interface MemberHeaderProps {
+  personName?: string;
+  personId: string;
+  memberView: MemberView;
+}
+
+export default function MemberHeader({ personName, personId, memberView }: MemberHeaderProps) {
+
+const [  createTaskOpened,{open: openCreateTask, close: closeCreateTask,},] = useDisclosure(false);
+const [ leaveOpened, {open: openLeave, close: closeLeave,},] = useDisclosure(false);
+
+    return(
+        <Group
+                justify="space-between"
+                align="flex-start"
+              >
+                <Stack gap={2}>
+                  <Title order={3}>
+                     {personName ?? 'Member'} — Member Horizon (IC)
+                  </Title>
+        
+                  <Text
+                    size="xs"
+                    c="dimmed"
+                  >
+                    Personal execution queue, peer task visibility,
+                    and accomplishment ledger
+                  </Text>
+                </Stack>
+        
+                <Group>
+                  {memberView !== 'completed' && (
+                    <Button
+                      variant="outline"
+                      color="gray"
+                      leftSection={
+                        <IconCalendarEvent size={16} />
+                      }
+                      onClick={openLeave}
+                    >
+                      Record Leave / Out of Office
+                    </Button>
+                  )}
+        
+                  {memberView === 'team' && (
+                    <Button
+                      color="teal"
+                      leftSection={
+                        <IconPlus size={16} />
+                      }
+                      onClick={openCreateTask}
+                    >
+                      New Task
+                    </Button>
+                  )}
+                  <CreateTaskModal opened={createTaskOpened} onClose={closeCreateTask} personId={personId} />
+                    <RecordLeaveModal opened={leaveOpened} onClose={closeLeave} />
+                </Group>
+              </Group>
+    )
 }
