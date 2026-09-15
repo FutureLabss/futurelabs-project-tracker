@@ -26,7 +26,11 @@ import {
 
 import type { PersonalTask } from '../../../types/memberpersonaltasks';
 import { personalTasks } from './MockData';
+import { useTasks } from '../../../api/hooks/use-tasks';
 
+interface personTaskTableProps {
+  personId:string;
+}
 
 const personalTaskColumns: TableColumn<PersonalTask>[] = [
   {
@@ -186,12 +190,30 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
     ),
   },
 ];
+export function PersonalTasksTable({personId}:personTaskTableProps) {
+// console.log('Member ID:', personId);
+const {data: tasks = [], isLoading, error} = useTasks({
+    assigneeId: personId,
+  });
 
-export function PersonalTasksTable() {
+  console.log('Member ID:', personId);
+  console.log('Tasks:', tasks);
+
+  if (isLoading) {
+    return <Text>Loading tasks...</Text>;
+  }
+
+  if (error) {
+    return (
+      <Text c="red">
+        Failed to load tasks.
+      </Text>
+    );
+  }
   return (
     <ReusableTable
       columns={personalTaskColumns}
-      data={personalTasks}
+      data={[]}
     />
   );
 }

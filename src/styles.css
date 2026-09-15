@@ -339,3 +339,19 @@ body {
   }
 }
 
+
+/* Keep operational labels readable in the horizontally scrollable portfolio. */
+.admin-portfolio-table th { white-space: nowrap; }
+.admin-portfolio-table td:first-child { min-width: 260px; max-width: 340px; }
+.admin-portfolio-table td:nth-child(2) { min-width: 140px; }
+.admin-portfolio-table td:nth-child(3) { min-width: 104px; white-space: nowrap; }
+.admin-portfolio-table td:nth-child(4) { min-width: 86px; }
+.admin-portfolio-table td:nth-child(7) { min-width: 140px; }
+.admin-portfolio-table .mantine-Badge-root { max-width: none; flex-shrink: 0; }
+@media (max-width: 767px) {
+  .time-machine-bar { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .time-machine-label { flex-basis: 100%; }
+  .time-machine-step, .time-machine-bar > .mantine-ActionIcon-root { display: none; }
+  .time-machine-input { width: 100%; }
+  .app-navbar { overflow-y: auto; }
+}

@@ -1,19 +1,19 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { MantineProvider } from '@mantine/core';
-import '@mantine/core/styles.css';
-import { App } from './App';
-import { appTheme } from './theme';
-import './styles.css';
-import './theme/index.css';
-const rootElement = document.getElementById('root');
+import React from "react";
+import ReactDOM from "react-dom/client";
+
+import "@mantine/core/styles.css";
+import { App } from "./App";
+import { AppProviders } from "./app/AppProviders";
+import "./styles.css";
+import "./theme/index.css";
+const rootElement = document.getElementById("root");
 
 if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
-      <MantineProvider theme={appTheme}>
+      <AppProviders>
         <App />
-      </MantineProvider>
-    </React.StrictMode>
+      </AppProviders>
+    </React.StrictMode>,
   );
 }
