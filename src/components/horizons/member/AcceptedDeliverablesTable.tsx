@@ -6,7 +6,8 @@ import {
 import { ComplexityBadge } from './TaskBadges';
 import { ReusableTable, TableColumn } from '../../Table/ReusableTable';
 import { AcceptedDeliverable } from '../../../types/accepteddeliverables';
-import { acceptedDeliverables } from './MockData';
+import { useTasks } from '../../../api/hooks/use-tasks';
+import { useProjects } from '../../../api/hooks/use-projects';
 
 const deliverableColumns: TableColumn<AcceptedDeliverable>[] = [
   {
@@ -84,11 +85,43 @@ const deliverableColumns: TableColumn<AcceptedDeliverable>[] = [
   },
 ];
 
-export function AcceptedDeliverablesTable() {
+interface AcceptedDeliverablesTableProps {
+  personId: string;
+}
+
+export function AcceptedDeliverablesTable({ personId }: AcceptedDeliverablesTableProps) {
+  const { data: tasks = [], isLoading: tasksLoading } = useTasks({
+    assigneeId: personId,
+    status: ['accepted']
+  });
+  const { data: projects = [] } = useProjects();
+
+  if (tasksLoading) {
+    return <Text>Loading accepted deliverables...</Text>;
+  }
+
+  const mappedDeliverables: AcceptedDeliverable[] = tasks.map((task) => {
+    const project = projects.find((p) => p.id === task.projectId);
+
+    let complexity: AcceptedDeliverable['complexity'] = 'LOW (1 PT)';
+    if (task.complexity === 'mid') complexity = 'MID (2 PTS)';
+    if (task.complexity === 'high') complexity = 'HIGH (3 PTS)';
+
+    const dateStr = task.acceptedAt ? new Date(task.acceptedAt).toLocaleDateString() : 'Unknown';
+
+    return {
+      id: task.id as any,
+      deliverable: task.title,
+      project: project?.name || 'Unknown Project',
+      complexity,
+      acceptedOn: dateStr,
+    };
+  });
+
   return (
     <ReusableTable
       columns={deliverableColumns}
-      data={acceptedDeliverables}
+      data={mappedDeliverables}
     />
   );
 }

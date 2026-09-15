@@ -12,6 +12,10 @@ import {
   Controller,
   useForm,
 } from 'react-hook-form';
+import { useCreateTask } from '../../../api/hooks/use-tasks';
+import { useProjects } from '../../../api/hooks/use-projects';
+import { usePersons } from '../../../api/hooks/use-availability';
+import { TaskComplexity, TaskOrigin } from '../../../entities/task.entity';
 import { ReusableModal } from '../../modal/ReuseableModal';
 
 
@@ -28,12 +32,18 @@ type CreateTaskFormValues = {
 type CreateTaskModalProps = {
   opened: boolean;
   onClose: () => void;
+  personId: string;
 };
 
 export function CreateTaskModal({
   opened,
   onClose,
+  personId,
 }: CreateTaskModalProps) {
+  const { data: projects = [] } = useProjects();
+  const { data: persons = [] } = usePersons();
+  const createTaskMutation = useCreateTask();
+
   const {
     control,
     handleSubmit,
@@ -45,12 +55,12 @@ export function CreateTaskModal({
     mode: 'onChange',
 
     defaultValues: {
-      project: 'mobile-sdk',
+      project: '',
       title: '',
       description: '',
-      assignee: 'alex',
-      complexity: 'mid',
-      taskOrigin: 'planned',
+      assignee: '',
+      complexity: 'MID',
+      taskOrigin: 'PLANNED',
       dueDate: null,
     },
   });
@@ -58,18 +68,30 @@ export function CreateTaskModal({
   const handleCreateTask = (
     values: CreateTaskFormValues,
   ) => {
-    console.log('Creating task:', values);
+    if (!values.dueDate) return;
 
-    // Later your API mutation will go here.
-
-    reset();
-
-    onClose();
+    createTaskMutation.mutate(
+      {
+        projectId: values.project,
+        title: values.title,
+        description: values.description,
+        assigneeId: values.assignee || null,
+        complexity: values.complexity as TaskComplexity,
+        origin: values.taskOrigin as TaskOrigin,
+        dueDate: values.dueDate.toISOString().split('T')[0],
+        actorId: personId,
+      },
+      {
+        onSuccess: () => {
+          reset();
+          onClose();
+        },
+      }
+    );
   };
 
   const handleCancel = () => {
     reset();
-
     onClose();
   };
 
@@ -95,22 +117,13 @@ export function CreateTaskModal({
             <Select
               label="Project"
               withAsterisk
-              data={[
-                {
-                  value: 'mobile-sdk',
-                  label: 'Mobile SDK Onboarding',
-                },
-                {
-                  value: 'identity',
-                  label:
-                    'Identity & Access Engine (IAM v2)',
-                },
-                {
-                  value: 'data-ingestion',
-                  label:
-                    'Data Ingestion & Analytics Pipeline',
-                },
-              ]}
+              placeholder={projects.length === 0 ? "No projects available" : "Select a project"}
+              nothingFoundMessage="No projects found"
+              disabled={projects.length === 0}
+              data={projects.map((p) => ({
+                value: p.id,
+                label: p.name,
+              }))}
               {...field}
               error={fieldState.error?.message}
             />
@@ -160,16 +173,13 @@ export function CreateTaskModal({
             render={({ field }) => (
               <Select
                 label="Assignee"
-                data={[
-                  {
-                    value: 'alex',
-                    label: 'Alex Chen (member)',
-                  },
-                  {
-                    value: 'maya',
-                    label: 'Maya Patel (member)',
-                  },
-                ]}
+                placeholder={persons.length === 0 ? "No teammates available" : "Select an assignee (optional)"}
+                nothingFoundMessage="No teammates found"
+                disabled={persons.length === 0}
+                data={persons.map((p) => ({
+                  value: p.id,
+                  label: `${p.name} (${p.role})`,
+                }))}
                 {...field}
               />
             )}
@@ -187,15 +197,15 @@ export function CreateTaskModal({
                 withAsterisk
                 data={[
                   {
-                    value: 'low',
+                    value: 'LOW',
                     label: 'Low (1 pt)',
                   },
                   {
-                    value: 'mid',
+                    value: 'MID',
                     label: 'Mid (2 pts)',
                   },
                   {
-                    value: 'high',
+                    value: 'HIGH',
                     label: 'High (3 pts)',
                   },
                 ]}
@@ -225,12 +235,12 @@ export function CreateTaskModal({
                 withAsterisk
                 data={[
                   {
-                    value: 'planned',
+                    value: 'PLANNED',
                     label:
                       'Planned (Sprint / Milestone)',
                   },
                   {
-                    value: 'unplanned',
+                    value: 'UNPLANNED',
                     label: 'Unplanned',
                   },
                 ]}

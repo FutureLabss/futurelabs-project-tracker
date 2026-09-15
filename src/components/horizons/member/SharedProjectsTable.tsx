@@ -17,8 +17,6 @@ import {
   IconUsers,
 } from '@tabler/icons-react';
 
-
-
 import {
   BlockedBadge,
   ComplexityBadge,
@@ -27,11 +25,9 @@ import {
 } from './TaskBadges';
 import { SharedProjectTask } from '../../../types/memberSharedProject';
 import { ReusableTable, TableColumn } from '../../Table/ReusableTable';
-import { sharedProjectTasks } from './MockData';
-
-
-
-
+import { useTasks } from '../../../api/hooks/use-tasks';
+import { useProjects } from '../../../api/hooks/use-projects';
+import { usePersons } from '../../../api/hooks/use-availability';
 
 const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
   {
@@ -174,7 +170,7 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
     render: (task) => (
       <Stack gap={4}>
         <StatusBadge
-          status={task.status}
+          status={task.status as any}
         />
 
         {task.status === 'BLOCKED' && (
@@ -213,7 +209,52 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
   },
 ];
 
-export function SharedProjectsTable() {
+interface SharedProjectsTableProps {
+  personId: string;
+}
+
+export function SharedProjectsTable({ personId }: SharedProjectsTableProps) {
+  const { data: tasks = [], isLoading: tasksLoading } = useTasks();
+  const { data: projects = [] } = useProjects();
+  const { data: persons = [] } = usePersons();
+
+  if (tasksLoading) {
+    return <Text>Loading shared projects...</Text>;
+  }
+
+  const mappedTasks: SharedProjectTask[] = tasks
+    .filter((task) => task.assigneeId !== personId && task.status !== 'accepted' && task.status !== 'cancelled')
+    .map((task) => {
+      const project = projects.find((p) => p.id === task.projectId);
+      const assignee = persons.find((p) => p.id === task.assigneeId);
+      
+      let complexity: SharedProjectTask['complexity'] = 'LOW (1 PT)';
+      if (task.complexity === 'mid') complexity = 'MID (2 PTS)';
+      if (task.complexity === 'high') complexity = 'HIGH (3 PTS)';
+
+      let status: SharedProjectTask['status'] = 'NOT STARTED';
+      if (task.status === 'in_progress') status = 'IN PROGRESS';
+      if (task.status === 'blocked') status = 'BLOCKED';
+
+      const isOverdue = new Date(task.dueDate) < new Date();
+
+      return {
+        id: task.id as any,
+        title: task.title,
+        overview: task.description,
+        teammate: assignee ? {
+          name: assignee.name,
+          initials: assignee.name.substring(0, 2).toUpperCase(),
+        } : undefined,
+        project: project?.name || 'Unknown Project',
+        complexity,
+        dueDate: task.dueDate,
+        overdue: isOverdue,
+        status,
+        accessMode: 'INSPECT (READ-ONLY)',
+      };
+    });
+
   return (
     <Stack gap="md">
 
@@ -230,7 +271,7 @@ export function SharedProjectsTable() {
             />
 
             <Title order={5}>
-              Teammates' Tasks & Shared Work (4)
+              Teammates' Tasks & Shared Work ({mappedTasks.length})
             </Title>
 
             <Badge
@@ -284,7 +325,7 @@ export function SharedProjectsTable() {
 
       <ReusableTable
         columns={sharedProjectColumns}
-        data={sharedProjectTasks}
+        data={mappedTasks}
       />
 
     </Stack>

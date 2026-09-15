@@ -1,10 +1,8 @@
 import {
-  Badge,
   Group,
   Paper,
   SimpleGrid,
   Stack,
-  Tabs,
   Text,
   Title,
 } from '@mantine/core';
@@ -15,7 +13,6 @@ import {
   IconFlame,
   IconTrophy,
   IconUser,
-  IconUsers,
 } from '@tabler/icons-react';
 
 import { StatCard } from './StatCard';
@@ -23,23 +20,42 @@ import { PersonalTasksTable } from './PersonalTasksTable';
 import { SharedProjectsTable } from './SharedProjectsTable';
 import { AcceptedDeliverablesTable } from './AcceptedDeliverablesTable';
 import MemberHeader from './MemberHeader';
+import { MemberView } from '../../../types/dashboard';
+import { useTasks } from '../../../api/hooks/use-tasks';
 
 
 interface MemberDashboardProps {
   personId:string;
   personName?:string;
+  memberView: MemberView;
 }
 
+export default function MemberDashboard({personId, personName, memberView}:MemberDashboardProps) {
 
+  const { data: tasks = [] } = useTasks({ assigneeId: personId });
 
+  const activeTasks = tasks.filter((t) => t.status !== 'accepted' && t.status !== 'cancelled');
+  const activeTasksCount = activeTasks.length;
 
-export default function MemberDashboard({personId, personName}:MemberDashboardProps) {
+  const getComplexityPoints = (complexity: string) => {
+    const c = complexity.toLowerCase();
+    if (c === 'high') return 3;
+    if (c === 'mid') return 2;
+    if (c === 'low') return 1;
+    return 0;
+  };
 
+  const sizeWeightedLoad = activeTasks.reduce((acc, t) => acc + getComplexityPoints(t.complexity), 0);
 
+  const todayStr = new Date().toISOString().split('T')[0];
+  const overdueTasksCount = activeTasks.filter((t) => t.dueDate < todayStr).length;
 
-
-
-  return (
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const acceptedThisMonthTasks = tasks.filter(
+    (t) => t.status === 'accepted' && t.acceptedAt?.startsWith(currentMonth)
+  );
+  const acceptedThisMonthCount = acceptedThisMonthTasks.length;
+  const acceptedThisMonthPts = acceptedThisMonthTasks.reduce((acc, t) => acc + getComplexityPoints(t.complexity), 0);  return (
     <Stack
       gap="md"
       p="lg"
@@ -53,220 +69,154 @@ export default function MemberDashboard({personId, personName}:MemberDashboardPr
           HEADER
       ========================= */}
 
-      <MemberHeader personName={personName} />
+      <MemberHeader personName={personName} personId={personId} memberView={memberView} />
 
 
       {/* =========================
           STAT CARDS
       ========================= */}
 
-      <SimpleGrid
-        cols={{
-          base: 1,
-          sm: 2,
-          lg: 4,
-        }}
-      >
-        <StatCard
-          title="Active Tasks"
-          value={4}
-          description="In queue"
-          color="blue"
-          icon={
-            <IconClipboardList size={18} />
-          }
-        />
+      {memberView !== 'completed' && (
+        <SimpleGrid
+          cols={{
+            base: 1,
+            sm: 2,
+            lg: 4,
+          }}
+        >
+          <StatCard
+            title="Active Tasks"
+            value={activeTasksCount}
+            description="In queue"
+            color="blue"
+            icon={
+              <IconClipboardList size={18} />
+            }
+          />
 
-        <StatCard
-          title="Size-Weighted Load"
-          value="9 pts"
-          description="Complexity sum (1/2/3)"
-          color="grape"
-          icon={
-            <IconFlame size={18} />
-          }
-        />
+          <StatCard
+            title="Size-Weighted Load"
+            value={`${sizeWeightedLoad} pts`}
+            description="Complexity sum (1/2/3)"
+            color="grape"
+            icon={
+              <IconFlame size={18} />
+            }
+          />
 
-        <StatCard
-          title="Overdue Tasks"
-          value={1}
-          description="Action needed"
-          color="red"
-          icon={
-            <IconClock size={18} />
-          }
-        />
+          <StatCard
+            title="Overdue Tasks"
+            value={overdueTasksCount}
+            description="Action needed"
+            color="red"
+            icon={
+              <IconClock size={18} />
+            }
+          />
 
-        <StatCard
-          title="Accepted This Month"
-          value={0}
-          description="0 complexity pts"
-          color="teal"
-          icon={
-            <IconTrophy size={18} />
-          }
-        />
-      </SimpleGrid>
+          <StatCard
+            title="Accepted This Month"
+            value={acceptedThisMonthCount}
+            description={`${acceptedThisMonthPts} complexity pts`}
+            color="teal"
+            icon={
+              <IconTrophy size={18} />
+            }
+          />
+        </SimpleGrid>
+      )}
 
 
       {/* =========================
-          TABS
+          CONTENT VIEWS
       ========================= */}
 
-      <Tabs
-        defaultValue="my-work"
-      >
-
-        <Tabs.List>
-
-          <Tabs.Tab
-            value="my-work"
-            leftSection={
-              <IconUser size={15} />
-            }
-          >
-            My Active Work
-
-            <Badge
-              ml={6}
-              size="xs"
-              color="blue"
-              variant="filled"
-            >
-              5
-            </Badge>
-          </Tabs.Tab>
-
-
-          <Tabs.Tab
-            value="shared-work"
-            leftSection={
-              <IconUsers size={15} />
-            }
-          >
-            Teammates' Tasks (Shared Projects)
-
-            <Badge
-              ml={6}
-              size="xs"
-              color="gray"
-              variant="light"
-            >
-              4
-            </Badge>
-          </Tabs.Tab>
-
-        </Tabs.List>
-
-
-        {/* =========================
-            MY ACTIVE WORK
-        ========================= */}
-
-        <Tabs.Panel
-          value="my-work"
-          pt="md"
+      {memberView === 'my-work' && (
+        <Paper
+          withBorder
+          radius="md"
+          p="md"
         >
-          <Paper
-            withBorder
-            radius="md"
-            p="md"
-          >
 
-            <Stack gap="md">
+          <Stack gap="md">
 
-              <Group
-                justify="space-between"
-                align="flex-start"
+            <Group
+              justify="space-between"
+              align="flex-start"
+            >
+              <Stack gap={3}>
+
+                <Group gap="xs">
+
+                  <IconUser
+                    size={20}
+                    color="var(--mantine-color-blue-6)"
+                  />
+
+                  <Title order={5}>
+                    My Active Work
+                  </Title>
+
+                </Group>
+
+                <Text
+                  size="xs"
+                  c="dimmed"
+                >
+                  Your active tasks, deadlines, and
+                  current execution status
+                </Text>
+
+              </Stack>
+
+            </Group>
+
+            <PersonalTasksTable personId={personId} />
+
+          </Stack>
+
+        </Paper>
+      )}
+
+      {memberView === 'team' && (
+        <Paper
+          withBorder
+          radius="md"
+          p="md"
+        >
+          <SharedProjectsTable personId={personId} />
+        </Paper>
+      )}
+
+      {memberView === 'completed' && (
+        <Paper
+          withBorder
+          radius="md"
+          p="md"
+        >
+          <Stack gap="md">
+
+            <Group
+              justify="space-between"
+              align="center"
+            >
+              <Title order={5}>
+                Accepted Deliverables Track Record (3)
+              </Title>
+
+              <Text
+                size="xs"
+                c="dimmed"
               >
-                <Stack gap={3}>
+                Verified accomplishments • Click any row
+              </Text>
+            </Group>
 
-                  <Group gap="xs">
+            <AcceptedDeliverablesTable personId={personId} />
 
-                    <IconUser
-                      size={20}
-                      color="var(--mantine-color-blue-6)"
-                    />
-
-                    <Title order={5}>
-                      My Active Work
-                    </Title>
-
-                  </Group>
-
-                  <Text
-                    size="xs"
-                    c="dimmed"
-                  >
-                    Your active tasks, deadlines, and
-                    current execution status
-                  </Text>
-
-                </Stack>
-
-              </Group>
-
-              <PersonalTasksTable personId={personId} />
-
-            </Stack>
-
-          </Paper>
-        </Tabs.Panel>
-
-
-        {/* =========================
-            SHARED PROJECTS
-        ========================= */}
-
-        <Tabs.Panel
-          value="shared-work"
-          pt="md"
-        >
-          <Paper
-            withBorder
-            radius="md"
-            p="md"
-          >
-            <SharedProjectsTable />
-          </Paper>
-        </Tabs.Panel>
-
-      </Tabs>
-
-
-      {/* =========================
-          ACCEPTED DELIVERABLES
-      ========================= */}
-
-    
-
-<Paper
-  withBorder
-  radius="md"
-  p="md"
->
-  <Stack gap="md">
-
-    <Group
-      justify="space-between"
-      align="center"
-    >
-      <Title order={5}>
-        Accepted Deliverables Track Record (3)
-      </Title>
-
-      <Text
-        size="xs"
-        c="dimmed"
-      >
-        Verified accomplishments • Click any row
-      </Text>
-    </Group>
-
-    <AcceptedDeliverablesTable />
-
-  </Stack>
-</Paper>
+          </Stack>
+        </Paper>
+      )}
 
     </Stack>
   );

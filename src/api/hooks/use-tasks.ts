@@ -16,6 +16,14 @@ export function useTasks(filter?: {
   });
 }
 
+export function useTaskById(taskId: string) {
+  return useQuery({
+    queryKey: queryKeys.tasks.detail(taskId),
+    queryFn: () => taskService.getTaskById(taskId),
+    enabled: !!taskId,
+  });
+}
+
 export function useCreateTask() {
   const queryClient = useQueryClient();
   return useMutation({

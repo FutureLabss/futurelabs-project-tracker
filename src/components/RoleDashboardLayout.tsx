@@ -257,6 +257,7 @@ export function RoleDashboardLayout({
             <MemberDashboard
             personId={personId}
             personName={personName}
+            memberView={memberView}
             />
 
         ) : (

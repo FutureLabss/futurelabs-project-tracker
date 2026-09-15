@@ -3,12 +3,15 @@ import { useDisclosure } from "@mantine/hooks";
 import { IconCalendarEvent, IconPlus } from "@tabler/icons-react";
 import { CreateTaskModal } from "./CreateTaskModal";
 import { RecordLeaveModal } from "./RecordLeaveModal";
+import { MemberView } from "../../../types/dashboard";
 
 interface MemberHeaderProps {
   personName?: string;
+  personId: string;
+  memberView: MemberView;
 }
 
-export default function MemberHeader({ personName }: MemberHeaderProps) {
+export default function MemberHeader({ personName, personId, memberView }: MemberHeaderProps) {
 
 const [  createTaskOpened,{open: openCreateTask, close: closeCreateTask,},] = useDisclosure(false);
 const [ leaveOpened, {open: openLeave, close: closeLeave,},] = useDisclosure(false);
@@ -33,27 +36,31 @@ const [ leaveOpened, {open: openLeave, close: closeLeave,},] = useDisclosure(fal
                 </Stack>
         
                 <Group>
-                  <Button
-                    variant="outline"
-                    color="gray"
-                    leftSection={
-                      <IconCalendarEvent size={16} />
-                    }
-                    onClick={openLeave}
-                  >
-                    Record Leave / Out of Office
-                  </Button>
+                  {memberView !== 'completed' && (
+                    <Button
+                      variant="outline"
+                      color="gray"
+                      leftSection={
+                        <IconCalendarEvent size={16} />
+                      }
+                      onClick={openLeave}
+                    >
+                      Record Leave / Out of Office
+                    </Button>
+                  )}
         
-                  <Button
-                    color="teal"
-                    leftSection={
-                      <IconPlus size={16} />
-                    }
-                    onClick={openCreateTask}
-                  >
-                    New Task
-                  </Button>
-                  <CreateTaskModal opened={createTaskOpened} onClose={closeCreateTask} />
+                  {memberView === 'team' && (
+                    <Button
+                      color="teal"
+                      leftSection={
+                        <IconPlus size={16} />
+                      }
+                      onClick={openCreateTask}
+                    >
+                      New Task
+                    </Button>
+                  )}
+                  <CreateTaskModal opened={createTaskOpened} onClose={closeCreateTask} personId={personId} />
                     <RecordLeaveModal opened={leaveOpened} onClose={closeLeave} />
                 </Group>
               </Group>
