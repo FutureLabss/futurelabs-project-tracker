@@ -51,6 +51,9 @@ node_modules/
 
 # Local browser verification artifacts
 /test-results/
+<<<<<<< HEAD
 
 .agents/*
 AGENTS
+=======
+>>>>>>> cf79a3fcd654ee97608a76e0a7e8deef1823f15e
