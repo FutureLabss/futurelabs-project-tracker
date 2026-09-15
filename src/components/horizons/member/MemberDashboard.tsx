@@ -24,7 +24,16 @@ import { SharedProjectsTable } from './SharedProjectsTable';
 import { AcceptedDeliverablesTable } from './AcceptedDeliverablesTable';
 import MemberHeader from './MemberHeader';
 
-export default function MemberDashboard() {
+
+interface MemberDashboardProps {
+  personId:string;
+  personName?:string;
+}
+
+
+
+
+export default function MemberDashboard({personId, personName}:MemberDashboardProps) {
 
 
 
@@ -44,7 +53,7 @@ export default function MemberDashboard() {
           HEADER
       ========================= */}
 
-      <MemberHeader />
+      <MemberHeader personName={personName} />
 
 
       {/* =========================
@@ -197,7 +206,7 @@ export default function MemberDashboard() {
 
               </Group>
 
-              <PersonalTasksTable />
+              <PersonalTasksTable personId={personId} />
 
             </Stack>
 

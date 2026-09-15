@@ -4,7 +4,11 @@ import { IconCalendarEvent, IconPlus } from "@tabler/icons-react";
 import { CreateTaskModal } from "./CreateTaskModal";
 import { RecordLeaveModal } from "./RecordLeaveModal";
 
-export default function MemberHeader() {
+interface MemberHeaderProps {
+  personName?: string;
+}
+
+export default function MemberHeader({ personName }: MemberHeaderProps) {
 
 const [  createTaskOpened,{open: openCreateTask, close: closeCreateTask,},] = useDisclosure(false);
 const [ leaveOpened, {open: openLeave, close: closeLeave,},] = useDisclosure(false);
@@ -16,7 +20,7 @@ const [ leaveOpened, {open: openLeave, close: closeLeave,},] = useDisclosure(fal
               >
                 <Stack gap={2}>
                   <Title order={3}>
-                    Alex Chen — Member Horizon (IC)
+                     {personName ?? 'Member'} — Member Horizon (IC)
                   </Title>
         
                   <Text
