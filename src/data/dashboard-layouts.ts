@@ -18,7 +18,7 @@ export const roleDashboards: Record<UserRole, DashboardLayoutConfig> = {
     title: "",
     subtitle: "",
     navigation: [
-      { label: "Work", icon: IconUser, memberView: "my-work", active: true },
+      { label: "Projects", icon: IconUser, memberView: "my-work", active: true },
       { label: "Tasks", icon: IconUsers, memberView: "team" },
       { label: "History", icon: IconHistory, memberView: "completed" },
     ],

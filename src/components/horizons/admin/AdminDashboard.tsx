@@ -418,6 +418,7 @@ export default function AdminDashboard({
           {exportNotice}
         </Alert>
       )}
+
       <SimpleGrid cols={{ base: 1, xs: 2, xl: 4 }}>
         {metric(
           "Active projects",
@@ -450,6 +451,7 @@ export default function AdminDashboard({
           () => changeView("risks"),
         )}
       </SimpleGrid>
+      
       <TextInput
         label="Search current view"
         placeholder="Search projects, tasks, people, or changes"

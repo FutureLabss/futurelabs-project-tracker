@@ -51,3 +51,6 @@ node_modules/
 
 # Local browser verification artifacts
 /test-results/
+
+.agents/*
+AGENTS.md
