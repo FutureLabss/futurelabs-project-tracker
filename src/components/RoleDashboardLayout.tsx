@@ -31,6 +31,7 @@ import { useMemo, useState } from 'react';
 import {  AdminView, DashboardLayoutConfig, DashboardPanel as DashboardPanelConfig, DashboardTone,  MemberView, } from '../types/dashboard';
 
 import MemberDashboard from './horizons/member/MemberDashboard';
+import AdminDashboard from './horizons/admin/AdminDashboard';
 import { useMediaQuery } from "@mantine/hooks";
 
 interface RoleDashboardLayoutProps {
@@ -260,9 +261,15 @@ export function RoleDashboardLayout({
             memberView={memberView}
             />
 
+        ) : config.role === 'admin' ? (
+            <AdminDashboard
+              actorId={personId}
+              date={activeDate}
+              view={adminView}
+              onViewChange={setAdminView}
+            />
+
         ) : (
-    
-  
         <Stack gap="xl" className="dashboard-shell">
           <Group justify="space-between" align="flex-start" gap="lg">
             <Box maw={760}>
