@@ -15,11 +15,12 @@ import {
   IconUser,
 } from '@tabler/icons-react';
 
-import { StatCard } from './StatCard';
-import { PersonalTasksTable } from './PersonalTasksTable';
-import { SharedProjectsTable } from './SharedProjectsTable';
-import { AcceptedDeliverablesTable } from './AcceptedDeliverablesTable';
-import MemberHeader from './MemberHeader';
+import { MetricCard } from './atoms/MetricCard';
+import { PersonalTasksTable } from './organisms/PersonalTasksTable';
+import { SharedProjectsTable } from './organisms/SharedProjectsTable';
+import { AcceptedDeliverablesTable } from './organisms/AcceptedDeliverablesTable';
+import { MemberPageHeader } from './molecules/MemberPageHeader';
+import { MemberTemplate } from './templates/MemberTemplate';
 import { MemberView } from '../../../types/dashboard';
 import { useTasks } from '../../../api/hooks/use-tasks';
 
@@ -55,77 +56,61 @@ export default function MemberDashboard({personId, personName, memberView}:Membe
     (t) => t.status === 'accepted' && t.acceptedAt?.startsWith(currentMonth)
   );
   const acceptedThisMonthCount = acceptedThisMonthTasks.length;
-  const acceptedThisMonthPts = acceptedThisMonthTasks.reduce((acc, t) => acc + getComplexityPoints(t.complexity), 0);  return (
-    <Stack
-      gap="md"
-      p="lg"
-      style={{
-        backgroundColor: '#f8fafc',
-        minHeight: '100vh',
-      }}
+  const acceptedThisMonthPts = acceptedThisMonthTasks.reduce((acc, t) => acc + getComplexityPoints(t.complexity), 0);
+
+  return (
+    <MemberTemplate
+      header={
+        <MemberPageHeader
+          personName={personName}
+          personId={personId}
+          memberView={memberView}
+        />
+      }
+      metricsGrid={
+        memberView !== 'completed' ? (
+          <SimpleGrid
+            cols={{
+              base: 1,
+              sm: 2,
+              lg: 4,
+            }}
+          >
+            <MetricCard
+              title="Active Tasks"
+              value={activeTasksCount}
+              description="In queue"
+              color="blue"
+              icon={<IconClipboardList size={18} />}
+            />
+
+            <MetricCard
+              title="Size-Weighted Load"
+              value={`${sizeWeightedLoad} pts`}
+              description="Complexity sum (1/2/3)"
+              color="grape"
+              icon={<IconFlame size={18} />}
+            />
+
+            <MetricCard
+              title="Overdue Tasks"
+              value={overdueTasksCount}
+              description="Action needed"
+              color="red"
+              icon={<IconClock size={18} />}
+            />
+
+            <MetricCard
+              title="Accepted This Month"
+              value={acceptedThisMonthCount}
+              description={`${acceptedThisMonthPts} complexity pts`}
+              color="teal"
+              icon={<IconTrophy size={18} />}
+            />
+          </SimpleGrid>
+        ) : undefined
+      }
     >
-
-      {/* =========================
-          HEADER
-      ========================= */}
-
-      <MemberHeader personName={personName} personId={personId} memberView={memberView} />
-
-
-      {/* =========================
-          STAT CARDS
-      ========================= */}
-
-      {memberView !== 'completed' && (
-        <SimpleGrid
-          cols={{
-            base: 1,
-            sm: 2,
-            lg: 4,
-          }}
-        >
-          <StatCard
-            title="Active Tasks"
-            value={activeTasksCount}
-            description="In queue"
-            color="blue"
-            icon={
-              <IconClipboardList size={18} />
-            }
-          />
-
-          <StatCard
-            title="Size-Weighted Load"
-            value={`${sizeWeightedLoad} pts`}
-            description="Complexity sum (1/2/3)"
-            color="grape"
-            icon={
-              <IconFlame size={18} />
-            }
-          />
-
-          <StatCard
-            title="Overdue Tasks"
-            value={overdueTasksCount}
-            description="Action needed"
-            color="red"
-            icon={
-              <IconClock size={18} />
-            }
-          />
-
-          <StatCard
-            title="Accepted This Month"
-            value={acceptedThisMonthCount}
-            description={`${acceptedThisMonthPts} complexity pts`}
-            color="teal"
-            icon={
-              <IconTrophy size={18} />
-            }
-          />
-        </SimpleGrid>
-      )}
-
 
       {/* =========================
           CONTENT VIEWS
@@ -137,28 +122,21 @@ export default function MemberDashboard({personId, personName, memberView}:Membe
           radius="md"
           p="md"
         >
-
           <Stack gap="md">
-
             <Group
               justify="space-between"
               align="flex-start"
             >
               <Stack gap={3}>
-
                 <Group gap="xs">
-
                   <IconUser
                     size={20}
                     color="var(--mantine-color-blue-6)"
                   />
-
                   <Title order={5}>
                     My Active Work
                   </Title>
-
                 </Group>
-
                 <Text
                   size="xs"
                   c="dimmed"
@@ -166,15 +144,11 @@ export default function MemberDashboard({personId, personName, memberView}:Membe
                   Your active tasks, deadlines, and
                   current execution status
                 </Text>
-
               </Stack>
-
             </Group>
 
             <PersonalTasksTable personId={personId} />
-
           </Stack>
-
         </Paper>
       )}
 
@@ -195,29 +169,34 @@ export default function MemberDashboard({personId, personName, memberView}:Membe
           p="md"
         >
           <Stack gap="md">
-
             <Group
               justify="space-between"
-              align="center"
+              align="flex-start"
             >
-              <Title order={5}>
-                Accepted Deliverables Track Record (3)
-              </Title>
-
-              <Text
-                size="xs"
-                c="dimmed"
-              >
-                Verified accomplishments • Click any row
-              </Text>
+              <Stack gap={3}>
+                <Group gap="xs">
+                  <IconTrophy
+                    size={20}
+                    color="var(--mantine-color-teal-6)"
+                  />
+                  <Title order={5}>
+                    Accepted Deliverables
+                  </Title>
+                </Group>
+                <Text
+                  size="xs"
+                  c="dimmed"
+                >
+                  Work that has been formally accepted by project leads
+                </Text>
+              </Stack>
             </Group>
 
             <AcceptedDeliverablesTable personId={personId} />
-
           </Stack>
         </Paper>
       )}
 
-    </Stack>
+    </MemberTemplate>
   );
 }

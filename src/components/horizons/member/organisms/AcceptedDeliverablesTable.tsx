@@ -3,11 +3,11 @@ import {
   Text,
 } from '@mantine/core';
 
-import { ComplexityBadge } from './TaskBadges';
-import { ReusableTable, TableColumn } from '../../Table/ReusableTable';
-import { AcceptedDeliverable } from '../../../types/accepteddeliverables';
-import { useTasks } from '../../../api/hooks/use-tasks';
-import { useProjects } from '../../../api/hooks/use-projects';
+import { ComplexityBadge } from '../atoms/ComplexityBadge';
+import { ReusableTable, TableColumn } from '../../../Table/ReusableTable';
+import { AcceptedDeliverable } from '../../../../types/accepteddeliverables';
+import { useTasks } from '../../../../api/hooks/use-tasks';
+import { useProjects } from '../../../../api/hooks/use-projects';
 
 const deliverableColumns: TableColumn<AcceptedDeliverable>[] = [
   {
@@ -15,7 +15,7 @@ const deliverableColumns: TableColumn<AcceptedDeliverable>[] = [
     label: 'Deliverable',
     width: '35%',
 
-    render: (item) => (
+    render: (item: AcceptedDeliverable) => (
       <Text
         size="sm"
         c="blue.7"
@@ -31,7 +31,7 @@ const deliverableColumns: TableColumn<AcceptedDeliverable>[] = [
     label: 'Project',
     width: '30%',
 
-    render: (item) => (
+    render: (item: AcceptedDeliverable) => (
       <Text
         size="sm"
         c="dimmed"
@@ -46,7 +46,7 @@ const deliverableColumns: TableColumn<AcceptedDeliverable>[] = [
     label: 'Complexity',
     width: '14%',
 
-    render: (item) => (
+    render: (item: AcceptedDeliverable) => (
       <ComplexityBadge
         value={item.complexity}
       />
@@ -58,7 +58,7 @@ const deliverableColumns: TableColumn<AcceptedDeliverable>[] = [
     label: 'Accepted On',
     width: '12%',
 
-    render: (item) => (
+    render: (item: AcceptedDeliverable) => (
       <Text
         size="sm"
         c="dimmed"
@@ -100,8 +100,8 @@ export function AcceptedDeliverablesTable({ personId }: AcceptedDeliverablesTabl
     return <Text>Loading accepted deliverables...</Text>;
   }
 
-  const mappedDeliverables: AcceptedDeliverable[] = tasks.map((task) => {
-    const project = projects.find((p) => p.id === task.projectId);
+  const mappedDeliverables: AcceptedDeliverable[] = tasks.map((task: any) => {
+    const project = projects.find((p: any) => p.id === task.projectId);
 
     let complexity: AcceptedDeliverable['complexity'] = 'LOW (1 PT)';
     if (task.complexity === 'mid') complexity = 'MID (2 PTS)';
