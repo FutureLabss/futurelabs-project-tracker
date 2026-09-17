@@ -225,12 +225,15 @@ export function AdminActionDialog({
     label: string,
     defaultValue?: string | null,
     required = false,
+    placeholder = "Select a person",
   ) => (
     <Select
       name="person"
       label={label}
       data={options(rows)}
       defaultValue={defaultValue}
+      placeholder={placeholder}
+      nothingFoundMessage="No eligible users found"
       searchable
       clearable={!required}
       required={required}
@@ -320,7 +323,13 @@ export function AdminActionDialog({
                 label="Description and acceptance criteria"
               />
               <div key={projectId}>
-                {personField(eligible, "Task owner (optional)")}
+                {personField(
+                  eligible,
+                  "Assignee (optional)",
+                  undefined,
+                  false,
+                  "Select an assignee",
+                )}
               </div>
               <Text size="xs" c="dimmed">
                 Grant project access from the project detail before assigning
