@@ -8,7 +8,7 @@ import {
 
 import type { ReactNode } from 'react';
 
-type StatCardProps = {
+type MetricCardProps = {
   title: string;
   value: string | number;
   description: string;
@@ -16,13 +16,13 @@ type StatCardProps = {
   color: string;
 };
 
-export function StatCard({
+export function MetricCard({
   title,
   value,
   description,
   icon,
   color,
-}: StatCardProps) {
+}: MetricCardProps) {
   return (
     <Card
       withBorder

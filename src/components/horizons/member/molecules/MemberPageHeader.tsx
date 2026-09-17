@@ -1,17 +1,17 @@
 import { Button, Group, Stack, Text, Title } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconCalendarEvent, IconPlus } from "@tabler/icons-react";
-import { CreateTaskModal } from "./CreateTaskModal";
-import { RecordLeaveModal } from "./RecordLeaveModal";
-import { MemberView } from "../../../types/dashboard";
+import { CreateTaskModal } from "../organisms/CreateTaskModal";
+import { RecordLeaveModal } from "../organisms/RecordLeaveModal";
+import { MemberView } from "../../../../types/dashboard";
 
-interface MemberHeaderProps {
+interface MemberPageHeaderProps {
   personName?: string;
   personId: string;
   memberView: MemberView;
 }
 
-export default function MemberHeader({ personName, personId, memberView }: MemberHeaderProps) {
+export function MemberPageHeader({ personName, personId, memberView }: MemberPageHeaderProps) {
 
 const [  createTaskOpened,{open: openCreateTask, close: closeCreateTask,},] = useDisclosure(false);
 const [ leaveOpened, {open: openLeave, close: closeLeave,},] = useDisclosure(false);
