@@ -12,11 +12,11 @@ import {
   Controller,
   useForm,
 } from 'react-hook-form';
-import { useCreateTask } from '../../../api/hooks/use-tasks';
-import { useProjects } from '../../../api/hooks/use-projects';
-import { usePersons } from '../../../api/hooks/use-availability';
-import { TaskComplexity, TaskOrigin } from '../../../entities/task.entity';
-import { ReusableModal } from '../../modal/ReuseableModal';
+import { useCreateTask } from '../../../../api/hooks/use-tasks';
+import { useProjects } from '../../../../api/hooks/use-projects';
+import { usePersons } from '../../../../api/hooks/use-availability';
+import { TaskComplexity, TaskOrigin } from '../../../../entities/task.entity';
+import { ReusableModal } from '../../../modal/ReuseableModal';
 
 
 type CreateTaskFormValues = {
@@ -120,7 +120,7 @@ export function CreateTaskModal({
               placeholder={projects.length === 0 ? "No projects available" : "Select a project"}
               nothingFoundMessage="No projects found"
               disabled={projects.length === 0}
-              data={projects.map((p) => ({
+              data={projects.map((p: any) => ({
                 value: p.id,
                 label: p.name,
               }))}
@@ -176,7 +176,7 @@ export function CreateTaskModal({
                 placeholder={persons.length === 0 ? "No teammates available" : "Select an assignee (optional)"}
                 nothingFoundMessage="No teammates found"
                 disabled={persons.length === 0}
-                data={persons.map((p) => ({
+                data={persons.map((p: any) => ({
                   value: p.id,
                   label: `${p.name} (${p.role})`,
                 }))}

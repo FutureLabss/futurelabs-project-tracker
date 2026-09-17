@@ -7,7 +7,7 @@ import {
 } from '@mantine/core';
 
 import { DateInput } from '@mantine/dates';
-import { ReusableModal } from '../../modal/ReuseableModal';
+import { ReusableModal } from '../../../modal/ReuseableModal';
 import { Controller, useForm } from 'react-hook-form';
 
 

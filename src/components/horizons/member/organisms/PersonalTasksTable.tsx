@@ -12,21 +12,19 @@ import {
   IconSend,
 } from '@tabler/icons-react';
 
-import {
-  BlockedBadge,
-  ComplexityBadge,
-  OverdueBadge,
-  StatusBadge,
-} from './TaskBadges';
+import { BlockedBadge } from '../atoms/BlockedBadge';
+import { ComplexityBadge } from '../atoms/ComplexityBadge';
+import { OverdueBadge } from '../atoms/OverdueBadge';
+import { StatusBadge } from '../atoms/StatusBadge';
 
 import {
   ReusableTable,
   type TableColumn,
-} from '../../Table/ReusableTable';
+} from '../../../Table/ReusableTable';
 
-import type { PersonalTask } from '../../../types/memberpersonaltasks';
-import { useTasks } from '../../../api/hooks/use-tasks';
-import { useProjects } from '../../../api/hooks/use-projects';
+import type { PersonalTask } from '../../../../types/memberpersonaltasks';
+import { useTasks } from '../../../../api/hooks/use-tasks';
+import { useProjects } from '../../../../api/hooks/use-projects';
 
 interface personTaskTableProps {
   personId:string;

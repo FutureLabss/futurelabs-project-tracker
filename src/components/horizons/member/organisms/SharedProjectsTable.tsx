@@ -17,17 +17,15 @@ import {
   IconUsers,
 } from '@tabler/icons-react';
 
-import {
-  BlockedBadge,
-  ComplexityBadge,
-  OverdueBadge,
-  StatusBadge,
-} from './TaskBadges';
-import { SharedProjectTask } from '../../../types/memberSharedProject';
-import { ReusableTable, TableColumn } from '../../Table/ReusableTable';
-import { useTasks } from '../../../api/hooks/use-tasks';
-import { useProjects } from '../../../api/hooks/use-projects';
-import { usePersons } from '../../../api/hooks/use-availability';
+import { BlockedBadge } from '../atoms/BlockedBadge';
+import { ComplexityBadge } from '../atoms/ComplexityBadge';
+import { OverdueBadge } from '../atoms/OverdueBadge';
+import { StatusBadge } from '../atoms/StatusBadge';
+import { SharedProjectTask } from '../../../../types/memberSharedProject';
+import { ReusableTable, TableColumn } from '../../../Table/ReusableTable';
+import { useTasks } from '../../../../api/hooks/use-tasks';
+import { useProjects } from '../../../../api/hooks/use-projects';
+import { usePersons } from '../../../../api/hooks/use-availability';
 
 const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
   {

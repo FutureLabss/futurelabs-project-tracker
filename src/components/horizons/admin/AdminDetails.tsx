@@ -15,6 +15,11 @@ import type { AdminAction } from "./AdminActionDialog";
 import type { LedgerRecord } from "../../../entities/ledger-record.entity";
 import type { Task } from "../../../entities/task.entity";
 import { isOpen, readable } from "./admin-utils";
+import { RagBadge } from "./atoms/RagBadge";
+import { PersonLink } from "./atoms/PersonLink";
+import { ProjectLink } from "./atoms/ProjectLink";
+import { TaskStatusBadge } from "./atoms/TaskStatusBadge";
+import { EmptyState } from "./atoms/EmptyState";
 
 export function TaskList({
   tasks,
@@ -58,17 +63,7 @@ export function TaskList({
               </Table.Td>
               <Table.Td>{t.dueDate}</Table.Td>
               <Table.Td>
-                <Badge
-                  color={
-                    t.status === "blocked"
-                      ? "red"
-                      : t.status === "accepted"
-                        ? "teal"
-                        : "blue"
-                  }
-                >
-                  {readable(t.status)}
-                </Badge>
+                <TaskStatusBadge status={t.status} />
               </Table.Td>
               <Table.Td>
                 {t.complexity} · {t.origin}
@@ -78,9 +73,7 @@ export function TaskList({
           {!tasks.length && (
             <Table.Tr>
               <Table.Td colSpan={6}>
-                <Text c="dimmed" ta="center">
-                  No tasks match this view.
-                </Text>
+                <EmptyState message="No tasks match this view." />
               </Table.Td>
             </Table.Tr>
           )}
@@ -100,7 +93,7 @@ export function LedgerList({
 }) {
   return (
     <Stack gap="xs">
-      {!records.length && <Text c="dimmed">No recorded changes.</Text>}
+      {!records.length && <EmptyState message="No recorded changes." />}
       {records.map((r) => (
         <Card key={r.id} withBorder padding="sm">
           <Group justify="space-between">
@@ -182,21 +175,10 @@ export function AdminDetails({
         {selection.type === "project" && project && (
           <>
             <Group>
-              <Badge
-                color={
-                  project.state === "closed"
-                    ? "gray"
-                    : summary?.ragStatus === "red"
-                      ? "red"
-                      : summary?.ragStatus === "amber"
-                        ? "orange"
-                        : "teal"
-                }
-              >
-                {project.state === "closed"
-                  ? "Closed"
-                  : (summary?.ragStatus ?? "Active")}
-              </Badge>
+              <RagBadge
+                status={summary?.ragStatus}
+                closed={project.state === "closed"}
+              />
               <Text>
                 {project.startDate} → {project.targetDate}
               </Text>
@@ -205,12 +187,10 @@ export function AdminDetails({
             <Text>
               Lead:{" "}
               {project.managerId ? (
-                <Anchor
-                  component="button"
+                <PersonLink
+                  name={personName(project.managerId)}
                   onClick={() => onPerson(project.managerId!)}
-                >
-                  {personName(project.managerId)}
-                </Anchor>
+                />
               ) : (
                 "Unmanaged"
               )}
@@ -278,12 +258,10 @@ export function AdminDetails({
               .filter((m) => m.projectId === project.id)
               .map((m) => (
                 <Group key={m.personId} justify="space-between">
-                  <Anchor
-                    component="button"
+                  <PersonLink
+                    name={personName(m.personId)}
                     onClick={() => onPerson(m.personId)}
-                  >
-                    {personName(m.personId)}
-                  </Anchor>
+                  />
                   {project.state === "active" && (
                     <Button
                       variant="subtle"
@@ -303,7 +281,7 @@ export function AdminDetails({
                 </Group>
               ))}
             {!data.members.some((m) => m.projectId === project.id) && (
-              <Text c="dimmed">No explicit members yet.</Text>
+              <EmptyState message="No explicit members yet." />
             )}
             <Title order={3} size="h5">
               Project tasks ({projectTasks.length})
@@ -314,28 +292,23 @@ export function AdminDetails({
         {selection.type === "task" && task && (
           <>
             <Group>
-              <Badge>{readable(task.status)}</Badge>
+              <TaskStatusBadge status={task.status} />
               <Badge variant="outline">
                 {task.complexity} · {task.origin}
               </Badge>
             </Group>
             <Text>{task.description || "No description provided."}</Text>
-            <Anchor
-              component="button"
-              ta="left"
+            <ProjectLink
+              name={data.projects.find((p) => p.id === task.projectId)?.name ?? "Unknown project"}
               onClick={() => onProject(task.projectId)}
-            >
-              {data.projects.find((p) => p.id === task.projectId)?.name}
-            </Anchor>
+            />
             <Text>
               Owner:{" "}
               {task.assigneeId ? (
-                <Anchor
-                  component="button"
+                <PersonLink
+                  name={personName(task.assigneeId)}
                   onClick={() => onPerson(task.assigneeId!)}
-                >
-                  {personName(task.assigneeId)}
-                </Anchor>
+                />
               ) : (
                 "Unassigned"
               )}
@@ -446,7 +419,7 @@ export function AdminDetails({
               Blocker history
             </Title>
             {!taskBlockers.length && (
-              <Text c="dimmed">No blockers recorded.</Text>
+              <EmptyState message="No blockers recorded." />
             )}
             {taskBlockers.map((b) => (
               <Card key={b.id} withBorder>
@@ -522,7 +495,7 @@ export function AdminDetails({
                 </Text>
               ))}
             {!data.availability.some((a) => a.personId === person.id) && (
-              <Text c="dimmed">No leave recorded.</Text>
+              <EmptyState message="No leave recorded." />
             )}
             <Title order={3} size="h5">
               Assigned work
