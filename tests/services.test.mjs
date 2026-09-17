@@ -24,9 +24,10 @@ const {
   createTrackerServices,
 } = require("../src/services/create-tracker-services.ts");
 const { TaskService } = require("../src/services/task-service.ts");
+const { createTrackerTestValues } = require("./fixtures/tracker-storage.ts");
 
 function setup() {
-  const values = new Map();
+  const values = createTrackerTestValues();
   const storage = {
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value),
@@ -136,12 +137,12 @@ test("submitting and accepting work preserves delivery metadata", async () => {
   assert.equal(task.deliverableUrl, "https://example.com/delivery");
 });
 
-test("demo reset restores seed without touching other applications storage", async () => {
+test("local reset clears operational data without touching other applications storage", async () => {
   const { taskService, demoService, values } = setup();
   values.set("fl_tracker_tasks", "reference project data");
   await taskService.updateTaskStatus("task-1", "cancelled", "p-alex");
   await demoService.resetToSeedData();
-  assert.equal((await taskService.getTaskById("task-1")).status, "in_progress");
+  assert.equal(await taskService.getTaskById("task-1"), null);
   assert.equal(values.get("fl_tracker_tasks"), "reference project data");
 });
 
