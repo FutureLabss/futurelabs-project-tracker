@@ -350,6 +350,7 @@ function TimeMachineBar({
     [activeDate],
   );
 
+
   const shiftDate = (days: number) => {
     setActiveDate((currentDate) =>
       dayjs(currentDate).add(days, "day").format("YYYY-MM-DD"),
