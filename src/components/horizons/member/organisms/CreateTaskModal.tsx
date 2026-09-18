@@ -59,8 +59,8 @@ export function CreateTaskModal({
       title: '',
       description: '',
       assignee: '',
-      complexity: 'MID',
-      taskOrigin: 'PLANNED',
+      complexity: 'mid',
+      taskOrigin: 'planned',
       dueDate: null,
     },
   });
@@ -197,15 +197,15 @@ export function CreateTaskModal({
                 withAsterisk
                 data={[
                   {
-                    value: 'LOW',
+                    value: 'low',
                     label: 'Low (1 pt)',
                   },
                   {
-                    value: 'MID',
+                    value: 'mid',
                     label: 'Mid (2 pts)',
                   },
                   {
-                    value: 'HIGH',
+                    value: 'high',
                     label: 'High (3 pts)',
                   },
                 ]}
@@ -235,12 +235,12 @@ export function CreateTaskModal({
                 withAsterisk
                 data={[
                   {
-                    value: 'PLANNED',
+                    value: 'planned',
                     label:
                       'Planned (Sprint / Milestone)',
                   },
                   {
-                    value: 'UNPLANNED',
+                    value: 'unplanned',
                     label: 'Unplanned',
                   },
                 ]}

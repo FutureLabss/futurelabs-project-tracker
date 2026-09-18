@@ -4,6 +4,7 @@ type TaskStatus =
   | 'NOT STARTED'
   | 'IN PROGRESS'
   | 'BLOCKED'
+  | 'SUBMITTED (REVIEW)'
   | 'ACCEPTED';
 
 export function StatusBadge({
@@ -16,9 +17,11 @@ export function StatusBadge({
       ? 'red'
       : status === 'ACCEPTED'
         ? 'teal'
-        : status === 'IN PROGRESS'
-          ? 'blue'
-          : 'gray';
+        : status === 'SUBMITTED (REVIEW)'
+          ? 'grape'
+          : status === 'IN PROGRESS'
+            ? 'blue'
+            : 'gray';
 
   return (
     <Badge

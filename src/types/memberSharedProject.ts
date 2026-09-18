@@ -21,7 +21,9 @@ export type SharedProjectTask = {
   status:
     | 'NOT STARTED'
     | 'IN PROGRESS'
-    | 'BLOCKED';
+    | 'BLOCKED'
+    | 'SUBMITTED (REVIEW)'
+    | 'ACCEPTED';
 
   accessMode:
     | 'INSPECT (READ-ONLY)'

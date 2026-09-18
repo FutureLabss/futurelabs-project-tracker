@@ -1,5 +1,5 @@
 export type PersonalTask = {
-  id: number;
+  id: string;
   title: string;
   overview: string;
   project: string;
@@ -12,7 +12,9 @@ export type PersonalTask = {
   status:
     | 'NOT STARTED'
     | 'IN PROGRESS'
-    | 'BLOCKED';
+    | 'BLOCKED'
+    | 'SUBMITTED (REVIEW)'
+    | 'ACCEPTED';
   accessMode:
     | 'SUBMIT'
     | 'START'

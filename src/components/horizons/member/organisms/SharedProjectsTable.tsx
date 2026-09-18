@@ -27,6 +27,14 @@ import { useTasks } from '../../../../api/hooks/use-tasks';
 import { useProjects } from '../../../../api/hooks/use-projects';
 import { usePersons } from '../../../../api/hooks/use-availability';
 
+
+
+interface SharedProjectsTableProps {
+  personId: string;
+}
+
+export function SharedProjectsTable({ personId }: SharedProjectsTableProps) {
+
 const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
   {
     key: 'title',
@@ -207,11 +215,6 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
   },
 ];
 
-interface SharedProjectsTableProps {
-  personId: string;
-}
-
-export function SharedProjectsTable({ personId }: SharedProjectsTableProps) {
   const { data: tasks = [], isLoading: tasksLoading } = useTasks();
   const { data: projects = [] } = useProjects();
   const { data: persons = [] } = usePersons();
@@ -221,7 +224,7 @@ export function SharedProjectsTable({ personId }: SharedProjectsTableProps) {
   }
 
   const mappedTasks: SharedProjectTask[] = tasks
-    .filter((task) => task.assigneeId !== personId && task.status !== 'accepted' && task.status !== 'cancelled')
+    .filter((task) => task.assigneeId !== personId && task.status !== 'cancelled')
     .map((task) => {
       const project = projects.find((p) => p.id === task.projectId);
       const assignee = persons.find((p) => p.id === task.assigneeId);
@@ -233,6 +236,8 @@ export function SharedProjectsTable({ personId }: SharedProjectsTableProps) {
       let status: SharedProjectTask['status'] = 'NOT STARTED';
       if (task.status === 'in_progress') status = 'IN PROGRESS';
       if (task.status === 'blocked') status = 'BLOCKED';
+      if (task.status === 'submitted') status = 'SUBMITTED (REVIEW)';
+      if (task.status === 'accepted') status = 'ACCEPTED';
 
       const isOverdue = new Date(task.dueDate) < new Date();
 

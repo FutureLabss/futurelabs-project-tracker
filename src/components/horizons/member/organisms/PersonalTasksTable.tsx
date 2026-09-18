@@ -4,6 +4,7 @@ import {
   Stack,
   Text,
 } from '@mantine/core';
+import { useState } from 'react';
 
 import {
   IconAlertCircle,
@@ -23,12 +24,18 @@ import {
 } from '../../../Table/ReusableTable';
 
 import type { PersonalTask } from '../../../../types/memberpersonaltasks';
-import { useTasks } from '../../../../api/hooks/use-tasks';
+import { useSubmitTask, useTasks, useUpdateTaskStatus } from '../../../../api/hooks/use-tasks';
 import { useProjects } from '../../../../api/hooks/use-projects';
+import { useClearBlocker } from '../../../../api/hooks/use-blockers';
+import { RaiseBlockerModal } from './RaiseBlockerModal';
+import { RescheduleTaskModal } from './RescheduleTaskModal';
 
 interface personTaskTableProps {
   personId:string;
 }
+
+
+export function PersonalTasksTable({personId}:personTaskTableProps) {
 
 const personalTaskColumns: TableColumn<PersonalTask>[] = [
   {
@@ -141,6 +148,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
             leftSection={
               <IconPlayerPlay size={13} />
             }
+            onClick={() => handleStart(task.id)}
           >
             Start Working
           </Button>
@@ -155,6 +163,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
             leftSection={
               <IconSend size={13} />
             }
+            onClick={() => handleSubmit(task.id)}
           >
             Submit
           </Button>
@@ -168,8 +177,24 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
             color="red"
             p={5}
             aria-label="Raise blocker"
+            onClick={() => handleOpenRaiseBlocker(task)}
           >
             <IconAlertCircle size={15} />
+          </Button>
+        )}
+
+        {/* RESUME */}
+        {task.status === 'BLOCKED' && (
+          <Button
+            size="compact-xs"
+            variant="light"
+            color="blue"
+            leftSection={
+              <IconPlayerPlay size={13} />
+            }
+            onClick={() => handleResume(task.id as string)}
+          >
+            Resume
           </Button>
         )}
 
@@ -180,6 +205,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
           color="orange"
           p={5}
           aria-label="Reschedule due date"
+          onClick={() => handleOpenReschedule(task)}
         >
           <IconCalendarEvent size={15} />
         </Button>
@@ -188,12 +214,81 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
     ),
   },
 ];
-export function PersonalTasksTable({personId}:personTaskTableProps) {
+
+
+const { mutate: updateTaskStatus } = useUpdateTaskStatus();
+const { mutate: clearBlocker } = useClearBlocker();
+
+const handleStart = (taskId: string) => {
+    updateTaskStatus({
+      taskId,
+      status: 'in_progress',
+      actorId: personId,
+    });
+    console.log(`Start working button clicked for task: ${taskId}`);
+
+}
+
+const handleResume = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task?.activeBlockerId) {
+      clearBlocker({
+        blockerId: task.activeBlockerId,
+        actorId: personId,
+      });
+      console.log(`Blocker cleared and task resumed: ${taskId}`);
+    } else {
+      updateTaskStatus({
+        taskId,
+        status: 'in_progress',
+        actorId: personId,
+      });
+      console.log(`Resume button clicked for task: ${taskId}`);
+    }
+}
+
+const{ mutate: submitTask } = useSubmitTask();
+const handleSubmit = (taskId: string) => {
+  submitTask({
+    taskId,
+    actorId: personId,
+    notes:'task completed successfully',
+    deliverableUrl:''
+  });
+
+  console.log(`Submit button clicked for task: ${taskId}`);
+}
   const {data: tasks = [], isLoading, error} = useTasks({
     assigneeId: personId,
   });
 
   const { data: projects = [] } = useProjects();
+
+  const [raiseBlockerOpened, setRaiseBlockerOpened] = useState(false);
+  const [selectedTaskForBlocker, setSelectedTaskForBlocker] = useState<{ id: string; title: string } | null>(null);
+
+  const [rescheduleOpened, setRescheduleOpened] = useState(false);
+  const [selectedTaskForReschedule, setSelectedTaskForReschedule] = useState<{ id: string; title: string; dueDate: string } | null>(null);
+
+  const handleOpenRaiseBlocker = (task: PersonalTask) => {
+    setSelectedTaskForBlocker({ id: task.id as string, title: task.title });
+    setRaiseBlockerOpened(true);
+  };
+
+  const handleCloseRaiseBlocker = () => {
+    setSelectedTaskForBlocker(null);
+    setRaiseBlockerOpened(false);
+  };
+
+  const handleOpenReschedule = (task: PersonalTask) => {
+    setSelectedTaskForReschedule({ id: task.id as string, title: task.title, dueDate: task.dueDate });
+    setRescheduleOpened(true);
+  };
+
+  const handleCloseReschedule = () => {
+    setSelectedTaskForReschedule(null);
+    setRescheduleOpened(false);
+  };
 
   if (isLoading) {
     return <Text>Loading tasks...</Text>;
@@ -217,6 +312,8 @@ export function PersonalTasksTable({personId}:personTaskTableProps) {
     let status: PersonalTask['status'] = 'NOT STARTED';
     if (task.status === 'in_progress') status = 'IN PROGRESS';
     if (task.status === 'blocked') status = 'BLOCKED';
+    if (task.status === 'submitted') status = 'SUBMITTED (REVIEW)';
+    if (task.status === 'accepted') status = 'ACCEPTED';
 
     let accessMode: PersonalTask['accessMode'] = 'INSPECT (READ-ONLY)';
     if (status === 'NOT STARTED') accessMode = 'START';
@@ -238,9 +335,30 @@ export function PersonalTasksTable({personId}:personTaskTableProps) {
   });
 
   return (
-    <ReusableTable
-      columns={personalTaskColumns}
-      data={mappedTasks}
-    />
+    <>
+      <ReusableTable
+        columns={personalTaskColumns}
+        data={mappedTasks}
+      />
+      {selectedTaskForBlocker && (
+        <RaiseBlockerModal
+          opened={raiseBlockerOpened}
+          onClose={handleCloseRaiseBlocker}
+          taskId={selectedTaskForBlocker.id}
+          taskTitle={selectedTaskForBlocker.title}
+          actorId={personId}
+        />
+      )}
+      {selectedTaskForReschedule && (
+        <RescheduleTaskModal
+          opened={rescheduleOpened}
+          onClose={handleCloseReschedule}
+          taskId={selectedTaskForReschedule.id}
+          taskTitle={selectedTaskForReschedule.title}
+          actorId={personId}
+          currentDueDate={selectedTaskForReschedule.dueDate}
+        />
+      )}
+    </>
   );
 }
