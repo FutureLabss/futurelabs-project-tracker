@@ -1,91 +1,93 @@
-// src/components/dashboard/AttentionCard.tsx
-
 import {
-  AlertTriangle,
-  Flame,
-  Info,
-  Clock,
-} from "lucide-react";
-
-import type { AttentionItem  } from "../../../data/mockData";
+  Badge,
+  Button,
+  Card,
+  Group,
+  Text,
+  Title,
+} from '@mantine/core';
+import { IconFlame, IconInfoCircle } from '@tabler/icons-react';
+import type { AttentionItem } from '../../../data/mockData';
 
 type AttentionCardProps = {
   item: AttentionItem;
   onInspect?: (item: AttentionItem) => void;
 };
 
-export default function AttentionCard({
-  item,
-  onInspect,
-}: AttentionCardProps) {
-  const isCritical = item.type === "critical";
+export default function AttentionCard({ item, onInspect }: AttentionCardProps) {
+  const isCritical = item.type === 'critical';
 
   return (
-    <div
-      className={[
-        "rounded-xl border bg-white p-5 shadow-sm transition",
+    <Card
+      withBorder
+      radius="md"
+      p="md"
+      bg="white"
+      style={
         isCritical
-          ? "border-red-400 hover:shadow-md"
-          : "border-gray-200 hover:shadow-md",
-      ].join(" ")}
+          ? { borderColor: 'var(--mantine-color-red-5)' }
+          : undefined
+      }
     >
-      {/* Top row */}
-      <div className="flex flex-wrap items-center gap-3">
-        <span
-          className={[
-            "inline-flex items-center gap-2 rounded-md px-3 py-1 text-xs font-bold",
-            isCritical
-              ? "bg-red-500 text-white"
-              : "bg-amber-400 text-white",
-          ].join(" ")}
-        >
+      <Group justify="space-between" mb="xs">
+        <Group gap="sm">
           {isCritical ? (
-            <Flame size={15} />
+            <Badge
+              color="red"
+              variant="filled"
+              radius="sm"
+              size="sm"
+              leftSection={<IconFlame size={12} />}
+            >
+              CRITICAL: SILENT OVERRUN
+            </Badge>
           ) : (
-            <AlertTriangle size={15} />
+            <Badge
+              color="yellow.7"
+              variant="filled"
+              radius="sm"
+              size="sm"
+              leftSection={<IconInfoCircle size={12} />}
+            >
+              WARNING
+            </Badge>
           )}
 
-          {isCritical ? "CRITICAL: SILENT OVERRUN" : "WARNING"}
-        </span>
+          <Text fz="sm" fw={500} c="dimmed">
+            {item.project}
+          </Text>
+        </Group>
 
-        <span className="text-sm font-medium text-gray-500">
-          {item.project}
-        </span>
-
-        <span className="ml-auto rounded-md border border-gray-400 px-2.5 py-1 text-[11px] font-bold text-gray-500">
+        <Badge variant="outline" color="gray" radius="sm" size="sm" tt="uppercase">
           ASSIGNEE: {item.assignee}
-        </span>
-      </div>
+        </Badge>
+      </Group>
 
-      {/* Title */}
-      <h3
-        className={[
-          "mt-4 text-lg font-semibold",
-          isCritical ? "text-red-600" : "text-gray-900",
-        ].join(" ")}
-      >
-        {item.title}
-      </h3>
+      {isCritical ? (
+        <Title order={4} fz="md" fw={700} c="red.7" mt="xs">
+          {item.title}
+        </Title>
+      ) : (
+        <Text fz="sm" fw={700} c="dark.9" mt="xs">
+          {item.title}
+        </Text>
+      )}
 
-      {/* Description */}
-      <p className="mt-1 max-w-5xl text-sm leading-6 text-gray-400">
+      <Text fz="xs" c="dimmed" mt={4} lh={1.4}>
         {item.description}
-      </p>
+      </Text>
 
-      {/* Action */}
-      <div className="mt-5 flex justify-end">
-        <button
+      <Group justify="flex-end" mt="md">
+        <Button
+          variant="light"
+          color={isCritical ? 'red' : 'yellow.8'}
+          radius="md"
+          size={isCritical ? 'sm' : 'xs'}
           onClick={() => onInspect?.(item)}
-          className={[
-            "rounded-xl px-5 py-3 text-sm font-semibold transition",
-            isCritical
-              ? "bg-red-50 text-red-500 hover:bg-red-100"
-              : "bg-amber-50 text-amber-600 hover:bg-amber-100",
-          ].join(" ")}
         >
           {item.actionLabel}
-        </button>
-      </div>
-    </div>
+        </Button>
+      </Group>
+    </Card>
   );
 }

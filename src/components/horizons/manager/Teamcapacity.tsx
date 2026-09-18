@@ -1,83 +1,101 @@
-import type { TeamMember } from "../../../data/mockData";
+import {
+  Badge,
+  Card,
+  Group,
+  Progress,
+  SimpleGrid,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
+import type { TeamMember } from '../../../data/mockData';
 
 type TeamCapacityProps = {
   members: TeamMember[];
+  onSelectMember?: (member: TeamMember) => void;
 };
 
 export default function TeamCapacity({
   members,
+  onSelectMember,
 }: TeamCapacityProps) {
   return (
-    <section className="mt-7 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <Card withBorder radius="md" p="xl" bg="white">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-xl font-bold text-gray-950">
+      <Group justify="space-between" align="center" mb="md">
+        <Title order={3} fz="lg" fw={700}>
           Size-Weighted Team Capacity Distribution
-        </h2>
+        </Title>
 
-        <p className="text-xs text-gray-400">
+        <Text fz="xs" c="dimmed">
           Complexity points sum (Low=1, Mid=2, High=3) • Click any member card
-        </p>
-      </div>
+        </Text>
+      </Group>
 
       {/* Team members */}
-      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
         {members.map((member) => (
-          <button
+          <Card
             key={member.id}
-            type="button"
-            className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-left transition hover:border-gray-300 hover:shadow-sm"
+            withBorder
+            radius="md"
+            p="md"
+            style={{ cursor: 'pointer' }}
+            onClick={() => onSelectMember?.(member)}
           >
             {/* Name and points */}
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-bold text-blue-500">
+            <Group justify="space-between" align="flex-start">
+              <Stack gap={2}>
+                <Text fz="md" fw={700} c="blue.6">
                   {member.name}
-                </h3>
-
-                <p className="mt-1 text-sm text-gray-400">
+                </Text>
+                <Text fz="xs" c="dimmed">
                   {member.role}
-                </p>
-              </div>
+                </Text>
+              </Stack>
 
-              <div className="flex items-center gap-2">
+              <Group gap="xs">
                 {member.onLeave && (
-                  <span className="rounded-md border border-blue-400 bg-white px-2 py-1 text-[11px] font-bold text-blue-500">
+                  <Badge variant="outline" color="blue" radius="sm" size="xs" fw={700}>
                     ON LEAVE
-                  </span>
+                  </Badge>
                 )}
-
-                <span className="rounded-md bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white">
+                <Badge
+                  color={member.overdue > 0 ? 'orange.8' : 'teal'}
+                  variant="filled"
+                  radius="sm"
+                  size="sm"
+                  fw={700}
+                >
                   {member.points} PTS
-                </span>
-              </div>
-            </div>
+                </Badge>
+              </Group>
+            </Group>
 
             {/* Capacity bar */}
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-gray-200">
-              <div
-                className="h-full rounded-full bg-emerald-500 transition-all"
-                style={{
-                  width: `${member.capacityPercentage}%`,
-                }}
-              />
-            </div>
+            <Progress
+              value={member.capacityPercentage}
+              color={member.overdue > 0 ? 'orange.7' : 'teal.6'}
+              size="sm"
+              radius="xl"
+              mt="md"
+            />
 
             {/* Bottom information */}
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-sm text-gray-400">
+            <Group justify="space-between" mt="sm">
+              <Text fz="xs" c="dimmed">
                 {member.activeTasks} active task(s)
-              </p>
+              </Text>
 
               {member.overdue > 0 && (
-                <span className="rounded-md bg-red-50 px-2.5 py-1 text-xs font-bold text-red-500">
+                <Badge color="red" variant="light" radius="sm" size="xs" fw={700}>
                   {member.overdue} OVERDUE
-                </span>
+                </Badge>
               )}
-            </div>
-          </button>
+            </Group>
+          </Card>
         ))}
-      </div>
-    </section>
+      </SimpleGrid>
+    </Card>
   );
 }

@@ -1,102 +1,121 @@
-import { History } from "lucide-react";
-
-import type { AuditEvent } from "../../../data/mockData";
+import {
+  Badge,
+  Box,
+  Card,
+  Group,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
+import { IconHistory } from '@tabler/icons-react';
+import { auditEvents, type AuditEvent } from '../../../data/mockData';
+import { ReusableTable, type TableColumn } from '../../Table/ReusableTable';
 
 type AuditLedgerProps = {
-  events: AuditEvent[];
+  events?: AuditEvent[];
+  onSelectEvent?: (event: AuditEvent) => void;
 };
 
-const eventStyles: Record<AuditEvent["eventType"], string> = {
-  "SUBMITTED TO GATE":
-    "bg-purple-50 text-purple-500",
-
-  "TASK CREATED":
-    "bg-blue-50 text-blue-500",
-
-  "DELIVERABLE ACCEPTED":
-    "bg-emerald-50 text-emerald-500",
-
-  "STATUS CHANGED":
-    "bg-cyan-50 text-cyan-500",
+const eventBadgeConfig: Record<string, { color: string; label: string }> = {
+  'SUBMITTED TO GATE': { color: 'grape', label: 'SUBMITTED TO GATE' },
+  'TASK CREATED': { color: 'blue', label: 'TASK CREATED' },
+  'DELIVERABLE ACCEPTED': { color: 'teal', label: 'DELIVERABLE ACCEPTED' },
+  'STATUS CHANGED': { color: 'cyan', label: 'STATUS CHANGED' },
 };
 
 export default function AuditLedger({
-  events,
+  events = auditEvents,
+  onSelectEvent,
 }: AuditLedgerProps) {
+  const columns: TableColumn<AuditEvent>[] = [
+    {
+      key: 'timestamp',
+      label: 'Timestamp',
+      width: '12%',
+      render: (event) => (
+        <Text size="xs" c="dimmed">
+          {event.timestamp}
+        </Text>
+      ),
+    },
+    {
+      key: 'actor',
+      label: 'Actor',
+      width: '15%',
+      render: (event) => (
+        <Text
+          size="sm"
+          fw={600}
+          c="blue.6"
+          style={{ cursor: onSelectEvent ? 'pointer' : 'default' }}
+          onClick={() => onSelectEvent?.(event)}
+        >
+          {event.actor}
+        </Text>
+      ),
+    },
+    {
+      key: 'eventType',
+      label: 'Event Type',
+      width: '18%',
+      render: (event) => {
+        const config = eventBadgeConfig[event.eventType] || {
+          color: 'gray',
+          label: event.eventType,
+        };
+        return (
+          <Badge color={config.color} variant="light" radius="sm" size="xs" fw={700}>
+            {config.label}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: 'transition',
+      label: 'Transition',
+      width: '22%',
+      render: (event) => (
+        <Text size="sm" fw={700} c="dark.9">
+          {event.transition}
+        </Text>
+      ),
+    },
+    {
+      key: 'note',
+      label: 'Mandatory Justification / Note',
+      width: '33%',
+      render: (event) => (
+        <Text size="sm" c="dimmed">
+          {event.note}
+        </Text>
+      ),
+    },
+  ];
+
   return (
-    <section className="mt-7 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <History
-            size={24}
-            className="text-emerald-500"
-            strokeWidth={2}
-          />
-
-          <h2 className="text-xl font-bold text-gray-950">
+    <Card withBorder radius="md" p="xl" bg="white">
+      <Group justify="space-between" align="center" mb="md">
+        <Group gap="sm">
+          <ThemeIcon variant="transparent" c="teal.6" size="sm">
+            <IconHistory size={24} />
+          </ThemeIcon>
+          <Title order={3} fz="lg" fw={700}>
             Immutable Project Audit Ledger
-          </h2>
-        </div>
+          </Title>
+        </Group>
 
-        <p className="text-xs text-gray-400">
+        <Text fz="xs" c="dimmed">
           Append-only event stream • Click any row to inspect raw record
-        </p>
-      </div>
+        </Text>
+      </Group>
 
-      {/* Table */}
-      <div className="mt-6 overflow-x-auto">
-        <div className="min-w-[950px]">
-          {/* Table header */}
-          <div className="grid grid-cols-[1fr_1fr_1.6fr_1.8fr_3fr] gap-5 border-b border-gray-200 px-3 pb-3 text-sm font-bold text-gray-950">
-            <span>Timestamp</span>
-            <span>Actor</span>
-            <span>Event Type</span>
-            <span>Transition</span>
-            <span>Mandatory Justification / Note</span>
-          </div>
-
-          {/* Rows */}
-          <div>
-            {events.map((event) => (
-              <button
-                key={event.id}
-                type="button"
-                className="grid w-full grid-cols-[1fr_1fr_1.6fr_1.8fr_3fr] gap-5 border-b border-gray-200 px-3 py-4 text-left transition hover:bg-gray-50"
-              >
-                {/* Timestamp */}
-                <span className="text-sm text-gray-400">
-                  {event.timestamp}
-                </span>
-
-                {/* Actor */}
-                <span className="text-sm font-semibold text-blue-500">
-                  {event.actor}
-                </span>
-
-                {/* Event type */}
-                <span>
-                  <span
-                    className={`inline-flex rounded-md px-2.5 py-1 text-[11px] font-bold ${eventStyles[event.eventType]}`}
-                  >
-                    {event.eventType}
-                  </span>
-                </span>
-
-                {/* Transition */}
-                <span className="text-sm text-gray-700">
-                  {event.transition}
-                </span>
-
-                {/* Note */}
-                <span className="text-sm text-gray-400">
-                  {event.note}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
+      <Box mt="md">
+        <ReusableTable
+          columns={columns}
+          data={events}
+          emptyMessage="No audit records found"
+        />
+      </Box>
+    </Card>
   );
 }

@@ -1,483 +1,276 @@
 // src/app/ManagerDashboard.tsx
 
-import { useState } from "react";
+import { useState } from 'react';
 import {
-  AlertTriangle,
-  Check,
-  ClipboardCheck,
-  Clock3,
-  Flame,
-  Folder,
-  Plus,
-  Users,
-} from "lucide-react";
+  Avatar,
+  Badge,
+  Box,
+  Button,
+  Card,
+  Container,
+  Group,
+  Select,
+  SimpleGrid,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
+import {
+  IconAlertTriangle,
+  IconClipboardCheck,
+  IconFlame,
+  IconFolder,
+  IconPlus,
+  IconUsers,
+} from '@tabler/icons-react';
 
 import {
-  criticalExceptions,
-  agingWorkItems,
-  managerStats,
-  managers,
   acceptanceItems,
-  teamMembers,
+  agingWorkItems,
   auditEvents,
+  criticalExceptions,
+  managers,
+  managerStats,
+  teamMembers,
   type AttentionItem,
-} from "../data/mockData";
+} from '../data/mockData';
+
+import AttentionCard from '../components/horizons/manager/AttentionCard';
 import CreateTaskModal, {
   type CreatedTask,
-} from "../components/horizons/manager/CreateTaskModal";
-
-import AttentionCard from "../components/horizons/manager/AttentionCard";
-
-import TaskInspectorModal from "../components/horizons/manager/TaskInspectorModal";
-import ManagerAcceptanceGate from "../components/horizons/manager/ManagerAcceptanceGate";
-
-import TeamCapacity from "../components/horizons/manager/Teamcapacity";
-
-import AuditLedger from "../components/horizons/manager/AuditLedger";
-
-
-// ============================================
-// STAT ICONS
-// ============================================
-
-const statIcons = {
-  flame: Flame,
-  clipboard: ClipboardCheck,
-  folder: Folder,
-  users: Users,
-};
-
-
-// ============================================
-// STAT COLORS
-// ============================================
-
-const statColors = {
-  red: "bg-red-50 text-red-500",
-  purple: "bg-purple-50 text-purple-500",
-  blue: "bg-blue-50 text-blue-500",
-  green: "bg-emerald-50 text-emerald-500",
-};
-
-
-// ============================================
-// MANAGER DASHBOARD
-// ============================================
+} from '../components/horizons/manager/CreateTaskModal';
+import ManagerAcceptanceGate from '../components/horizons/manager/ManagerAcceptanceGate';
+import TeamCapacity from '../components/horizons/manager/Teamcapacity';
+import AuditLedger from '../components/horizons/manager/AuditLedger';
+import { StatCard } from '../components/horizons/member/StatCard';
 
 export default function ManagerDashboard() {
   const [selectedManager, setSelectedManager] = useState(managers[0]);
+  const [, setSelectedTask] = useState<AttentionItem | null>(null);
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [auditEventsState, setAuditEventsState] = useState(auditEvents);
 
-  const [selectedTask, setSelectedTask] =
-    useState<AttentionItem | null>(null);
-const [createTaskOpen, setCreateTaskOpen] =
-  useState(false);
-
-const [auditEventsState, setAuditEventsState] =
-  useState(auditEvents);
-
-  // ------------------------------------------
-  // Inspect attention item
-  // ------------------------------------------
-
-const handleInspect = (item: AttentionItem) => {
-  setSelectedTask(item);
-};
-const handleTaskCreated = (task: CreatedTask) => {
-
-  const newAuditEvent = {
-    id: Date.now(),
-
-    timestamp: new Date().toLocaleTimeString(
-      "en-US",
-      {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      }
-    ),
-
-    actor: selectedManager.name,
-
-    eventType: "TASK CREATED" as const,
-
-    transition: task.title,
-
-    note: task.description,
+  const handleInspect = (item: AttentionItem) => {
+    setSelectedTask(item);
   };
 
+  const handleTaskCreated = (task: CreatedTask) => {
+    const newAuditEvent = {
+      id: Date.now(),
+      timestamp: new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
+      actor: selectedManager.name,
+      eventType: 'TASK CREATED' as const,
+      transition: task.title,
+      note: task.description,
+    };
 
-  setAuditEventsState((previousEvents) => [
-    newAuditEvent,
-    ...previousEvents,
-  ]);
-};
+    setAuditEventsState((previousEvents) => [
+      newAuditEvent,
+      ...previousEvents,
+    ]);
+  };
 
-  // ------------------------------------------
-  // Dashboard UI
-  // ------------------------------------------
+  const getStatIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'flame':
+        return <IconFlame size={20} />;
+      case 'clipboard':
+        return <IconClipboardCheck size={20} />;
+      case 'folder':
+        return <IconFolder size={20} />;
+      case 'users':
+        return <IconUsers size={20} />;
+      default:
+        return undefined;
+    }
+  };
+
+  const getStatColor = (colorName: string) => {
+    switch (colorName) {
+      case 'red':
+        return 'red';
+      case 'purple':
+        return 'grape';
+      case 'blue':
+        return 'blue';
+      case 'green':
+        return 'teal';
+      default:
+        return 'teal';
+    }
+  };
 
   return (
-    <main className="min-h-screen bg-white text-gray-900">
-
-      {/* ======================================
-          HEADER
-      ====================================== */}
-
-      <header className="border-b border-gray-100 px-5 py-3">
-
-        <div className="flex flex-wrap items-center gap-3">
-
-          {/* Manager selector */}
-
-          <div className="relative">
-
-            <select
-              value={selectedManager.id}
-              onChange={(event) => {
-
-                const manager = managers.find(
-                  (item) =>
-                    item.id === event.target.value
-                );
-
-                if (manager) {
-                  setSelectedManager(manager);
-                }
-
-              }}
-              className="h-10 min-w-[325px] appearance-none rounded-xl border border-gray-200 bg-white px-4 pr-10 text-sm font-medium text-gray-700 outline-none focus:border-emerald-400"
-            >
-
-              {managers.map((manager) => (
-
-                <option
-                  key={manager.id}
-                  value={manager.id}
-                >
-                  {manager.name} ({manager.role})
-                </option>
-
-              ))}
-
-            </select>
-
-
-            {/* Dropdown arrow */}
-
-            <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-              ▾
-            </div>
-
-          </div>
-
-
-          {/* Manager badge */}
-
-          <span className="rounded-md bg-purple-50 px-3 py-1.5 text-xs font-bold tracking-wide text-purple-600">
+    <Box bg="gray.0" mih="100vh" py="xl">
+      <Container size="xl">
+        {/* =========================================================
+            HEADER & PERSONA SWITCHER (Image 1 & Image 2)
+        ========================================================= */}
+        <Group gap="xs" mb="lg">
+          <Avatar color="grape" radius="xl" size="sm">
+            DK
+          </Avatar>
+          <Select
+            size="xs"
+            w={230}
+            value={selectedManager.id}
+            data={managers.map((manager) => ({
+              value: manager.id,
+              label: `${manager.name} (${manager.role})`,
+            }))}
+            onChange={(val) => {
+              const matched = managers.find((m) => m.id === val);
+              if (matched) {
+                setSelectedManager(matched);
+              }
+            }}
+          />
+          <Badge color="grape" variant="light" radius="sm">
             MANAGER
-          </span>
+          </Badge>
+        </Group>
 
-        </div>
-
-      </header>
-
-
-      {/* ======================================
-          MAIN CONTENT
-      ====================================== */}
-
-      <div className="px-5 py-5">
-
-        {/* ====================================
-            PAGE HEADING
-        ==================================== */}
-
-        <div className="flex flex-col justify-between gap-5 md:flex-row md:items-start">
-
-          <div>
-
-            <h1 className="text-3xl font-bold tracking-tight text-gray-950">
+        <Group justify="space-between" align="flex-start" mb="xl">
+          <Stack gap={2}>
+            <Title order={2} fw={700} c="dark.9">
               {selectedManager.name} — Manager Horizon (Lead)
-            </h1>
+            </Title>
+            <Text fz="sm" c="dimmed">
+              Operational attention radar, gate review queue, team workload, and live audit ledger
+            </Text>
+          </Stack>
 
-            <p className="mt-1 text-base text-gray-400">
-              Operational attention radar, gate review queue,
-              team workload, and live audit ledger
-            </p>
+          <Button
+            color="teal"
+            radius="md"
+            leftSection={<IconPlus size={16} />}
+            onClick={() => setCreateTaskOpen(true)}
+          >
+            Create Task
+          </Button>
+        </Group>
 
-          </div>
+        {/* =========================================================
+            STATISTICS / KPI CARDS (Image 1)
+        ========================================================= */}
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md" mb="xl">
+          {managerStats.map((stat) => (
+            <StatCard
+              key={stat.label}
+              title={stat.label}
+              value={stat.value}
+              description={stat.description}
+              icon={getStatIcon(stat.icon)}
+              color={getStatColor(stat.color)}
+            />
+          ))}
+        </SimpleGrid>
 
-
-          {/* Create Task */}
-
-          <button
-  type="button"
-  onClick={() => setCreateTaskOpen(true)}
-  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600"
->
-  <Plus size={20} />
-
-  Create Task
-</button>
-
-        </div>
-
-
-        {/* ====================================
-            STATISTICS
-        ==================================== */}
-
-        <section className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-
-          {managerStats.map((stat) => {
-
-            const Icon =
-              statIcons[
-                stat.icon as keyof typeof statIcons
-              ];
-
-            return (
-
-              <div
-                key={stat.label}
-                className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+        {/* =========================================================
+            OPERATIONAL ATTENTION RADAR (Image 1 & Image 2)
+        ========================================================= */}
+        <Card withBorder radius="md" p="xl" bg="white" mb="xl">
+          <Group justify="space-between" align="center" mb="lg">
+            <Group gap="sm">
+              <ThemeIcon variant="transparent" c="teal.6">
+                <IconAlertTriangle size={24} />
+              </ThemeIcon>
+              <Title order={3} fz="lg" fw={700}>
+                Operational Attention Radar ({criticalExceptions.length + agingWorkItems.length})
+              </Title>
+              <Badge
+                color="red"
+                variant="filled"
+                radius="xl"
+                size="md"
+                leftSection={<IconFlame size={14} />}
               >
+                {criticalExceptions.length} SILENT OVERRUN(S) PINNED
+              </Badge>
+            </Group>
 
-                <div className="flex items-start justify-between">
+            <Text fz="xs" c="dimmed">
+              Ranked deterministically by temporal risk • Click Inspect on any card
+            </Text>
+          </Group>
 
-                  <div>
+          {/* Subheading: Pinned Critical Exceptions */}
+          <Group gap={6} mb="sm">
+            <ThemeIcon variant="transparent" c="red" size="sm">
+              <IconFlame size={16} />
+            </ThemeIcon>
+            <Text fz="xs" fw={700} c="red.7" tt="uppercase" lts={0.5}>
+              PINNED CRITICAL EXCEPTIONS (OVERDUE + STALE ACTIVITY)
+            </Text>
+          </Group>
 
-                    <p className="text-sm font-medium tracking-wide text-gray-400">
-                      {stat.label}
-                    </p>
-
-                    <p className="mt-3 text-2xl font-bold text-gray-950">
-                      {stat.value}
-                    </p>
-
-                  </div>
-
-
-                  {/* Stat icon */}
-
-                  <div
-                    className={`flex h-12 w-12 items-center justify-center rounded-xl ${
-                      statColors[stat.color]
-                    }`}
-                  >
-
-                    <Icon
-                      size={25}
-                      strokeWidth={1.8}
-                    />
-
-                  </div>
-
-                </div>
-
-
-                <p className="mt-4 text-sm text-gray-400">
-                  {stat.description}
-                </p>
-
-              </div>
-
-            );
-
-          })}
-
-        </section>
-
-
-        {/* ====================================
-            OPERATIONAL ATTENTION RADAR
-        ==================================== */}
-
-        <section className="mt-7 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-
-          {/* Radar heading */}
-
-          <div className="flex flex-wrap items-center gap-3">
-
-            <div className="flex items-center gap-3">
-
-              <AlertTriangle
-                size={24}
-                className="text-emerald-500"
-                strokeWidth={2}
+          {/* Pinned Card */}
+          <Box mb="xl">
+            {criticalExceptions.map((item) => (
+              <AttentionCard
+                key={item.id}
+                item={item}
+                onInspect={handleInspect}
               />
+            ))}
+          </Box>
 
-              <h2 className="text-xl font-bold text-gray-950">
-                Operational Attention Radar (6)
-              </h2>
+          {/* Subheading: Aging WIP, Blockers & Unassigned Items */}
+          <Group gap={6} mb="sm">
+            <ThemeIcon variant="transparent" c="yellow.8" size="sm">
+              <IconAlertTriangle size={16} />
+            </ThemeIcon>
+            <Text fz="xs" fw={700} c="yellow.8" tt="uppercase" lts={0.5}>
+              AGING WIP, BLOCKERS & UNASSIGNED ITEMS
+            </Text>
+          </Group>
 
-            </div>
-
-
-            {/* Silent overrun badge */}
-
-            <span className="inline-flex items-center gap-2 rounded-md bg-red-500 px-3 py-1.5 text-xs font-bold text-white">
-
-              <Flame size={14} />
-
-              1 SILENT OVERRUN(S) PINNED
-
-            </span>
-
-
-            <p className="ml-auto text-xs text-gray-400">
-              Ranked deterministically by temporal risk •
-              Click Inspect on any card
-            </p>
-
-          </div>
-
-
-          {/* ==================================
-              CRITICAL EXCEPTIONS
-          ================================== */}
-
-          <div className="mt-7">
-
-            <div className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-red-500">
-
-              <Flame size={18} />
-
-              Pinned Critical Exceptions
-              (Overdue + Stale Activity)
-
-            </div>
-
-
-            <div className="space-y-4">
-
-              {criticalExceptions.map((item) => (
-
-                <AttentionCard
-                  key={item.id}
-                  item={item}
-                  onInspect={handleInspect}
-                />
-
-              ))}
-
-            </div>
-
-          </div>
-
-
-          {/* ==================================
-              AGING WORK ITEMS
-          ================================== */}
-
-          <div className="mt-8">
-
-            <div className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-gray-400">
-
-              <AlertTriangle
-                size={18}
-                className="text-amber-500"
+          {/* 2-Column Warning Grid */}
+          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+            {agingWorkItems.map((item) => (
+              <AttentionCard
+                key={item.id}
+                item={item}
+                onInspect={handleInspect}
               />
+            ))}
+          </SimpleGrid>
+        </Card>
 
-              Aging WIP, Blockers & Unassigned Items
+        {/* =========================================================
+            MANAGER ACCEPTANCE GATE (Image 3) - Uses ReusableTable
+        ========================================================= */}
+        <Box mb="xl">
+          <ManagerAcceptanceGate items={acceptanceItems} />
+        </Box>
 
-            </div>
+        {/* =========================================================
+            SIZE-WEIGHTED TEAM CAPACITY (Image 3)
+        ========================================================= */}
+        <Box mb="xl">
+          <TeamCapacity members={teamMembers} />
+        </Box>
 
+        {/* =========================================================
+            IMMUTABLE PROJECT AUDIT LEDGER (Image 3) - Uses ReusableTable
+        ========================================================= */}
+        <Box mb="xl">
+          <AuditLedger events={auditEventsState} />
+        </Box>
 
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-
-              {agingWorkItems.map((item) => (
-
-                <AttentionCard
-                  key={item.id}
-                  item={item}
-                  onInspect={handleInspect}
-                />
-
-              ))}
-
-            </div>
-
-          </div>
-
-
-          {/* ==================================
-              RADAR FOOTER
-          ================================== */}
-
-          <div className="mt-7 flex flex-wrap items-center gap-5 border-t border-gray-100 pt-5 text-xs text-gray-400">
-
-            <span className="inline-flex items-center gap-2">
-
-              <Clock3 size={15} />
-
-              Live workload monitoring
-
-            </span>
-
-
-            <span className="inline-flex items-center gap-2">
-
-              <ClipboardCheck size={15} />
-
-              Review gate tracking
-
-            </span>
-
-
-            <span className="inline-flex items-center gap-2">
-
-              <Check size={15} />
-
-              Audit-ready activity
-
-            </span>
-
-          </div>
-
-        </section>
-
-
-        {/* =================================================
-            NEW SECTION 1:
-            MANAGER ACCEPTANCE GATE
-        ================================================= */}
-
-        <ManagerAcceptanceGate
-          items={acceptanceItems}
+        {/* Create Task Modal */}
+        <CreateTaskModal
+          opened={createTaskOpen}
+          onClose={() => setCreateTaskOpen(false)}
+          managerName={selectedManager.name}
+          onTaskCreated={handleTaskCreated}
         />
-
-
-        {/* =================================================
-            NEW SECTION 2:
-            TEAM CAPACITY
-        ================================================= */}
-
-        <TeamCapacity
-          members={teamMembers}
-        />
-
-
-        {/* =================================================
-            NEW SECTION 3:
-            AUDIT LEDGER
-        ================================================= */}
-
-        <AuditLedger
-  events={auditEventsState}
-/>
-<CreateTaskModal
-  opened={createTaskOpen}
-  onClose={() => setCreateTaskOpen(false)}
-  managerName={selectedManager.name}
-  onTaskCreated={handleTaskCreated}
-/>
-      </div>
-{/* Task Inspector Modal */}
-      <TaskInspectorModal
-        item={selectedTask}
-        onClose={() => setSelectedTask(null)}
-      />
-    </main>
+      </Container>
+    </Box>
   );
 }

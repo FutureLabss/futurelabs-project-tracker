@@ -1,18 +1,43 @@
-// import { useState } from 'react';
-// import { LoginScreen } from './components/LoginScreen';
-// import { RoleDashboardLayout } from './components/RoleDashboardLayout';
-// import { demoCredentials } from './data/admin-credentials';
-// import { roleDashboards } from './data/dashboard-layouts';
-// import { UserRole } from './types/dashboard';
-import ManagerDashboard from './app/ManagerDashboard';
+import { Alert } from "@mantine/core";
+import { useState } from "react";
+import { LoginScreen } from "./components/LoginScreen";
+import { RoleDashboardLayout } from "./components/RoleDashboardLayout";
+import { demoCredentials } from "./data/admin-credentials";
+import { roleDashboards } from "./data/dashboard-layouts";
+import { Persona } from "./types/dashboard";
+
+import { backendConfig } from "./lib/supabase/client";
+import { SupabaseApp } from "./app/SupabaseApp";
+import ManagerDashboard from "./app/ManagerDashboard";
 
 export function App() {
-  // const [activeRole, setActiveRole] = useState<UserRole | null>(null);
-
-  // if (!activeRole) {
-  //   return <LoginScreen credentials={demoCredentials} onLogin={(role) => setActiveRole(role)} />;
-  // }
-
-  // return <RoleDashboardLayout config={roleDashboards[activeRole]} onLogout={() => setActiveRole(null)} />;
-   return <ManagerDashboard />;
+  if (
+    backendConfig.backend === "invalid" ||
+    (window.location.pathname === "/auth/callback" &&
+      backendConfig.backend !== "supabase")
+  )
+    return (
+      <Alert color="red" m="lg">
+        Project Tracker sign-in is not configured. Contact your administrator.
+      </Alert>
+    );
+  return backendConfig.backend === "supabase" ? <SupabaseApp /> : <DemoApp />;
 }
+
+function DemoApp() {
+  const [activePerson, setActivePerson] = useState<Persona | null>(null);
+
+  if (!activePerson) {
+    return (
+      <LoginScreen credentials={demoCredentials} onLogin={setActivePerson} />
+    );
+  }
+
+  return (
+    <><RoleDashboardLayout
+      config={roleDashboards[activePerson.role]}
+      personId={activePerson.id}
+      onLogout={() => setActivePerson(null)} /><ManagerDashboard /></>
+  );
+}
+

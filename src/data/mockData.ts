@@ -1,6 +1,5 @@
 // src/data/mockData.ts
 
-
 // ======================================================
 // MANAGER
 // ======================================================
@@ -10,7 +9,6 @@ export type Manager = {
   name: string;
   role: string;
 };
-
 
 // ======================================================
 // DASHBOARD STATISTICS
@@ -23,7 +21,6 @@ export type Stat = {
   icon: string;
   color: "red" | "purple" | "blue" | "green";
 };
-
 
 // ======================================================
 // ATTENTION RADAR
@@ -38,7 +35,6 @@ export type AttentionItem = {
   assignee: string;
   actionLabel: string;
 };
-
 
 // ======================================================
 // MANAGERS
@@ -57,7 +53,6 @@ export const managers: Manager[] = [
     role: "MANAGER",
   },
 ];
-
 
 // ======================================================
 // MANAGER STATISTICS
@@ -97,7 +92,6 @@ export const managerStats: Stat[] = [
   },
 ];
 
-
 // ======================================================
 // CRITICAL EXCEPTIONS
 // ======================================================
@@ -120,7 +114,6 @@ export const criticalExceptions: AttentionItem[] = [
     actionLabel: "Inspect Silent Overrun",
   },
 ];
-
 
 // ======================================================
 // AGING WORK ITEMS
@@ -152,8 +145,7 @@ export const agingWorkItems: AttentionItem[] = [
 
     project: "Data Ingestion & Analytics Pipeline",
 
-    title:
-      "Aging WIP (MID Complexity): ETL Chunking Algorithm",
+    title: "Aging WIP (MID Complexity): ETL Chunking Algorithm",
 
     description:
       "In progress for 8 working days (threshold: 6 days). May be blocked or under-scoped.",
@@ -162,8 +154,41 @@ export const agingWorkItems: AttentionItem[] = [
 
     actionLabel: "Inspect",
   },
-];
 
+  {
+    id: 4,
+
+    type: "warning",
+
+    project: "Data Ingestion & Analytics Pipeline",
+
+    title: "Aging WIP (LOW Complexity): Schema Migration Script",
+
+    description:
+      "In progress for 5 working days (threshold: 3 days). May be blocked or under-scoped.",
+
+    assignee: "MAYA PATEL",
+
+    actionLabel: "Inspect",
+  },
+
+  {
+    id: 5,
+
+    type: "warning",
+
+    project: "Mobile SDK Onboarding",
+
+    title: "Unmanaged Project: Mobile SDK Onboarding",
+
+    description:
+      "Project has no assigned manager lead responsible for deliverables.",
+
+    assignee: "NONE",
+
+    actionLabel: "Inspect",
+  },
+];
 
 // ======================================================
 // MANAGER ACCEPTANCE GATE
@@ -186,7 +211,6 @@ export type AcceptanceItem = {
 
   status: "AWAITING VERIFICATION";
 };
-
 
 // ======================================================
 // ACCEPTANCE GATE DATA
@@ -213,7 +237,6 @@ export const acceptanceItems: AcceptanceItem[] = [
   },
 ];
 
-
 // ======================================================
 // TEAM CAPACITY
 // ======================================================
@@ -235,7 +258,6 @@ export type TeamMember = {
 
   capacityPercentage: number;
 };
-
 
 // ======================================================
 // TEAM MEMBERS
@@ -277,7 +299,6 @@ export const teamMembers: TeamMember[] = [
   },
 ];
 
-
 // ======================================================
 // AUDIT LEDGER
 // ======================================================
@@ -299,7 +320,6 @@ export type AuditEvent = {
 
   note: string;
 };
-
 
 // ======================================================
 // AUDIT EVENTS

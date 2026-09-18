@@ -11,43 +11,53 @@ import {
   Text,
   TextInput,
   Title,
-} from '@mantine/core';
-import { IconAlertCircle, IconLock, IconLogin2, IconMail, IconShieldCheck } from '@tabler/icons-react';
-import { FormEvent, useState } from 'react';
-import { Persona, UserRole } from '../types/dashboard';
+} from "@mantine/core";
+import {
+  IconAlertCircle,
+  IconLock,
+  IconLogin2,
+  IconMail,
+  IconShieldCheck,
+} from "@tabler/icons-react";
+import { FormEvent, useState } from "react";
+import { Persona } from "../types/dashboard";
 
 interface LoginScreenProps {
   credentials: Persona[];
-  onLogin: (role: UserRole) => void;
+  onLogin: (person: Persona) => void;
 }
 
 export function LoginScreen({ credentials, onLogin }: LoginScreenProps) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const normalizedEmail = email.trim().toLowerCase();
     const matchingCredentials = credentials.find(
-      (credential) => credential.email === normalizedEmail && credential.password === password,
+      (credential) =>
+        credential.email === normalizedEmail &&
+        credential.password === password,
     );
 
     if (!matchingCredentials) {
-      setError('Invalid email or password. Use one of the sample credentials shown on this screen.');
+      setError(
+        "Invalid email or password. Use one of the sample credentials shown on this screen.",
+      );
       return;
     }
 
-    setError('');
-    onLogin(matchingCredentials.role);
+    setError("");
+    onLogin(matchingCredentials);
   };
 
   const fillDemoCredentials = (credential: Persona) => {
     setEmail(credential.email);
     setPassword(credential.password);
-    setError('');
+    setError("");
   };
 
   return (
@@ -65,7 +75,8 @@ export function LoginScreen({ credentials, onLogin }: LoginScreenProps) {
 
               <Title order={1}>Dashboard sign in</Title>
               <Text c="dimmed" mt="sm" size="lg" maw={480}>
-                Access role-based dashboards with the sample administrator or member account.
+                Access role-based dashboards with the sample administrator or
+                member account.
               </Text>
             </Box>
 
@@ -74,7 +85,11 @@ export function LoginScreen({ credentials, onLogin }: LoginScreenProps) {
                 <Text size="xs" fw={800} c="dimmed" tt="uppercase">
                   Sample login credentials
                 </Text>
-                <Button size="compact-xs" variant="light" onClick={() => fillDemoCredentials(credentials[0])}>
+                <Button
+                  size="compact-xs"
+                  variant="light"
+                  onClick={() => fillDemoCredentials(credentials[0])}
+                >
                   Fill admin
                 </Button>
               </Group>
@@ -85,7 +100,13 @@ export function LoginScreen({ credentials, onLogin }: LoginScreenProps) {
                       <Text size="xs" fw={800} c="dimmed" tt="uppercase">
                         {credential.role} account
                       </Text>
-                      <Anchor size="xs" fw={700} component="button" type="button" onClick={() => fillDemoCredentials(credential)}>
+                      <Anchor
+                        size="xs"
+                        fw={700}
+                        component="button"
+                        type="button"
+                        onClick={() => fillDemoCredentials(credential)}
+                      >
                         Fill
                       </Anchor>
                     </Group>
@@ -93,7 +114,13 @@ export function LoginScreen({ credentials, onLogin }: LoginScreenProps) {
                       <Text size="sm" c="dimmed">
                         Email
                       </Text>
-                      <Anchor size="sm" fw={700} component="button" type="button" onClick={() => setEmail(credential.email)}>
+                      <Anchor
+                        size="sm"
+                        fw={700}
+                        component="button"
+                        type="button"
+                        onClick={() => setEmail(credential.email)}
+                      >
                         {credential.email}
                       </Anchor>
                     </Group>
@@ -101,7 +128,13 @@ export function LoginScreen({ credentials, onLogin }: LoginScreenProps) {
                       <Text size="sm" c="dimmed">
                         Password
                       </Text>
-                      <Anchor size="sm" fw={700} component="button" type="button" onClick={() => setPassword(credential.password)}>
+                      <Anchor
+                        size="sm"
+                        fw={700}
+                        component="button"
+                        type="button"
+                        onClick={() => setPassword(credential.password)}
+                      >
                         {credential.password}
                       </Anchor>
                     </Group>
@@ -156,7 +189,9 @@ export function LoginScreen({ credentials, onLogin }: LoginScreenProps) {
                   <Checkbox
                     checked={rememberMe}
                     label="Remember me"
-                    onChange={(event) => setRememberMe(event.currentTarget.checked)}
+                    onChange={(event) =>
+                      setRememberMe(event.currentTarget.checked)
+                    }
                     size="sm"
                   />
                   <Anchor component="button" size="sm" type="button">
@@ -164,7 +199,11 @@ export function LoginScreen({ credentials, onLogin }: LoginScreenProps) {
                   </Anchor>
                 </Group>
 
-                <Button fullWidth leftSection={<IconLogin2 size={16} />} type="submit">
+                <Button
+                  fullWidth
+                  leftSection={<IconLogin2 size={16} />}
+                  type="submit"
+                >
                   Sign in
                 </Button>
               </Stack>
