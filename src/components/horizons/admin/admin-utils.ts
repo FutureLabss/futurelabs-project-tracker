@@ -5,14 +5,20 @@ export const isOpen = (task: { status: string }) =>
 export const readable = (value: string) => value.replaceAll("_", " ");
 export function eligiblePeople(data: AdminWorkspace, projectId: string) {
   const project = data.projects.find((p) => p.id === projectId);
+  if (!project) return [];
+
+  const projectMemberIds = new Set(
+    data.members
+      .filter((member) => member.projectId === projectId)
+      .map((member) => member.personId),
+  );
+
   return data.people.filter(
     (p) =>
       p.status !== "inactive" &&
       (p.role === "admin" ||
-        p.id === project?.managerId ||
-        data.members.some(
-          (m) => m.projectId === projectId && m.personId === p.id,
-        )),
+        p.id === project.managerId ||
+        projectMemberIds.has(p.id)),
   );
 }
 // Quote every cell, escape CSV quotes, and neutralize spreadsheet formula input.
