@@ -9,6 +9,7 @@ export type SharedProjectTask = {
   };
 
   project: string;
+  projectId?: string;
 
   complexity:
     | 'LOW (1 PT)'

@@ -1,5 +1,6 @@
 import {
   Button,
+  Box,
   Group,
   Stack,
   Text,
@@ -29,6 +30,8 @@ import { useProjects } from '../../../../api/hooks/use-projects';
 import { useClearBlocker } from '../../../../api/hooks/use-blockers';
 import { RaiseBlockerModal } from './RaiseBlockerModal';
 import { RescheduleTaskModal } from './RescheduleTaskModal';
+import { ClearBlockerModal } from './ClearBlockerModal';
+import { TaskDiagnosticDrawer } from '../../../detail-views/TaskDiagnosticDrawer';
 
 interface personTaskTableProps {
   personId:string;
@@ -36,6 +39,16 @@ interface personTaskTableProps {
 
 
 export function PersonalTasksTable({personId}:personTaskTableProps) {
+  const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null);
+
+  const clickableCell = (taskId: string | number, children: React.ReactNode) => (
+    <Box
+      onClick={() => setDrawerTaskId(String(taskId))}
+      style={{ cursor: 'pointer', height: '100%', width: '100%', display: 'flex', alignItems: 'center' }}
+    >
+      {children}
+    </Box>
+  );
 
 const personalTaskColumns: TableColumn<PersonalTask>[] = [
   {
@@ -43,7 +56,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
     label: 'Task Title & Description',
     width: '40%',
 
-    render: (task) => (
+    render: (task) => clickableCell(task.id, (
       <Stack gap={3}>
         <Text
           size="sm"
@@ -61,14 +74,13 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
           {task.overview}
         </Text>
       </Stack>
-    ),
+    )),
   },
 
   {
     key: 'project',
     label: 'Project',
     width: '20%',
-
     render: (task) => (
       <Text
         size="sm"
@@ -85,11 +97,11 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
     label: 'Complexity',
     width: '12%',
 
-    render: (task) => (
+    render: (task) => clickableCell(task.id, (
       <ComplexityBadge
         value={task.complexity}
       />
-    ),
+    )),
   },
 
   {
@@ -97,7 +109,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
     label: 'Due Date',
     width: '12%',
 
-    render: (task) => (
+    render: (task) => clickableCell(task.id, (
       <Stack gap={4}>
         <Text
           size="sm"
@@ -110,7 +122,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
           <OverdueBadge />
         )}
       </Stack>
-    ),
+    )),
   },
 
   {
@@ -118,7 +130,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
     label: 'Status',
     width: '12%',
 
-    render: (task) => (
+    render: (task) => clickableCell(task.id, (
       <Stack gap={4}>
         <StatusBadge
           status={task.status}
@@ -128,7 +140,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
           <BlockedBadge />
         )}
       </Stack>
-    ),
+    )),
   },
 
   {
@@ -270,7 +282,10 @@ const handleSubmit = (taskId: string) => {
   const [rescheduleOpened, setRescheduleOpened] = useState(false);
   const [selectedTaskForReschedule, setSelectedTaskForReschedule] = useState<{ id: string; title: string; dueDate: string } | null>(null);
 
-  const handleOpenRaiseBlocker = (task: PersonalTask) => {
+  const [clearBlockerOpened, setClearBlockerOpened] = useState(false);
+  const [selectedTaskForClearBlocker, setSelectedTaskForClearBlocker] = useState<{ id: string; title: string; projectId: string; taskOwnerId: string; activeBlockerId?: string } | null>(null);
+
+  const handleOpenRaiseBlocker = (task: any) => {
     setSelectedTaskForBlocker({ id: task.id as string, title: task.title });
     setRaiseBlockerOpened(true);
   };
@@ -280,7 +295,7 @@ const handleSubmit = (taskId: string) => {
     setRaiseBlockerOpened(false);
   };
 
-  const handleOpenReschedule = (task: PersonalTask) => {
+  const handleOpenReschedule = (task: any) => {
     setSelectedTaskForReschedule({ id: task.id as string, title: task.title, dueDate: task.dueDate });
     setRescheduleOpened(true);
   };
@@ -288,6 +303,22 @@ const handleSubmit = (taskId: string) => {
   const handleCloseReschedule = () => {
     setSelectedTaskForReschedule(null);
     setRescheduleOpened(false);
+  };
+
+  const handleOpenClearBlocker = (task: any) => {
+    setSelectedTaskForClearBlocker({
+      id: task.id as string,
+      title: task.title,
+      projectId: task.projectId || '',
+      taskOwnerId: task.assigneeId || '',
+      activeBlockerId: task.activeBlockerId
+    });
+    setClearBlockerOpened(true);
+  };
+
+  const handleCloseClearBlocker = () => {
+    setSelectedTaskForClearBlocker(null);
+    setClearBlockerOpened(false);
   };
 
   if (isLoading) {
@@ -326,6 +357,7 @@ const handleSubmit = (taskId: string) => {
       title: task.title,
       overview: task.description,
       project: project?.name || 'Unknown Project',
+      projectId: task.projectId,
       complexity,
       dueDate: task.dueDate,
       overdue: isOverdue,
@@ -359,6 +391,30 @@ const handleSubmit = (taskId: string) => {
           currentDueDate={selectedTaskForReschedule.dueDate}
         />
       )}
+      {selectedTaskForClearBlocker && (
+        <ClearBlockerModal
+          opened={clearBlockerOpened}
+          onClose={handleCloseClearBlocker}
+          taskId={selectedTaskForClearBlocker.id}
+          taskTitle={selectedTaskForClearBlocker.title}
+          projectId={selectedTaskForClearBlocker.projectId}
+          taskOwnerId={selectedTaskForClearBlocker.taskOwnerId}
+          actorId={personId}
+          activeBlockerId={selectedTaskForClearBlocker.activeBlockerId}
+        />
+      )}
+      <TaskDiagnosticDrawer
+        opened={!!drawerTaskId}
+        onClose={() => setDrawerTaskId(null)}
+        taskId={drawerTaskId}
+        isReadOnly={false}
+        onOpenRaiseBlocker={(task: any) => { setDrawerTaskId(null); handleOpenRaiseBlocker(task); }}
+        onOpenReschedule={(task: any) => { setDrawerTaskId(null); handleOpenReschedule(task); }}
+        onOpenClearBlocker={(task: any) => { setDrawerTaskId(null); handleOpenClearBlocker(task); }}
+        onStartWorking={(task: any) => {
+          updateTaskStatus({ taskId: task.id as string, status: 'in_progress', actorId: personId });
+        }}
+      />
     </>
   );
 }
