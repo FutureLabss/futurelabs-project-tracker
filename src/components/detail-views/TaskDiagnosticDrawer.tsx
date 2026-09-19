@@ -39,6 +39,7 @@ interface TaskDiagnosticDrawerProps {
   onOpenReschedule?: (task: any) => void;
   onOpenClearBlocker?: (task: any) => void;
   onStartWorking?: (task: any) => void;
+  onSubmitTask?: (task: any) => void;
 }
 
 export function TaskDiagnosticDrawer({
@@ -50,6 +51,7 @@ export function TaskDiagnosticDrawer({
   onOpenReschedule,
   onOpenClearBlocker,
   onStartWorking,
+  onSubmitTask,
 }: TaskDiagnosticDrawerProps) {
   const { data: allTasks = [] } = useTasks();
   const { data: projects = [] } = useProjects();
@@ -230,7 +232,7 @@ export function TaskDiagnosticDrawer({
         </Card>
 
         {/* Operational State Actions */}
-        {!isReadOnly && (
+        {!isReadOnly && !['submitted', 'accepted', 'cancelled'].includes(task.status) && (
           <Card withBorder shadow="sm" radius="md">
             <Text fw={700} size="sm" c="dimmed" mb="md" tt="uppercase">Operational State Actions</Text>
             <Group>
@@ -244,6 +246,39 @@ export function TaskDiagnosticDrawer({
                   Start Working
                 </Button>
               )}
+
+              {task.status === 'in_progress' && (
+                <Button
+                  variant="filled"
+                  color="violet"
+                  leftSection={<IconSend size={16} />}
+                  onClick={() => onSubmitTask && onSubmitTask(task as any)}
+                >
+                  Submit for Acceptance Gate
+                </Button>
+              )}
+
+              {task.status === 'in_progress' && (
+                <Button
+                  variant="light"
+                  color="red"
+                  leftSection={<IconAlertCircle size={16} />}
+                  onClick={() => onOpenRaiseBlocker && onOpenRaiseBlocker(task as any)}
+                >
+                  Raise Blocker
+                </Button>
+              )}
+
+              {task.status === 'blocked' && (
+                <Button
+                  variant="filled"
+                  color="teal"
+                  leftSection={<IconCheck size={16} />}
+                  onClick={() => onOpenClearBlocker && onOpenClearBlocker(task as any)}
+                >
+                  Clear Blocker...
+                </Button>
+              )}
               
               {task.status !== 'not_started' && (
                 <Button
@@ -253,26 +288,6 @@ export function TaskDiagnosticDrawer({
                   onClick={() => onOpenReschedule && onOpenReschedule(task as any)}
                 >
                   Reschedule Due Date...
-                </Button>
-              )}
-
-              {task.status === 'blocked' ? (
-                <Button
-                  variant="filled"
-                  color="teal"
-                  leftSection={<IconCheck size={16} />}
-                  onClick={() => onOpenClearBlocker && onOpenClearBlocker(task as any)}
-                >
-                  Clear Blocker...
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  color="red"
-                  leftSection={<IconAlertCircle size={16} />}
-                  onClick={() => onOpenRaiseBlocker && onOpenRaiseBlocker(task as any)}
-                >
-                  Raise Blocker...
                 </Button>
               )}
             </Group>

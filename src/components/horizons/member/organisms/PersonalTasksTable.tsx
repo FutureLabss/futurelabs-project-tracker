@@ -414,6 +414,10 @@ const handleSubmit = (taskId: string) => {
         onStartWorking={(task: any) => {
           updateTaskStatus({ taskId: task.id as string, status: 'in_progress', actorId: personId });
         }}
+        onSubmitTask={(task: any) => {
+          setDrawerTaskId(null);
+          handleSubmit(task.id as string);
+        }}
       />
     </>
   );
