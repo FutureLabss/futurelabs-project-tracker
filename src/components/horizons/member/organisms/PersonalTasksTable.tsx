@@ -35,10 +35,11 @@ import { TaskDiagnosticDrawer } from '../../../detail-views/TaskDiagnosticDrawer
 
 interface personTaskTableProps {
   personId:string;
+  onProjectClick?: (projectId: string) => void;
 }
 
 
-export function PersonalTasksTable({personId}:personTaskTableProps) {
+export function PersonalTasksTable({personId, onProjectClick}:personTaskTableProps) {
   const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null);
 
   const clickableCell = (taskId: string | number, children: React.ReactNode) => (
@@ -81,7 +82,17 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
     key: 'project',
     label: 'Project',
     width: '20%',
-    render: (task) => (
+    render: (task) => onProjectClick ? (
+      <Text
+        size="sm"
+        c="blue.7"
+        fw={500}
+        style={{ cursor: 'pointer' }}
+        onClick={() => task.projectId && onProjectClick(task.projectId)}
+      >
+        {task.project}
+      </Text>
+    ) : (
       <Text
         size="sm"
         c="blue.7"

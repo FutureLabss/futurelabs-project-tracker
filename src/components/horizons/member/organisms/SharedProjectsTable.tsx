@@ -32,9 +32,10 @@ import { TaskDiagnosticDrawer } from '../../../detail-views/TaskDiagnosticDrawer
 
 interface SharedProjectsTableProps {
   personId: string;
+  onProjectClick?: (projectId: string) => void;
 }
 
-export function SharedProjectsTable({ personId }: SharedProjectsTableProps) {
+export function SharedProjectsTable({ personId, onProjectClick }: SharedProjectsTableProps) {
   const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null);
 
   const clickableCell = (taskId: string | number, children: React.ReactNode) => (
@@ -133,7 +134,18 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
     key: 'project',
     label: 'Project',
     width: '16%',
-    render: (task) => (
+    render: (task) => onProjectClick ? (
+      <Text
+        size="sm"
+        c="blue.7"
+        fw={500}
+        lineClamp={2}
+        style={{ cursor: 'pointer' }}
+        onClick={() => task.projectId && onProjectClick(task.projectId)}
+      >
+        {task.project}
+      </Text>
+    ) : (
       <Text
         size="sm"
         c="blue.7"
@@ -217,6 +229,7 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
           variant="light"
           color="blue"
           leftSection={icon}
+          onClick={() => setDrawerTaskId(String(task.id))}
         >
           {task.accessMode}
         </Button>
