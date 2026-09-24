@@ -23,6 +23,8 @@ import { MemberPageHeader } from './molecules/MemberPageHeader';
 import { MemberTemplate } from './templates/MemberTemplate';
 import { MemberView } from '../../../types/dashboard';
 import { useTasks } from '../../../api/hooks/use-tasks';
+import { ProjectDetailsView } from './ProjectDetailsView';
+import { useState, useEffect } from 'react';
 
 
 interface MemberDashboardProps {
@@ -32,6 +34,12 @@ interface MemberDashboardProps {
 }
 
 export default function MemberDashboard({personId, personName, memberView}:MemberDashboardProps) {
+
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveProjectId(null);
+  }, [memberView]);
 
   const { data: tasks = [] } = useTasks({ assigneeId: personId });
 
@@ -61,14 +69,16 @@ export default function MemberDashboard({personId, personName, memberView}:Membe
   return (
     <MemberTemplate
       header={
-        <MemberPageHeader
-          personName={personName}
-          personId={personId}
-          memberView={memberView}
-        />
+        !activeProjectId && (
+          <MemberPageHeader
+            personName={personName}
+            personId={personId}
+            memberView={memberView}
+          />
+        )
       }
       metricsGrid={
-        memberView !== 'completed' ? (
+        !activeProjectId && memberView !== 'completed' ? (
           <SimpleGrid
             cols={{
               base: 1,
@@ -116,7 +126,14 @@ export default function MemberDashboard({personId, personName, memberView}:Membe
           CONTENT VIEWS
       ========================= */}
 
-      {memberView === 'my-work' && (
+      {activeProjectId && (
+        <ProjectDetailsView
+          projectId={activeProjectId}
+          onBack={() => setActiveProjectId(null)}
+        />
+      )}
+
+      {!activeProjectId && memberView === 'my-work' && (
         <Paper
           withBorder
           radius="md"
@@ -147,22 +164,22 @@ export default function MemberDashboard({personId, personName, memberView}:Membe
               </Stack>
             </Group>
 
-            <PersonalTasksTable personId={personId} />
+            <PersonalTasksTable personId={personId} onProjectClick={setActiveProjectId} />
           </Stack>
         </Paper>
       )}
 
-      {memberView === 'team' && (
+      {!activeProjectId && memberView === 'team' && (
         <Paper
           withBorder
           radius="md"
           p="md"
         >
-          <SharedProjectsTable personId={personId} />
+          <SharedProjectsTable personId={personId} onProjectClick={setActiveProjectId} />
         </Paper>
       )}
 
-      {memberView === 'completed' && (
+      {!activeProjectId && memberView === 'completed' && (
         <Paper
           withBorder
           radius="md"
@@ -192,7 +209,7 @@ export default function MemberDashboard({personId, personName, memberView}:Membe
               </Stack>
             </Group>
 
-            <AcceptedDeliverablesTable personId={personId} />
+            <AcceptedDeliverablesTable personId={personId} onProjectClick={setActiveProjectId} />
           </Stack>
         </Paper>
       )}

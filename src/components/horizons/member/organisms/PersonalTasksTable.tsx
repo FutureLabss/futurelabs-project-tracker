@@ -1,9 +1,11 @@
 import {
   Button,
+  Box,
   Group,
   Stack,
   Text,
 } from '@mantine/core';
+import { useState } from 'react';
 
 import {
   IconAlertCircle,
@@ -23,12 +25,31 @@ import {
 } from '../../../Table/ReusableTable';
 
 import type { PersonalTask } from '../../../../types/memberpersonaltasks';
-import { useTasks } from '../../../../api/hooks/use-tasks';
+import { useSubmitTask, useTasks, useUpdateTaskStatus } from '../../../../api/hooks/use-tasks';
 import { useProjects } from '../../../../api/hooks/use-projects';
+import { useClearBlocker } from '../../../../api/hooks/use-blockers';
+import { RaiseBlockerModal } from './RaiseBlockerModal';
+import { RescheduleTaskModal } from './RescheduleTaskModal';
+import { ClearBlockerModal } from './ClearBlockerModal';
+import { TaskDiagnosticDrawer } from '../../../detail-views/TaskDiagnosticDrawer';
 
 interface personTaskTableProps {
   personId:string;
+  onProjectClick?: (projectId: string) => void;
 }
+
+
+export function PersonalTasksTable({personId, onProjectClick}:personTaskTableProps) {
+  const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null);
+
+  const clickableCell = (taskId: string | number, children: React.ReactNode) => (
+    <Box
+      onClick={() => setDrawerTaskId(String(taskId))}
+      style={{ cursor: 'pointer', height: '100%', width: '100%', display: 'flex', alignItems: 'center' }}
+    >
+      {children}
+    </Box>
+  );
 
 const personalTaskColumns: TableColumn<PersonalTask>[] = [
   {
@@ -36,7 +57,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
     label: 'Task Title & Description',
     width: '40%',
 
-    render: (task) => (
+    render: (task) => clickableCell(task.id, (
       <Stack gap={3}>
         <Text
           size="sm"
@@ -54,15 +75,24 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
           {task.overview}
         </Text>
       </Stack>
-    ),
+    )),
   },
 
   {
     key: 'project',
     label: 'Project',
     width: '20%',
-
-    render: (task) => (
+    render: (task) => onProjectClick ? (
+      <Text
+        size="sm"
+        c="blue.7"
+        fw={500}
+        style={{ cursor: 'pointer' }}
+        onClick={() => task.projectId && onProjectClick(task.projectId)}
+      >
+        {task.project}
+      </Text>
+    ) : (
       <Text
         size="sm"
         c="blue.7"
@@ -78,11 +108,11 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
     label: 'Complexity',
     width: '12%',
 
-    render: (task) => (
+    render: (task) => clickableCell(task.id, (
       <ComplexityBadge
         value={task.complexity}
       />
-    ),
+    )),
   },
 
   {
@@ -90,7 +120,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
     label: 'Due Date',
     width: '12%',
 
-    render: (task) => (
+    render: (task) => clickableCell(task.id, (
       <Stack gap={4}>
         <Text
           size="sm"
@@ -103,7 +133,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
           <OverdueBadge />
         )}
       </Stack>
-    ),
+    )),
   },
 
   {
@@ -111,7 +141,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
     label: 'Status',
     width: '12%',
 
-    render: (task) => (
+    render: (task) => clickableCell(task.id, (
       <Stack gap={4}>
         <StatusBadge
           status={task.status}
@@ -121,7 +151,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
           <BlockedBadge />
         )}
       </Stack>
-    ),
+    )),
   },
 
   {
@@ -141,6 +171,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
             leftSection={
               <IconPlayerPlay size={13} />
             }
+            onClick={() => handleStart(task.id)}
           >
             Start Working
           </Button>
@@ -155,6 +186,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
             leftSection={
               <IconSend size={13} />
             }
+            onClick={() => handleSubmit(task.id)}
           >
             Submit
           </Button>
@@ -168,8 +200,24 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
             color="red"
             p={5}
             aria-label="Raise blocker"
+            onClick={() => handleOpenRaiseBlocker(task)}
           >
             <IconAlertCircle size={15} />
+          </Button>
+        )}
+
+        {/* RESUME */}
+        {task.status === 'BLOCKED' && (
+          <Button
+            size="compact-xs"
+            variant="light"
+            color="blue"
+            leftSection={
+              <IconPlayerPlay size={13} />
+            }
+            onClick={() => handleResume(task.id as string)}
+          >
+            Resume
           </Button>
         )}
 
@@ -180,6 +228,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
           color="orange"
           p={5}
           aria-label="Reschedule due date"
+          onClick={() => handleOpenReschedule(task)}
         >
           <IconCalendarEvent size={15} />
         </Button>
@@ -188,12 +237,100 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
     ),
   },
 ];
-export function PersonalTasksTable({personId}:personTaskTableProps) {
+
+
+const { mutate: updateTaskStatus } = useUpdateTaskStatus();
+const { mutate: clearBlocker } = useClearBlocker();
+
+const handleStart = (taskId: string) => {
+    updateTaskStatus({
+      taskId,
+      status: 'in_progress',
+      actorId: personId,
+    });
+    console.log(`Start working button clicked for task: ${taskId}`);
+
+}
+
+const handleResume = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task?.activeBlockerId) {
+      clearBlocker({
+        blockerId: task.activeBlockerId,
+        actorId: personId,
+      });
+      console.log(`Blocker cleared and task resumed: ${taskId}`);
+    } else {
+      updateTaskStatus({
+        taskId,
+        status: 'in_progress',
+        actorId: personId,
+      });
+      console.log(`Resume button clicked for task: ${taskId}`);
+    }
+}
+
+const{ mutate: submitTask } = useSubmitTask();
+const handleSubmit = (taskId: string) => {
+  submitTask({
+    taskId,
+    actorId: personId,
+    notes:'task completed successfully',
+    deliverableUrl:''
+  });
+
+  console.log(`Submit button clicked for task: ${taskId}`);
+}
   const {data: tasks = [], isLoading, error} = useTasks({
     assigneeId: personId,
   });
 
   const { data: projects = [] } = useProjects();
+
+  const [raiseBlockerOpened, setRaiseBlockerOpened] = useState(false);
+  const [selectedTaskForBlocker, setSelectedTaskForBlocker] = useState<{ id: string; title: string } | null>(null);
+
+  const [rescheduleOpened, setRescheduleOpened] = useState(false);
+  const [selectedTaskForReschedule, setSelectedTaskForReschedule] = useState<{ id: string; title: string; dueDate: string } | null>(null);
+
+  const [clearBlockerOpened, setClearBlockerOpened] = useState(false);
+  const [selectedTaskForClearBlocker, setSelectedTaskForClearBlocker] = useState<{ id: string; title: string; projectId: string; taskOwnerId: string; activeBlockerId?: string } | null>(null);
+
+  const handleOpenRaiseBlocker = (task: any) => {
+    setSelectedTaskForBlocker({ id: task.id as string, title: task.title });
+    setRaiseBlockerOpened(true);
+  };
+
+  const handleCloseRaiseBlocker = () => {
+    setSelectedTaskForBlocker(null);
+    setRaiseBlockerOpened(false);
+  };
+
+  const handleOpenReschedule = (task: any) => {
+    setSelectedTaskForReschedule({ id: task.id as string, title: task.title, dueDate: task.dueDate });
+    setRescheduleOpened(true);
+  };
+
+  const handleCloseReschedule = () => {
+    setSelectedTaskForReschedule(null);
+    setRescheduleOpened(false);
+  };
+
+  const handleOpenClearBlocker = (task: any) => {
+    setSelectedTaskForClearBlocker({
+      id: task.id as string,
+      title: task.title,
+      projectId: task.projectId || '',
+      taskOwnerId: task.assigneeId || '',
+      activeBlockerId: task.activeBlockerId
+    });
+    setClearBlockerOpened(true);
+  };
+
+  const handleCloseClearBlocker = () => {
+    setSelectedTaskForClearBlocker(null);
+    setClearBlockerOpened(false);
+  };
 
   if (isLoading) {
     return <Text>Loading tasks...</Text>;
@@ -217,6 +354,8 @@ export function PersonalTasksTable({personId}:personTaskTableProps) {
     let status: PersonalTask['status'] = 'NOT STARTED';
     if (task.status === 'in_progress') status = 'IN PROGRESS';
     if (task.status === 'blocked') status = 'BLOCKED';
+    if (task.status === 'submitted') status = 'SUBMITTED (REVIEW)';
+    if (task.status === 'accepted') status = 'ACCEPTED';
 
     let accessMode: PersonalTask['accessMode'] = 'INSPECT (READ-ONLY)';
     if (status === 'NOT STARTED') accessMode = 'START';
@@ -229,6 +368,7 @@ export function PersonalTasksTable({personId}:personTaskTableProps) {
       title: task.title,
       overview: task.description,
       project: project?.name || 'Unknown Project',
+      projectId: task.projectId,
       complexity,
       dueDate: task.dueDate,
       overdue: isOverdue,
@@ -238,9 +378,58 @@ export function PersonalTasksTable({personId}:personTaskTableProps) {
   });
 
   return (
-    <ReusableTable
-      columns={personalTaskColumns}
-      data={mappedTasks}
-    />
+    <>
+      <ReusableTable
+        columns={personalTaskColumns}
+        data={mappedTasks}
+      />
+      {selectedTaskForBlocker && (
+        <RaiseBlockerModal
+          opened={raiseBlockerOpened}
+          onClose={handleCloseRaiseBlocker}
+          taskId={selectedTaskForBlocker.id}
+          taskTitle={selectedTaskForBlocker.title}
+          actorId={personId}
+        />
+      )}
+      {selectedTaskForReschedule && (
+        <RescheduleTaskModal
+          opened={rescheduleOpened}
+          onClose={handleCloseReschedule}
+          taskId={selectedTaskForReschedule.id}
+          taskTitle={selectedTaskForReschedule.title}
+          actorId={personId}
+          currentDueDate={selectedTaskForReschedule.dueDate}
+        />
+      )}
+      {selectedTaskForClearBlocker && (
+        <ClearBlockerModal
+          opened={clearBlockerOpened}
+          onClose={handleCloseClearBlocker}
+          taskId={selectedTaskForClearBlocker.id}
+          taskTitle={selectedTaskForClearBlocker.title}
+          projectId={selectedTaskForClearBlocker.projectId}
+          taskOwnerId={selectedTaskForClearBlocker.taskOwnerId}
+          actorId={personId}
+          activeBlockerId={selectedTaskForClearBlocker.activeBlockerId}
+        />
+      )}
+      <TaskDiagnosticDrawer
+        opened={!!drawerTaskId}
+        onClose={() => setDrawerTaskId(null)}
+        taskId={drawerTaskId}
+        isReadOnly={false}
+        onOpenRaiseBlocker={(task: any) => { setDrawerTaskId(null); handleOpenRaiseBlocker(task); }}
+        onOpenReschedule={(task: any) => { setDrawerTaskId(null); handleOpenReschedule(task); }}
+        onOpenClearBlocker={(task: any) => { setDrawerTaskId(null); handleOpenClearBlocker(task); }}
+        onStartWorking={(task: any) => {
+          updateTaskStatus({ taskId: task.id as string, status: 'in_progress', actorId: personId });
+        }}
+        onSubmitTask={(task: any) => {
+          setDrawerTaskId(null);
+          handleSubmit(task.id as string);
+        }}
+      />
+    </>
   );
 }

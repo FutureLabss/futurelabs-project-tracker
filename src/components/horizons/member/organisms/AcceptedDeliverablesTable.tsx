@@ -9,7 +9,12 @@ import { AcceptedDeliverable } from '../../../../types/accepteddeliverables';
 import { useTasks } from '../../../../api/hooks/use-tasks';
 import { useProjects } from '../../../../api/hooks/use-projects';
 
-const deliverableColumns: TableColumn<AcceptedDeliverable>[] = [
+interface AcceptedDeliverablesTableProps {
+  personId: string;
+  onProjectClick?: (projectId: string) => void;
+}
+
+const deliverableColumns = (onProjectClick?: (projectId: string) => void): TableColumn<AcceptedDeliverable>[] => [
   {
     key: 'deliverable',
     label: 'Deliverable',
@@ -31,7 +36,16 @@ const deliverableColumns: TableColumn<AcceptedDeliverable>[] = [
     label: 'Project',
     width: '30%',
 
-    render: (item: AcceptedDeliverable) => (
+    render: (item: AcceptedDeliverable) => onProjectClick ? (
+      <Text
+        size="sm"
+        c="dimmed"
+        style={{ cursor: 'pointer' }}
+        onClick={() => item.projectId && onProjectClick(item.projectId)}
+      >
+        {item.project}
+      </Text>
+    ) : (
       <Text
         size="sm"
         c="dimmed"
@@ -85,11 +99,7 @@ const deliverableColumns: TableColumn<AcceptedDeliverable>[] = [
   },
 ];
 
-interface AcceptedDeliverablesTableProps {
-  personId: string;
-}
-
-export function AcceptedDeliverablesTable({ personId }: AcceptedDeliverablesTableProps) {
+export function AcceptedDeliverablesTable({ personId, onProjectClick }: AcceptedDeliverablesTableProps) {
   const { data: tasks = [], isLoading: tasksLoading } = useTasks({
     assigneeId: personId,
     status: ['accepted']
@@ -113,6 +123,7 @@ export function AcceptedDeliverablesTable({ personId }: AcceptedDeliverablesTabl
       id: task.id as any,
       deliverable: task.title,
       project: project?.name || 'Unknown Project',
+      projectId: task.projectId,
       complexity,
       acceptedOn: dateStr,
     };
@@ -120,7 +131,7 @@ export function AcceptedDeliverablesTable({ personId }: AcceptedDeliverablesTabl
 
   return (
     <ReusableTable
-      columns={deliverableColumns}
+      columns={deliverableColumns(onProjectClick)}
       data={mappedDeliverables}
     />
   );

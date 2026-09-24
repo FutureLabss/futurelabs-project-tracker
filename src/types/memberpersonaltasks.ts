@@ -1,8 +1,9 @@
 export type PersonalTask = {
-  id: number;
+  id: string;
   title: string;
   overview: string;
   project: string;
+  projectId?: string;
   complexity:
     | 'LOW (1 PT)'
     | 'MID (2 PTS)'
@@ -12,7 +13,9 @@ export type PersonalTask = {
   status:
     | 'NOT STARTED'
     | 'IN PROGRESS'
-    | 'BLOCKED';
+    | 'BLOCKED'
+    | 'SUBMITTED (REVIEW)'
+    | 'ACCEPTED';
   accessMode:
     | 'SUBMIT'
     | 'START'

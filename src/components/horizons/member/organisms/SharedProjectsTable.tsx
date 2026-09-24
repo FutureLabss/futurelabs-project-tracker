@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { Box } from '@mantine/core';
 import {
   ActionIcon,
   Badge,
@@ -26,6 +28,24 @@ import { ReusableTable, TableColumn } from '../../../Table/ReusableTable';
 import { useTasks } from '../../../../api/hooks/use-tasks';
 import { useProjects } from '../../../../api/hooks/use-projects';
 import { usePersons } from '../../../../api/hooks/use-availability';
+import { TaskDiagnosticDrawer } from '../../../detail-views/TaskDiagnosticDrawer';
+
+interface SharedProjectsTableProps {
+  personId: string;
+  onProjectClick?: (projectId: string) => void;
+}
+
+export function SharedProjectsTable({ personId, onProjectClick }: SharedProjectsTableProps) {
+  const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null);
+
+  const clickableCell = (taskId: string | number, children: React.ReactNode) => (
+    <Box
+      onClick={() => setDrawerTaskId(String(taskId))}
+      style={{ cursor: 'pointer', height: '100%', width: '100%', display: 'flex', alignItems: 'center' }}
+    >
+      {children}
+    </Box>
+  );
 
 const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
   {
@@ -33,7 +53,7 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
     label: 'Task Title & Overview',
     width: '31%',
 
-    render: (task) => (
+    render: (task) => clickableCell(task.id, (
       <Stack gap={3}>
         <Text
           size="sm"
@@ -51,7 +71,7 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
           {task.overview}
         </Text>
       </Stack>
-    ),
+    )),
   },
 
   {
@@ -114,8 +134,18 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
     key: 'project',
     label: 'Project',
     width: '16%',
-
-    render: (task) => (
+    render: (task) => onProjectClick ? (
+      <Text
+        size="sm"
+        c="blue.7"
+        fw={500}
+        lineClamp={2}
+        style={{ cursor: 'pointer' }}
+        onClick={() => task.projectId && onProjectClick(task.projectId)}
+      >
+        {task.project}
+      </Text>
+    ) : (
       <Text
         size="sm"
         c="blue.7"
@@ -132,11 +162,11 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
     label: 'Complexity',
     width: '9%',
 
-    render: (task) => (
+    render: (task) => clickableCell(task.id, (
       <ComplexityBadge
         value={task.complexity}
       />
-    ),
+    )),
   },
 
   {
@@ -144,7 +174,7 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
     label: 'Due Date',
     width: '10%',
 
-    render: (task) => (
+    render: (task) => clickableCell(task.id, (
       <Stack gap={4}>
         <Text
           size="sm"
@@ -157,7 +187,7 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
           <OverdueBadge />
         )}
       </Stack>
-    ),
+    )),
   },
 
   {
@@ -165,7 +195,7 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
     label: 'Status',
     width: '10%',
 
-    render: (task) => (
+    render: (task) => clickableCell(task.id, (
       <Stack gap={4}>
         <StatusBadge
           status={task.status as any}
@@ -175,7 +205,7 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
           <BlockedBadge />
         )}
       </Stack>
-    ),
+    )),
   },
 
   {
@@ -199,6 +229,7 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
           variant="light"
           color="blue"
           leftSection={icon}
+          onClick={() => setDrawerTaskId(String(task.id))}
         >
           {task.accessMode}
         </Button>
@@ -207,11 +238,6 @@ const sharedProjectColumns: TableColumn<SharedProjectTask>[] = [
   },
 ];
 
-interface SharedProjectsTableProps {
-  personId: string;
-}
-
-export function SharedProjectsTable({ personId }: SharedProjectsTableProps) {
   const { data: tasks = [], isLoading: tasksLoading } = useTasks();
   const { data: projects = [] } = useProjects();
   const { data: persons = [] } = usePersons();
@@ -221,7 +247,7 @@ export function SharedProjectsTable({ personId }: SharedProjectsTableProps) {
   }
 
   const mappedTasks: SharedProjectTask[] = tasks
-    .filter((task) => task.assigneeId !== personId && task.status !== 'accepted' && task.status !== 'cancelled')
+    .filter((task) => task.assigneeId !== personId && task.status !== 'cancelled')
     .map((task) => {
       const project = projects.find((p) => p.id === task.projectId);
       const assignee = persons.find((p) => p.id === task.assigneeId);
@@ -233,6 +259,8 @@ export function SharedProjectsTable({ personId }: SharedProjectsTableProps) {
       let status: SharedProjectTask['status'] = 'NOT STARTED';
       if (task.status === 'in_progress') status = 'IN PROGRESS';
       if (task.status === 'blocked') status = 'BLOCKED';
+      if (task.status === 'submitted') status = 'SUBMITTED (REVIEW)';
+      if (task.status === 'accepted') status = 'ACCEPTED';
 
       const isOverdue = new Date(task.dueDate) < new Date();
 
@@ -245,6 +273,7 @@ export function SharedProjectsTable({ personId }: SharedProjectsTableProps) {
           initials: assignee.name.substring(0, 2).toUpperCase(),
         } : undefined,
         project: project?.name || 'Unknown Project',
+        projectId: task.projectId,
         complexity,
         dueDate: task.dueDate,
         overdue: isOverdue,
@@ -326,6 +355,12 @@ export function SharedProjectsTable({ personId }: SharedProjectsTableProps) {
         data={mappedTasks}
       />
 
+      <TaskDiagnosticDrawer
+        opened={!!drawerTaskId}
+        onClose={() => setDrawerTaskId(null)}
+        taskId={drawerTaskId}
+        isReadOnly={true}
+      />
     </Stack>
   );
 }
