@@ -18,7 +18,12 @@ export const roleDashboards: Record<UserRole, DashboardLayoutConfig> = {
     title: "",
     subtitle: "",
     navigation: [
-      { label: "Work", icon: IconUser, memberView: "my-work", active: true },
+      {
+        label: "Projects",
+        icon: IconUser,
+        memberView: "my-work",
+        active: true,
+      },
       { label: "Tasks", icon: IconUsers, memberView: "team" },
       { label: "History", icon: IconHistory, memberView: "completed" },
     ],
@@ -42,83 +47,38 @@ export const roleDashboards: Record<UserRole, DashboardLayoutConfig> = {
     subtitle:
       "Review submitted work, rebalance load, and remove delivery blockers.",
     navigation: [
-      { label: "Team overview", icon: IconLayoutDashboard, active: true },
-      { label: "Review gate", icon: IconClipboardCheck },
-      { label: "Workload", icon: IconUsers },
-      { label: "Risk queue", icon: IconAlertTriangle },
-    ],
-    metrics: [
       {
-        label: "Review queue",
-        value: "3",
-        trend: "Oldest waiting 2 days",
-        tone: "violet",
+        label: "Team overview",
+        icon: IconLayoutDashboard,
+        managerView: "overview",
+        active: true,
       },
       {
-        label: "Active blockers",
-        value: "4",
-        trend: "2 need owner action",
-        tone: "orange",
+        label: "Review gate",
+        icon: IconClipboardCheck,
+        managerView: "review_gate",
       },
+      { label: "Workload", icon: IconUsers, managerView: "workload" },
       {
-        label: "Team capacity",
-        value: "82%",
-        trend: "Balanced across 5 members",
-        tone: "teal",
-      },
-      {
-        label: "Aging WIP",
-        value: "5",
-        trend: "Past complexity threshold",
-        tone: "red",
+        label: "Risk queue",
+        icon: IconAlertTriangle,
+        managerView: "risk_queue",
       },
     ],
+    metrics: [],
     primaryActions: [
       { label: "Review submissions", icon: IconClipboardCheck },
       { label: "Assign work", icon: IconUsers },
     ],
     focusPanel: {
-      title: "Manager attention",
-      description:
-        "Team items that need facilitation, review, or assignment decisions.",
-      items: [
-        {
-          title: "External Identity Provider Certs",
-          meta: "Maya Patel - Blocked 4 working days",
-          status: "Escalate",
-          tone: "red",
-        },
-        {
-          title: "ETL Chunking Algorithm",
-          meta: "Maya Patel - In progress 8 working days",
-          status: "Coach",
-          tone: "orange",
-        },
-        {
-          title: "Role-Based Route Guards",
-          meta: "Alex Chen - Submitted",
-          status: "Review",
-          tone: "violet",
-        },
-      ],
+      title: "",
+      description: "",
+      items: [],
     },
     secondaryPanel: {
-      title: "Team load",
-      description: "Capacity and risk snapshot across active contributors.",
-      items: [
-        {
-          title: "Alex Chen",
-          meta: "4 open tasks - 1 unplanned",
-          status: "High load",
-          tone: "orange",
-        },
-        {
-          title: "Maya Patel",
-          meta: "3 open tasks - 1 blocked",
-          status: "Needs help",
-          tone: "red",
-        },
-      ],
+      title: "",
+      description: "",
+      items: [],
     },
   },
   admin: {

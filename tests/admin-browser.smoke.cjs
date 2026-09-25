@@ -87,7 +87,7 @@ const fs = require("node:fs");
       .fill("Working admin lifecycle");
     await choose(
       dialog("Create task"),
-      "Task owner (optional)",
+      "Assignee (optional)",
       "Alex Chen (member)",
     );
     await confirm("Create task");

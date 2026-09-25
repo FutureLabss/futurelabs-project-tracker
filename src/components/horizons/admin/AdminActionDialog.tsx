@@ -13,8 +13,16 @@ import {
 import type { AdminWorkspace } from "../../../api/hooks/use-admin-workspace";
 import { useAdminAction } from "../../../api/hooks/use-admin-workspace";
 import {
+  useAcceptTask,
+  useAssignTask,
+  useCreateTask,
+  useRescheduleTask,
+  useReturnTask,
+  useSubmitTask,
+  useUpdateTaskStatus,
+} from "../../../api/hooks/use-tasks";
+import {
   projectService,
-  taskService,
   blockerService,
   peopleService,
 } from "../../../services";
@@ -77,7 +85,15 @@ export function AdminActionDialog({
   onClose: () => void;
 }) {
   const mutation = useAdminAction();
+  const createTaskMutation = useCreateTask();
+  const assignTaskMutation = useAssignTask();
+  const rescheduleTaskMutation = useRescheduleTask();
+  const submitTaskMutation = useSubmitTask();
+  const acceptTaskMutation = useAcceptTask();
+  const returnTaskMutation = useReturnTask();
+  const updateTaskStatusMutation = useUpdateTaskStatus();
   const [validation, setValidation] = useState("");
+  const [formValues, setFormValues] = useState<Record<string, string>>({});
   const task = data.tasks.find((t) => t.id === action.taskId);
   const [projectId, setProjectId] = useState(
     action.projectId ?? task?.projectId ?? "",
@@ -91,11 +107,17 @@ export function AdminActionDialog({
     task?.deliverableUrl && /^https?:\/\//i.test(task.deliverableUrl)
       ? task.deliverableUrl
       : undefined;
+
+  const updateField = (name: string, value: string) => {
+    setFormValues((current) => ({ ...current, [name]: value }));
+  };
+
+  const readField = (name: string) => String(formValues[name] ?? "").trim();
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setValidation("");
-    const form = new FormData(event.currentTarget);
-    const value = (name: string) => String(form.get(name) ?? "").trim();
+    const value = (name: string) => readField(name);
     const person = value("person") || null;
     if (["project", "task"].includes(action.kind) && !value("name")) {
       setValidation("A name is required.");
@@ -158,7 +180,7 @@ export function AdminActionDialog({
         case "close":
           return projectService.closeProject(projectId, actorId);
         case "task":
-          return taskService.createTask({
+          return createTaskMutation.mutateAsync({
             projectId,
             title: value("name"),
             description: value("description"),
@@ -169,29 +191,48 @@ export function AdminActionDialog({
             actorId,
           });
         case "assign":
-          return taskService.assignTask(task!.id, person, actorId);
+          return assignTaskMutation.mutateAsync({
+            taskId: task!.id,
+            assigneeId: person,
+            actorId,
+          });
         case "reschedule":
-          return taskService.rescheduleTask(
-            task!.id,
-            value("due"),
-            value("reason"),
+          return rescheduleTaskMutation.mutateAsync({
+            taskId: task!.id,
+            newDueDate: value("due"),
+            reason: value("reason"),
             actorId,
-          );
+          });
         case "submit":
-          return taskService.submitTask(
-            task!.id,
+          return submitTaskMutation.mutateAsync({
+            taskId: task!.id,
             actorId,
-            value("description"),
-            value("url") || undefined,
-          );
+            notes: value("description"),
+            deliverableUrl: value("url") || undefined,
+          });
         case "accept":
-          return taskService.acceptTask(task!.id, actorId);
+          return acceptTaskMutation.mutateAsync({
+            taskId: task!.id,
+            managerId: actorId,
+          });
         case "return":
-          return taskService.returnTask(task!.id, actorId, value("reason"));
+          return returnTaskMutation.mutateAsync({
+            taskId: task!.id,
+            managerId: actorId,
+            reason: value("reason"),
+          });
         case "start":
-          return taskService.updateTaskStatus(task!.id, "in_progress", actorId);
+          return updateTaskStatusMutation.mutateAsync({
+            taskId: task!.id,
+            status: "in_progress",
+            actorId,
+          });
         case "cancel":
-          return taskService.updateTaskStatus(task!.id, "cancelled", actorId);
+          return updateTaskStatusMutation.mutateAsync({
+            taskId: task!.id,
+            status: "cancelled",
+            actorId,
+          });
         case "blocker":
           return blockerService.raiseBlocker({
             taskId: task!.id,
@@ -225,12 +266,16 @@ export function AdminActionDialog({
     label: string,
     defaultValue?: string | null,
     required = false,
+    placeholder = "Select a person",
   ) => (
     <Select
       name="person"
       label={label}
       data={options(rows)}
-      defaultValue={defaultValue}
+      value={readField("person") || defaultValue || null}
+      onChange={(value) => updateField("person", value ?? "")}
+      placeholder={placeholder}
+      nothingFoundMessage="No eligible users found"
       searchable
       clearable={!required}
       required={required}
@@ -269,25 +314,39 @@ export function AdminActionDialog({
                 label="Project name"
                 required
                 maxLength={200}
+                value={readField("name")}
+                onChange={(event) =>
+                  updateField("name", event.currentTarget.value)
+                }
               />
               <Textarea
                 name="description"
                 label="Goal and expected outcome"
                 required
+                value={readField("description")}
+                onChange={(event) =>
+                  updateField("description", event.currentTarget.value)
+                }
               />
               <Group grow>
                 <TextInput
                   name="start"
                   type="date"
                   label="Start date"
-                  defaultValue={date}
+                  value={readField("start") || date}
+                  onChange={(event) =>
+                    updateField("start", event.currentTarget.value)
+                  }
                   required
                 />
                 <TextInput
                   name="end"
                   type="date"
                   label="Target date"
-                  defaultValue={date}
+                  value={readField("end") || date}
+                  onChange={(event) =>
+                    updateField("end", event.currentTarget.value)
+                  }
                   required
                 />
               </Group>
@@ -300,12 +359,16 @@ export function AdminActionDialog({
           {action.kind === "task" && (
             <>
               <Select
+                name="project"
                 label="Project"
                 data={data.projects
                   .filter((p) => p.state === "active")
                   .map((p) => ({ value: p.id, label: p.name }))}
                 value={projectId || null}
-                onChange={(v) => setProjectId(v ?? "")}
+                onChange={(v) => {
+                  setProjectId(v ?? "");
+                  updateField("project", v ?? "");
+                }}
                 searchable
                 required
               />
@@ -314,13 +377,27 @@ export function AdminActionDialog({
                 label="Task title"
                 required
                 maxLength={200}
+                value={readField("name")}
+                onChange={(event) =>
+                  updateField("name", event.currentTarget.value)
+                }
               />
               <Textarea
                 name="description"
                 label="Description and acceptance criteria"
+                value={readField("description")}
+                onChange={(event) =>
+                  updateField("description", event.currentTarget.value)
+                }
               />
               <div key={projectId}>
-                {personField(eligible, "Task owner (optional)")}
+                {personField(
+                  eligible,
+                  "Assignee (optional)",
+                  undefined,
+                  false,
+                  "Select an assignee",
+                )}
               </div>
               <Text size="xs" c="dimmed">
                 Grant project access from the project detail before assigning
@@ -331,7 +408,10 @@ export function AdminActionDialog({
                   name="complexity"
                   label="Complexity"
                   data={["low", "mid", "high"]}
-                  defaultValue="mid"
+                  value={readField("complexity") || "mid"}
+                  onChange={(value) =>
+                    updateField("complexity", value ?? "mid")
+                  }
                   allowDeselect={false}
                   required
                 />
@@ -339,7 +419,10 @@ export function AdminActionDialog({
                   name="origin"
                   label="Origin"
                   data={["planned", "unplanned"]}
-                  defaultValue="planned"
+                  value={readField("origin") || "planned"}
+                  onChange={(value) =>
+                    updateField("origin", value ?? "planned")
+                  }
                   allowDeselect={false}
                   required
                 />
@@ -348,7 +431,10 @@ export function AdminActionDialog({
                 name="due"
                 label="Due date"
                 type="date"
-                defaultValue={date}
+                value={readField("due") || date}
+                onChange={(event) =>
+                  updateField("due", event.currentTarget.value)
+                }
                 required
               />
             </>
@@ -393,12 +479,19 @@ export function AdminActionDialog({
                 name="due"
                 type="date"
                 label="New due date"
-                defaultValue={task?.dueDate}
+                value={readField("due") || task?.dueDate || ""}
+                onChange={(event) =>
+                  updateField("due", event.currentTarget.value)
+                }
                 required
               />
               <Textarea
                 name="reason"
                 label="Reason for rescheduling"
+                value={readField("reason")}
+                onChange={(event) =>
+                  updateField("reason", event.currentTarget.value)
+                }
                 required
               />
             </>
@@ -410,12 +503,18 @@ export function AdminActionDialog({
                 type="url"
                 label="Deliverable URL"
                 pattern="https?://.*"
-                defaultValue={task?.deliverableUrl ?? ""}
+                value={readField("url") || task?.deliverableUrl || ""}
+                onChange={(event) =>
+                  updateField("url", event.currentTarget.value)
+                }
               />
               <Textarea
                 name="description"
                 label="Submission notes"
-                defaultValue={task?.submissionNotes ?? ""}
+                value={readField("description") || task?.submissionNotes || ""}
+                onChange={(event) =>
+                  updateField("description", event.currentTarget.value)
+                }
               />
               <Text size="sm">This sends the task to the review queue.</Text>
             </>
@@ -439,7 +538,15 @@ export function AdminActionDialog({
             </>
           )}
           {action.kind === "return" && (
-            <Textarea name="reason" label="Required changes" required />
+            <Textarea
+              name="reason"
+              label="Required changes"
+              value={readField("reason")}
+              onChange={(event) =>
+                updateField("reason", event.currentTarget.value)
+              }
+              required
+            />
           )}
           {action.kind === "accept" && (
             <Text>
@@ -461,13 +568,20 @@ export function AdminActionDialog({
                     label: "Unclear requirement",
                   },
                 ]}
-                defaultValue="external"
+                value={readField("category") || "external"}
+                onChange={(value) =>
+                  updateField("category", value ?? "external")
+                }
                 allowDeselect={false}
                 required
               />
               <Textarea
                 name="reason"
                 label="What is blocking delivery?"
+                value={readField("reason")}
+                onChange={(event) =>
+                  updateField("reason", event.currentTarget.value)
+                }
                 required
               />
               {personField(eligible, "Responsible person", undefined, true)}
@@ -477,6 +591,8 @@ export function AdminActionDialog({
                 data={data.tasks
                   .filter((t) => t.id !== task?.id && isTaskOpen(t.status))
                   .map((t) => ({ value: t.id, label: t.title }))}
+                value={readField("dependency") || null}
+                onChange={(value) => updateField("dependency", value ?? "")}
                 searchable
                 clearable
               />
@@ -490,18 +606,31 @@ export function AdminActionDialog({
                   name="start"
                   type="date"
                   label="First day"
-                  defaultValue={date}
+                  value={readField("start") || date}
+                  onChange={(event) =>
+                    updateField("start", event.currentTarget.value)
+                  }
                   required
                 />
                 <TextInput
                   name="end"
                   type="date"
                   label="Last day"
-                  defaultValue={date}
+                  value={readField("end") || date}
+                  onChange={(event) =>
+                    updateField("end", event.currentTarget.value)
+                  }
                   required
                 />
               </Group>
-              <Textarea name="description" label="Note" />
+              <Textarea
+                name="description"
+                label="Note"
+                value={readField("description")}
+                onChange={(event) =>
+                  updateField("description", event.currentTarget.value)
+                }
+              />
             </>
           )}
           {action.kind === "cancel" && (

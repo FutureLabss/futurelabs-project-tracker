@@ -12,15 +12,15 @@ export type AdminView =
   | "ledger";
 
 export type MemberView = "my-work" | "team" | "completed";
+export type ManagerView =
+  "overview" | "review_gate" | "workload" | "risk_queue";
 
 export type DashboardTone =
   "teal" | "blue" | "orange" | "red" | "violet" | "gray";
 
-export type TaskComplexity = 'LOW' | 'MID' | 'HIGH';
+export type TaskComplexity = "LOW" | "MID" | "HIGH";
 
-export type TaskOrigin = 'PLANNED' | 'UNPLANNED';
-
-
+export type TaskOrigin = "PLANNED" | "UNPLANNED";
 
 export interface Persona {
   id: string;
@@ -46,6 +46,7 @@ export interface DashboardAction {
 export interface DashboardNavigationItem {
   adminView?: AdminView;
   memberView?: MemberView;
+  managerView?: ManagerView;
   label: string;
   icon: TablerIcon;
   active?: boolean;
@@ -76,9 +77,6 @@ export interface DashboardLayoutConfig {
   secondaryPanel: DashboardPanel;
 }
 
-
-
-
 export interface ScheduleSlip {
   id: string;
   oldDate: string;
@@ -90,7 +88,7 @@ export interface ScheduleSlip {
 
 export interface ReviewGateDecision {
   id: string;
-  status: 'ACCEPTED' | 'RETURNED FOR REWORK';
+  status: "ACCEPTED" | "RETURNED FOR REWORK";
   timestamp: string;
   reviewer: string;
   rationale: string;
@@ -104,18 +102,20 @@ export interface DeliverableArtifact {
 
 export interface LifecycleEvent {
   id: string;
-  type: 'init' | 'reschedule' | 'submit' | 'blocked' | 'unblocked' | 'accepted' | 'rework';
+  type:
+    | "init"
+    | "reschedule"
+    | "submit"
+    | "blocked"
+    | "unblocked"
+    | "accepted"
+    | "rework";
   title: string;
   author: string;
   timestamp: string;
   transition?: string;
   note?: string;
 }
-
-
-
-
-
 
 export interface LeaveRecord {
   id: string;
@@ -124,4 +124,75 @@ export interface LeaveRecord {
   toDate: string;
   reason: string;
   createdAt: string;
+}
+
+export type ManagerNavView = ManagerView;
+
+export type TaskStatus =
+  | "not_started"
+  | "in_progress"
+  | "blocked"
+  | "submitted"
+  | "accepted"
+  | "cancelled";
+
+export interface ManagerTask {
+  id: string;
+  title: string;
+  description?: string;
+  projectId: string;
+  projectName?: string;
+  assigneeId?: string;
+  assigneeName?: string;
+  status: TaskStatus;
+  complexity: TaskComplexity;
+  dueDate: string;
+  submittedAt?: string;
+  acceptedAt?: string;
+}
+
+export interface LedgerItem {
+  id: string;
+  occurredAt: string;
+  actorId: string;
+  actorName: string;
+  type: string;
+  subjectTitle: string;
+  fromStatus?: string;
+  toStatus?: string;
+  justification: string;
+}
+
+export interface RiskSignal {
+  id: string;
+  headline: string;
+  details: string;
+  projectName: string;
+  assigneeName: string;
+  severity: "critical" | "warning" | "normal";
+  signalType:
+    | "silent_overrun"
+    | "aging_blocker"
+    | "aging_wip"
+    | "stale_inactivity"
+    | "overdue"
+    | "imminent_unstarted"
+    | "unowned_task"
+    | "unmanaged_project";
+}
+
+export interface ManagerWorkspaceData {
+  metrics: {
+    reviewQueueCount: number;
+    activeBlockersCount: number;
+    teamCapacityPercent: number;
+    agingWipCount: number;
+    silentOverrunsPinned: number;
+  };
+  tasks: ManagerTask[];
+  reviewQueue: ManagerTask[];
+  ledger: LedgerItem[];
+  risks: RiskSignal[];
+  people: Array<{ id: string; name: string }>;
+  projects: Array<{ id: string; name: string }>;
 }
