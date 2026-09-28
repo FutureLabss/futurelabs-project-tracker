@@ -31,6 +31,13 @@ const LOCAL_PERSONS: Person[] = [
     role: "member",
     title: "Frontend Engineer",
   },
+  {
+    id: "p-david",
+    name: "David Kim",
+    email: "manager@futurelabs.io",
+    role: "manager",
+    title: "Engineering Manager",
+  },
 ];
 
 export function getInitialSeedDataset(): SeedData {

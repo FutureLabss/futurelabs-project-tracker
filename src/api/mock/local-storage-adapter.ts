@@ -1,4 +1,4 @@
-import { ITrackerApi } from "../tracker-api.interface";
+import { ITrackerApi, TaskFilter, LedgerFilter } from "../tracker-api.interface";
 import { STORAGE_KEYS } from "./storage-keys";
 import { Person } from "../../entities/person.entity";
 import { Project } from "../../entities/project.entity";
@@ -11,6 +11,13 @@ import { CreateTaskDto } from "../../dtos/create-task.dto";
 import { RaiseBlockerDto } from "../../dtos/raise-blocker.dto";
 import { CreateProjectDto } from "../../dtos/create-project.dto";
 import { RecordLeaveDto } from "../../dtos/record-leave.dto";
+import { CreatePersonDto } from "../../dtos/create-person.dto";
+import {
+  UpdatePersonProfileDto,
+  ChangePersonRoleDto,
+  SetPersonStatusDto,
+  RevokePersonSessionsDto,
+} from "../../dtos/manage-person.dto";
 import { getInitialSeedDataset } from "../../domain/seed/initial-dataset";
 import { calculateOperationalSignals } from "../../domain/calculations/derived-signals";
 
@@ -280,28 +287,45 @@ export class MockLocalStorageApi implements ITrackerApi {
 
   // --- TASKS ---
 
-  async getTasks(filter?: {
-    projectId?: string;
-    assigneeId?: string;
-    status?: TaskStatus[];
-  }): Promise<Task[]> {
-    await this.delay();
+  private filterTasks(filter?: TaskFilter): Task[] {
     let tasks = this.getCollection<Task>(STORAGE_KEYS.TASKS);
+    if (!filter) return tasks;
 
-    if (filter) {
-      if (filter.projectId) {
-        tasks = tasks.filter((t) => t.projectId === filter.projectId);
-      }
-      if (filter.assigneeId) {
-        tasks = tasks.filter((t) => t.assigneeId === filter.assigneeId);
-      }
-      if (filter.status && filter.status.length > 0) {
-        const allowed = new Set(filter.status);
-        tasks = tasks.filter((t) => allowed.has(t.status));
-      }
+    if (filter.projectId) {
+      tasks = tasks.filter((t) => t.projectId === filter.projectId);
     }
-
+    if (filter.assigneeId) {
+      tasks = tasks.filter((t) => t.assigneeId === filter.assigneeId);
+    }
+    if (filter.status && filter.status.length > 0) {
+      const allowed = new Set(filter.status);
+      tasks = tasks.filter((t) => allowed.has(t.status));
+    }
+    if (filter.search && filter.search.trim().length > 0) {
+      const q = filter.search.trim().toLowerCase();
+      tasks = tasks.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          t.description.toLowerCase().includes(q),
+      );
+    }
     return tasks;
+  }
+
+  async getTasks(filter?: TaskFilter): Promise<Task[]> {
+    await this.delay();
+    const tasks = this.filterTasks(filter);
+    if (filter?.offset !== undefined || filter?.limit !== undefined) {
+      const offset = filter.offset ?? 0;
+      const limit = filter.limit ?? tasks.length;
+      return tasks.slice(offset, offset + limit);
+    }
+    return tasks;
+  }
+
+  async getTasksCount(filter?: TaskFilter): Promise<number> {
+    await this.delay();
+    return this.filterTasks(filter).length;
   }
 
   async getTaskById(id: string): Promise<Task | null> {
@@ -693,27 +717,244 @@ export class MockLocalStorageApi implements ITrackerApi {
     return newAvail;
   }
 
-  // --- LEDGER & SIGNALS ---
-
-  async getLedger(filter?: {
-    subjectId?: string;
-    actorId?: string;
-  }): Promise<LedgerRecord[]> {
+  async createPerson(dto: CreatePersonDto): Promise<Person> {
     await this.delay();
-    let ledger = this.getCollection<LedgerRecord>(STORAGE_KEYS.LEDGER);
-    if (filter) {
-      if (filter.subjectId) {
-        ledger = ledger.filter((l) => l.subjectId === filter.subjectId);
-      }
-      if (filter.actorId) {
-        ledger = ledger.filter((l) => l.actorId === filter.actorId);
+    this.requireAdmin(dto.actorId);
+    const name = dto.name.trim();
+    if (!name) throw new Error("Person name cannot be blank.");
+    const email = dto.email.trim().toLowerCase();
+    if (!email || !email.includes("@")) throw new Error("A valid email is required.");
+    const persons = this.getCollection<Person>(STORAGE_KEYS.PERSONS);
+    if (persons.some((p) => p.email.toLowerCase() === email)) {
+      throw new Error(`A person with email ${email} already exists.`);
+    }
+
+    const newPerson: Person = {
+      id: `p-${crypto.randomUUID()}`,
+      name,
+      email,
+      role: dto.role,
+      status: dto.status ?? "active",
+      title: dto.title?.trim() || undefined,
+    };
+    persons.push(newPerson);
+    this.setCollection(STORAGE_KEYS.PERSONS, persons);
+
+    this.appendLedgerRecord({
+      subjectId: newPerson.id,
+      subjectType: "person",
+      actorId: dto.actorId,
+      type: "person_created",
+      fromValue: null,
+      toValue: dto.role,
+      reason: "Person account provisioned",
+    });
+
+    return newPerson;
+  }
+
+  async updateProfile(dto: UpdatePersonProfileDto): Promise<Person> {
+    await this.delay();
+    this.requireAdmin(dto.actorId);
+    const persons = this.getCollection<Person>(STORAGE_KEYS.PERSONS);
+    const index = persons.findIndex((p) => p.id === dto.personId);
+    if (index === -1) throw new Error(`Person ${dto.personId} not found`);
+
+    if (dto.name !== undefined) {
+      const name = dto.name.trim();
+      if (!name) throw new Error("Name cannot be blank.");
+      persons[index].name = name;
+    }
+    if (dto.title !== undefined) {
+      persons[index].title = dto.title.trim() || undefined;
+    }
+    if (dto.avatarUrl !== undefined) {
+      persons[index].avatarUrl = dto.avatarUrl.trim() || undefined;
+    }
+
+    this.setCollection(STORAGE_KEYS.PERSONS, persons);
+    this.appendLedgerRecord({
+      subjectId: dto.personId,
+      subjectType: "person",
+      actorId: dto.actorId,
+      type: "profile_updated",
+      fromValue: null,
+      toValue: null,
+      reason: "Profile details updated",
+    });
+
+    return persons[index];
+  }
+
+  async changeUserRole(dto: ChangePersonRoleDto): Promise<Person> {
+    await this.delay();
+    this.requireAdmin(dto.actorId);
+    const persons = this.getCollection<Person>(STORAGE_KEYS.PERSONS);
+    const index = persons.findIndex((p) => p.id === dto.personId);
+    if (index === -1) throw new Error(`Person ${dto.personId} not found`);
+
+    const currentRole = persons[index].role;
+    if (currentRole === "admin" && dto.role !== "admin") {
+      const otherAdmins = persons.filter(
+        (p) => p.role === "admin" && p.status !== "inactive" && p.id !== dto.personId,
+      );
+      if (otherAdmins.length === 0) {
+        throw new Error("Cannot demote the last active administrator.");
       }
     }
-    // Return sorted newest first
-    return ledger.sort(
+
+    // If demoting from manager/admin to member, unassign from manager of active projects
+    if (["manager", "admin"].includes(currentRole) && dto.role === "member") {
+      const projects = this.getCollection<Project>(STORAGE_KEYS.PROJECTS);
+      const members = await this.getProjectMembers();
+      let projectsChanged = false;
+      let membersChanged = false;
+
+      for (const p of projects) {
+        if (p.managerId === dto.personId && p.state === "active") {
+          p.managerId = null;
+          projectsChanged = true;
+          if (!members.some((m) => m.projectId === p.id && m.personId === dto.personId)) {
+            members.push({ projectId: p.id, personId: dto.personId });
+            membersChanged = true;
+          }
+        }
+      }
+      if (projectsChanged) this.setCollection(STORAGE_KEYS.PROJECTS, projects);
+      if (membersChanged) this.setCollection(STORAGE_KEYS.PROJECT_MEMBERS, members);
+    }
+
+    persons[index].role = dto.role;
+    this.setCollection(STORAGE_KEYS.PERSONS, persons);
+
+    this.appendLedgerRecord({
+      subjectId: dto.personId,
+      subjectType: "person",
+      actorId: dto.actorId,
+      type: "role_changed",
+      fromValue: currentRole,
+      toValue: dto.role,
+      reason: "User role updated",
+    });
+
+    return persons[index];
+  }
+
+  async setPersonStatus(dto: SetPersonStatusDto): Promise<Person> {
+    await this.delay();
+    this.requireAdmin(dto.actorId);
+    const persons = this.getCollection<Person>(STORAGE_KEYS.PERSONS);
+    const index = persons.findIndex((p) => p.id === dto.personId);
+    if (index === -1) throw new Error(`Person ${dto.personId} not found`);
+
+    const currentStatus = persons[index].status ?? "active";
+    if (persons[index].role === "admin" && currentStatus === "active" && dto.status === "inactive") {
+      const otherAdmins = persons.filter(
+        (p) => p.role === "admin" && p.status !== "inactive" && p.id !== dto.personId,
+      );
+      if (otherAdmins.length === 0) {
+        throw new Error("Cannot deactivate the last active administrator.");
+      }
+    }
+
+    persons[index].status = dto.status;
+
+    if (dto.status === "inactive") {
+      const projects = this.getCollection<Project>(STORAGE_KEYS.PROJECTS);
+      let projectsChanged = false;
+      for (const p of projects) {
+        if (p.managerId === dto.personId && p.state === "active") {
+          p.managerId = null;
+          projectsChanged = true;
+        }
+      }
+      if (projectsChanged) this.setCollection(STORAGE_KEYS.PROJECTS, projects);
+    }
+
+    this.setCollection(STORAGE_KEYS.PERSONS, persons);
+
+    this.appendLedgerRecord({
+      subjectId: dto.personId,
+      subjectType: "person",
+      actorId: dto.actorId,
+      type: "status_changed",
+      fromValue: currentStatus,
+      toValue: dto.status,
+      reason: "Account status updated",
+    });
+
+    return persons[index];
+  }
+
+  async revokePersonSessions(dto: RevokePersonSessionsDto): Promise<void> {
+    await this.delay();
+    this.requireAdmin(dto.actorId);
+    const persons = this.getCollection<Person>(STORAGE_KEYS.PERSONS);
+    const person = persons.find((p) => p.id === dto.personId);
+    if (!person) throw new Error(`Person ${dto.personId} not found`);
+
+    this.appendLedgerRecord({
+      subjectId: dto.personId,
+      subjectType: "person",
+      actorId: dto.actorId,
+      type: "sessions_revoked",
+      fromValue: null,
+      toValue: null,
+      reason: "Active tracker sessions revoked",
+    });
+  }
+
+  // --- LEDGER & SIGNALS ---
+
+  private filterLedger(filter?: LedgerFilter): LedgerRecord[] {
+    let ledger = this.getCollection<LedgerRecord>(STORAGE_KEYS.LEDGER);
+    if (!filter) {
+      return [...ledger].sort(
+        (a, b) =>
+          new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
+      );
+    }
+    if (filter.subjectId) {
+      ledger = ledger.filter((l) => l.subjectId === filter.subjectId);
+    }
+    if (filter.subjectType) {
+      ledger = ledger.filter((l) => l.subjectType === filter.subjectType);
+    }
+    if (filter.actorId) {
+      ledger = ledger.filter((l) => l.actorId === filter.actorId);
+    }
+    if (filter.type) {
+      ledger = ledger.filter((l) => l.type === filter.type);
+    }
+    if (filter.search && filter.search.trim().length > 0) {
+      const q = filter.search.trim().toLowerCase();
+      ledger = ledger.filter(
+        (l) =>
+          (l.reason && l.reason.toLowerCase().includes(q)) ||
+          l.type.toLowerCase().includes(q) ||
+          l.subjectType.toLowerCase().includes(q),
+      );
+    }
+    return [...ledger].sort(
       (a, b) =>
         new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
     );
+  }
+
+  async getLedger(filter?: LedgerFilter): Promise<LedgerRecord[]> {
+    await this.delay();
+    const list = this.filterLedger(filter);
+    if (filter?.offset !== undefined || filter?.limit !== undefined) {
+      const offset = filter.offset ?? 0;
+      const limit = filter.limit ?? list.length;
+      return list.slice(offset, offset + limit);
+    }
+    return list;
+  }
+
+  async getLedgerCount(filter?: LedgerFilter): Promise<number> {
+    await this.delay();
+    return this.filterLedger(filter).length;
   }
 
   async getDerivedSignals(
@@ -746,4 +987,9 @@ export class MockLocalStorageApi implements ITrackerApi {
     await this.delay();
     this.resetStorageToSeed();
   }
+
+  supportsDemoReset(): boolean {
+    return true;
+  }
 }
+
