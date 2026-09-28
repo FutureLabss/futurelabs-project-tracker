@@ -9,6 +9,8 @@ interface AdminTemplateProps {
   onRefresh: () => void;
   onExport: () => void;
   onNewProject: () => void;
+  onResetDemo?: () => void;
+  canResetDemo?: boolean;
   queryError?: string;
   exportError?: string;
   exportNotice?: string;
@@ -28,6 +30,8 @@ export function AdminTemplate({
   onRefresh,
   onExport,
   onNewProject,
+  onResetDemo,
+  canResetDemo,
   queryError,
   exportError,
   exportNotice,
@@ -48,7 +52,10 @@ export function AdminTemplate({
         onRefresh={onRefresh}
         onExport={onExport}
         onNewProject={onNewProject}
+        onResetDemo={onResetDemo}
+        canResetDemo={canResetDemo}
       />
+
       {queryError && (
         <Alert color="red" title="Refresh failed">
           {queryError} — showing the last loaded records.

@@ -1,7 +1,10 @@
 import { useState, type FormEvent } from "react";
 import {
   Alert,
+  Badge,
   Button,
+  Card,
+  Divider,
   Group,
   Modal,
   Select,
@@ -9,7 +12,33 @@ import {
   Text,
   Textarea,
   TextInput,
+  ThemeIcon,
 } from "@mantine/core";
+import {
+  IconAlertTriangle,
+  IconArrowBackUp,
+  IconCalendar,
+  IconCalendarEvent,
+  IconCalendarOff,
+  IconCalendarTime,
+  IconChecklist,
+  IconCircleCheck,
+  IconCircleX,
+  IconEdit,
+  IconFolder,
+  IconFolderOff,
+  IconFolderPlus,
+  IconKeyOff,
+  IconMail,
+  IconPlayerPlay,
+  IconSend,
+  IconShieldCheck,
+  IconUser,
+  IconUserCheck,
+  IconUserMinus,
+  IconUserPlus,
+  IconUserShare,
+} from "@tabler/icons-react";
 import type { AdminWorkspace } from "../../../api/hooks/use-admin-workspace";
 import { useAdminAction } from "../../../api/hooks/use-admin-workspace";
 import {
@@ -20,6 +49,7 @@ import {
 } from "../../../services";
 import type { TaskComplexity, TaskOrigin } from "../../../entities/task.entity";
 import type { BlockerCategory } from "../../../entities/blocker.entity";
+import type { UserRole } from "../../../entities/person.entity";
 import { eligiblePeople } from "./admin-utils";
 
 export type AdminAction = {
@@ -39,11 +69,18 @@ export type AdminAction = {
     | "start"
     | "blocker"
     | "clear"
-    | "leave";
+    | "leave"
+    | "create-person"
+    | "edit-person"
+    | "change-role"
+    | "set-person-status"
+    | "revoke-sessions";
   projectId?: string;
   taskId?: string;
   personId?: string;
   blockerId?: string;
+  targetRole?: UserRole;
+  targetStatus?: "active" | "inactive";
 };
 const titles: Record<AdminAction["kind"], string> = {
   project: "Create project",
@@ -62,6 +99,59 @@ const titles: Record<AdminAction["kind"], string> = {
   blocker: "Raise blocker",
   clear: "Resolve blocker",
   leave: "Record leave",
+  "create-person": "Add team member",
+  "edit-person": "Edit team member profile",
+  "change-role": "Change user role",
+  "set-person-status": "Update account status",
+  "revoke-sessions": "Revoke active sessions",
+};
+
+const descriptions: Record<AdminAction["kind"], string> = {
+  project: "Define a new strategic initiative, target timeline, and leadership ownership.",
+  task: "Create a new deliverable and define its ownership, scope, and timeline.",
+  lead: "Designate an engineering manager or lead to oversee this project.",
+  member: "Grant explicit access for team members to collaborate on this project.",
+  "remove-member": "Revoke a team member's access from this project.",
+  close: "Archive a completed initiative and finalize its delivery records.",
+  assign: "Assign ownership of this task to a qualified team member.",
+  reschedule: "Update the delivery deadline for this task with an audit rationale.",
+  submit: "Submit completed deliverables for inspection and acceptance.",
+  accept: "Approve and accept deliverables, recording them in organizational throughput.",
+  return: "Return deliverable to assignee with rework feedback.",
+  cancel: "Cancel this task and record the cancellation in the audit ledger.",
+  start: "Transition this task into active in-progress development.",
+  blocker: "Raise an operational blocker impeding progress on this deliverable.",
+  clear: "Resolve an active blocker and unfreeze deliverable progress.",
+  leave: "Log approved annual or personal leave for availability tracking.",
+  "create-person": "Add a new team member to your organization directory.",
+  "edit-person": "Update profile details, title, and contact information.",
+  "change-role": "Update organizational permission tier and access role.",
+  "set-person-status": "Activate or deactivate user account access.",
+  "revoke-sessions": "Immediately terminate all active sessions for this account.",
+};
+
+const actionIcons: Record<AdminAction["kind"], typeof IconFolderPlus> = {
+  project: IconFolderPlus,
+  task: IconChecklist,
+  lead: IconUserCheck,
+  member: IconUserPlus,
+  "remove-member": IconUserMinus,
+  close: IconFolderOff,
+  assign: IconUserShare,
+  reschedule: IconCalendarTime,
+  submit: IconSend,
+  accept: IconCircleCheck,
+  return: IconArrowBackUp,
+  cancel: IconCircleX,
+  start: IconPlayerPlay,
+  blocker: IconAlertTriangle,
+  clear: IconShieldCheck,
+  leave: IconCalendarOff,
+  "create-person": IconUserPlus,
+  "edit-person": IconEdit,
+  "change-role": IconShieldCheck,
+  "set-person-status": IconUserCheck,
+  "revoke-sessions": IconKeyOff,
 };
 export function AdminActionDialog({
   action,
@@ -79,6 +169,7 @@ export function AdminActionDialog({
   const mutation = useAdminAction();
   const [validation, setValidation] = useState("");
   const task = data.tasks.find((t) => t.id === action.taskId);
+  const targetPerson = data.people.find((p) => p.id === action.personId);
   const [projectId, setProjectId] = useState(
     action.projectId ?? task?.projectId ?? "",
   );
@@ -99,6 +190,20 @@ export function AdminActionDialog({
     const person = value("person") || null;
     if (["project", "task"].includes(action.kind) && !value("name")) {
       setValidation("A name is required.");
+      return;
+    }
+    if (action.kind === "create-person") {
+      if (!value("name")) {
+        setValidation("Person name is required.");
+        return;
+      }
+      if (!value("email") || !value("email").includes("@")) {
+        setValidation("A valid email address is required.");
+        return;
+      }
+    }
+    if (action.kind === "edit-person" && !value("name")) {
+      setValidation("Name cannot be blank.");
       return;
     }
     if (
@@ -211,6 +316,42 @@ export function AdminActionDialog({
             note: `Leave: ${value("description")}`,
             actorId,
           });
+        case "create-person":
+          return peopleService.createPerson({
+            name: value("name"),
+            email: value("email"),
+            role: (value("role") || "member") as UserRole,
+            title: value("title") || undefined,
+            status: (value("status") || "active") as "active" | "inactive",
+            actorId,
+          });
+        case "edit-person":
+          return peopleService.updateProfile({
+            personId: action.personId!,
+            name: value("name") || undefined,
+            title: value("title") || undefined,
+            avatarUrl: value("avatarUrl") || undefined,
+            actorId,
+          });
+        case "change-role":
+          return peopleService.changeUserRole({
+            personId: action.personId!,
+            role: value("role") as UserRole,
+            actorId,
+          });
+        case "set-person-status":
+          return peopleService.setPersonStatus({
+            personId: action.personId!,
+            status: (action.targetStatus || value("status")) as
+              | "active"
+              | "inactive",
+            actorId,
+          });
+        case "revoke-sessions":
+          return peopleService.revokePersonSessions({
+            personId: action.personId!,
+            actorId,
+          });
       }
     };
     try {
@@ -220,6 +361,19 @@ export function AdminActionDialog({
       /* Mutation error remains visible; preserve form values. */
     }
   }
+  const isDestructive =
+    ["cancel", "remove-member", "close", "revoke-sessions"].includes(
+      action.kind,
+    ) ||
+    (action.kind === "set-person-status" &&
+      (action.targetStatus ??
+        (targetPerson?.status === "inactive" ? "active" : "inactive")) ===
+        "inactive");
+
+  const isWarning = ["blocker", "return", "reschedule"].includes(action.kind);
+  const actionColor = isDestructive ? "red" : isWarning ? "orange" : "teal";
+  const ActionIcon = actionIcons[action.kind] || IconFolderPlus;
+
   const personField = (
     rows: typeof people,
     label: string,
@@ -237,6 +391,7 @@ export function AdminActionDialog({
       searchable
       clearable={!required}
       required={required}
+      leftSection={<IconUserCheck size={16} />}
     />
   );
   return (
@@ -251,39 +406,109 @@ export function AdminActionDialog({
       title={titles[action.kind]}
       centered
       size="lg"
+      radius="md"
     >
       <form onSubmit={submit}>
-        <Stack>
+        <Stack gap="md">
+          {/* Action Header Banner */}
+          <Card
+            withBorder
+            p="xs"
+            radius="sm"
+            style={{ background: "var(--mantine-color-default-hover)" }}
+          >
+            <Group gap="xs" wrap="nowrap">
+              <ThemeIcon
+                size="md"
+                radius="sm"
+                variant="light"
+                color={actionColor}
+                style={{ flexShrink: 0 }}
+              >
+                <ActionIcon size={18} />
+              </ThemeIcon>
+              <Text size="xs" c="dimmed">
+                {descriptions[action.kind]}
+              </Text>
+            </Group>
+          </Card>
+
           {(validation || mutation.error) && (
-            <Alert color="red" role="alert">
+            <Alert
+              color="red"
+              role="alert"
+              icon={<IconAlertTriangle size={16} />}
+              radius="sm"
+            >
               {validation || mutation.error?.message}
             </Alert>
           )}
-          {task && <Text fw={600}>{task.title}</Text>}
-          {project && action.kind !== "task" && (
-            <Text size="sm" c="dimmed">
-              {project.name}
-            </Text>
+
+          {task && (
+            <Card withBorder p="xs" radius="sm">
+              <Group justify="space-between">
+                <div>
+                  <Text size="xs" c="dimmed">
+                    Target task
+                  </Text>
+                  <Text fw={600} size="sm">
+                    {task.title}
+                  </Text>
+                </div>
+                <Badge size="xs" variant="light">
+                  {task.status}
+                </Badge>
+              </Group>
+            </Card>
           )}
+
+          {project && action.kind !== "task" && (
+            <Card withBorder p="xs" radius="sm">
+              <Group justify="space-between">
+                <div>
+                  <Text size="xs" c="dimmed">
+                    Project
+                  </Text>
+                  <Text fw={600} size="sm">
+                    {project.name}
+                  </Text>
+                </div>
+                <Badge
+                  size="xs"
+                  variant="light"
+                  color={project.state === "active" ? "teal" : "gray"}
+                >
+                  {project.state}
+                </Badge>
+              </Group>
+            </Card>
+          )}
+
           {action.kind === "project" && (
             <>
               <TextInput
                 name="name"
                 label="Project name"
+                placeholder="e.g. Identity & Access Engine"
+                leftSection={<IconFolder size={16} />}
                 required
                 maxLength={200}
               />
               <Textarea
                 name="description"
                 label="Goal and expected outcome"
+                placeholder="Define the primary objective, deliverables, and success criteria..."
+                minRows={3}
+                autosize
                 required
               />
-              <Group grow>
+              <Group grow gap="md">
                 <TextInput
                   name="start"
                   type="date"
                   label="Start date"
                   defaultValue={date}
+                  leftSection={<IconCalendar size={16} />}
                   required
                 />
                 <TextInput
@@ -291,6 +516,7 @@ export function AdminActionDialog({
                   type="date"
                   label="Target date"
                   defaultValue={date}
+                  leftSection={<IconCalendarEvent size={16} />}
                   required
                 />
               </Group>
@@ -311,16 +537,20 @@ export function AdminActionDialog({
                 onChange={(v) => setProjectId(v ?? "")}
                 searchable
                 required
+                leftSection={<IconFolder size={16} />}
               />
               <TextInput
                 name="name"
                 label="Task title"
                 required
                 maxLength={200}
+                leftSection={<IconChecklist size={16} />}
               />
               <Textarea
                 name="description"
                 label="Description and acceptance criteria"
+                minRows={3}
+                autosize
               />
               <div key={projectId}>
                 {personField(
@@ -358,6 +588,7 @@ export function AdminActionDialog({
                 label="Due date"
                 type="date"
                 defaultValue={date}
+                leftSection={<IconCalendar size={16} />}
                 required
               />
             </>
@@ -403,11 +634,14 @@ export function AdminActionDialog({
                 type="date"
                 label="New due date"
                 defaultValue={task?.dueDate}
+                leftSection={<IconCalendarTime size={16} />}
                 required
               />
               <Textarea
                 name="reason"
                 label="Reason for rescheduling"
+                minRows={2}
+                autosize
                 required
               />
             </>
@@ -500,6 +734,7 @@ export function AdminActionDialog({
                   type="date"
                   label="First day"
                   defaultValue={date}
+                  leftSection={<IconCalendar size={16} />}
                   required
                 />
                 <TextInput
@@ -507,10 +742,11 @@ export function AdminActionDialog({
                   type="date"
                   label="Last day"
                   defaultValue={date}
+                  leftSection={<IconCalendarEvent size={16} />}
                   required
                 />
               </Group>
-              <Textarea name="description" label="Note" />
+              <Textarea name="description" label="Note" minRows={2} autosize />
             </>
           )}
           {action.kind === "cancel" && (
@@ -547,7 +783,135 @@ export function AdminActionDialog({
               Lead/admin access is independent of membership.
             </Text>
           )}
-          <Group justify="flex-end">
+          {action.kind === "create-person" && (
+            <>
+              <TextInput
+                name="name"
+                label="Full name"
+                placeholder="Jane Doe"
+                leftSection={<IconUser size={16} />}
+                required
+              />
+              <TextInput
+                name="email"
+                label="Email address"
+                type="email"
+                placeholder="jane@futurelabs.io"
+                leftSection={<IconMail size={16} />}
+                required
+              />
+              <Select
+                name="role"
+                label="Role"
+                data={[
+                  { value: "member", label: "Team Member (contributor)" },
+                  { value: "manager", label: "Project Manager" },
+                  { value: "admin", label: "Administrator (org-wide access)" },
+                ]}
+                defaultValue="member"
+                allowDeselect={false}
+                required
+              />
+              <TextInput
+                name="title"
+                label="Job title"
+                placeholder="e.g. Infrastructure Engineer"
+              />
+              <Select
+                name="status"
+                label="Initial account status"
+                data={[
+                  { value: "active", label: "Active" },
+                  { value: "inactive", label: "Inactive" },
+                ]}
+                defaultValue="active"
+                allowDeselect={false}
+              />
+            </>
+          )}
+          {action.kind === "edit-person" && (
+            <>
+              <TextInput
+                name="name"
+                label="Full name"
+                defaultValue={targetPerson?.name}
+                leftSection={<IconUser size={16} />}
+                required
+              />
+              <TextInput
+                name="title"
+                label="Job title"
+                defaultValue={targetPerson?.title ?? ""}
+              />
+              <TextInput
+                name="avatarUrl"
+                label="Avatar URL (optional)"
+                defaultValue={targetPerson?.avatarUrl ?? ""}
+              />
+            </>
+          )}
+          {action.kind === "change-role" && (
+            <>
+              <Select
+                name="role"
+                label="New role"
+                data={[
+                  { value: "member", label: "Team Member" },
+                  { value: "manager", label: "Project Manager" },
+                  { value: "admin", label: "Administrator" },
+                ]}
+                defaultValue={targetPerson?.role}
+                allowDeselect={false}
+                required
+              />
+              <Text size="sm" c="dimmed">
+                Safeguards: The last active administrator cannot be demoted.
+                Demoting a manager unassigns project leadership responsibilities
+                while preserving project membership for open tasks.
+              </Text>
+            </>
+          )}
+          {action.kind === "set-person-status" && (
+            <>
+              <input
+                type="hidden"
+                name="status"
+                value={
+                  action.targetStatus ??
+                  (targetPerson?.status === "inactive" ? "active" : "inactive")
+                }
+              />
+              <Text>
+                Are you sure you want to{" "}
+                {(action.targetStatus ??
+                  (targetPerson?.status === "inactive"
+                    ? "active"
+                    : "inactive")) === "inactive"
+                  ? "deactivate"
+                  : "activate"}{" "}
+                <strong>{targetPerson?.name}</strong>?
+              </Text>
+              {(action.targetStatus ??
+                (targetPerson?.status === "inactive"
+                  ? "active"
+                  : "inactive")) === "inactive" && (
+                <Text size="sm" c="dimmed">
+                  Deactivating an account immediately revokes all active Tracker
+                  sessions, unassigns project leadership, and prevents further
+                  mutations. The last active admin cannot be deactivated.
+                </Text>
+              )}
+            </>
+          )}
+          {action.kind === "revoke-sessions" && (
+            <Text>
+              Revoke all active Tracker sessions for{" "}
+              <strong>{targetPerson?.name}</strong>? The user will be required
+              to sign in again.
+            </Text>
+          )}
+          <Divider mt="xs" mb="xs" />
+          <Group justify="flex-end" gap="sm">
             <Button
               variant="default"
               onClick={onClose}
@@ -559,7 +923,17 @@ export function AdminActionDialog({
               type="submit"
               loading={mutation.isPending}
               color={
-                ["cancel", "remove-member", "close"].includes(action.kind)
+                [
+                  "cancel",
+                  "remove-member",
+                  "close",
+                  "revoke-sessions",
+                ].includes(action.kind) ||
+                (action.kind === "set-person-status" &&
+                  (action.targetStatus ??
+                    (targetPerson?.status === "inactive"
+                      ? "active"
+                      : "inactive")) === "inactive")
                   ? "red"
                   : "teal"
               }
