@@ -136,6 +136,7 @@ export function useAcceptTask() {
       queryClient.invalidateQueries({ queryKey: queryKeys.blockers.all });
       queryClient.invalidateQueries({ queryKey: ["signals"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all });
+      queryClient.invalidateQueries({ queryKey: ["manager-workspace"] });
     },
   });
 }
@@ -157,6 +158,7 @@ export function useReturnTask() {
       queryClient.invalidateQueries({ queryKey: queryKeys.blockers.all });
       queryClient.invalidateQueries({ queryKey: ["signals"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all });
+      queryClient.invalidateQueries({ queryKey: ["manager-workspace"] });
     },
   });
 }

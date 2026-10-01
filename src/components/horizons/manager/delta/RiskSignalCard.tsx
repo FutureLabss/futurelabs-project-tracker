@@ -1,14 +1,15 @@
-import { Paper, Group, Text, Badge, Button, Box, Stack } from '@mantine/core';
-import { IconAlertTriangle, IconFlame } from '@tabler/icons-react';
-import type { RiskSignal } from '../../../../types/dashboard';
+// src/components/dashboard/molecules/RiskSignalCard.tsx
+import { Paper, Group, Text, Badge, Button, Box, Stack } from "@mantine/core";
+import { IconAlertTriangle, IconFlame } from "@tabler/icons-react";
+import type { AttentionRadarItem } from "../../../horizons/manager/kilos/OperationalRadar";
 
 interface RiskSignalCardProps {
-  risk: RiskSignal;
-  onInspect: (risk: RiskSignal) => void;
+  risk: AttentionRadarItem;
+  onInspect: (risk: AttentionRadarItem) => void;
 }
 
 export function RiskSignalCard({ risk, onInspect }: RiskSignalCardProps) {
-  const isCritical = risk.severity === 'critical';
+  const isCritical = risk.severity === "critical";
 
   return (
     <Paper
@@ -16,21 +17,36 @@ export function RiskSignalCard({ risk, onInspect }: RiskSignalCardProps) {
       p="md"
       radius="sm"
       style={{
-        borderColor: isCritical ? '#ffa8a8' : '#ffe066',
-        backgroundColor: isCritical ? '#fff5f5' : '#fff9db',
+        borderColor: isCritical ? "#ffa8a8" : "#ffe066",
+        backgroundColor: isCritical ? "#fff5f5" : "#fff9db",
       }}
     >
       <Stack gap="xs">
         <Group justify="space-between" wrap="nowrap">
           <Group gap="xs">
             <Badge
-              color={isCritical ? 'red' : 'yellow'}
+              color={
+                isCritical
+                  ? "red"
+                  : risk.signalType === "returned_for_rework"
+                    ? "orange"
+                    : "yellow"
+              }
               variant="filled"
+              size="xs"
               leftSection={
-                isCritical ? <IconFlame size={12} /> : <IconAlertTriangle size={12} />
+                isCritical ? (
+                  <IconFlame size={12} />
+                ) : (
+                  <IconAlertTriangle size={12} />
+                )
               }
             >
-              {isCritical ? 'CRITICAL: SILENT OVERRUN' : 'WARNING'}
+              {isCritical
+                ? "CRITICAL: SILENT OVERRUN"
+                : risk.signalType === "returned_for_rework"
+                  ? "RETURNED FOR WORK"
+                  : "WARNING"}
             </Badge>
             <Text size="xs" c="dimmed" fw={500}>
               {risk.projectName}
@@ -53,11 +69,11 @@ export function RiskSignalCard({ risk, onInspect }: RiskSignalCardProps) {
         <Group justify="flex-end" mt={4}>
           <Button
             variant="subtle"
-            color={isCritical ? 'red' : 'yellow'}
+            color={isCritical ? "red" : "yellow"}
             size="compact-xs"
-            onClick={() => onInspect(risk)}
+            onClick={() => onInspect(risk)} // Triggers modal opening
           >
-            {isCritical ? 'Inspect Silent Overrun' : 'Inspect Item'}
+            {isCritical ? "Inspect Silent Overrun" : "Inspect Item"}
           </Button>
         </Group>
       </Stack>

@@ -27,6 +27,13 @@ import {
   type AssignWorkFormValues,
 } from "../../modal/AssignWorkModal";
 import { ReviewDeliverableModal } from "../../modal/ReviewDeliverableModal";
+import { TaskLifecycleInspectorModal } from "../../modal/TaskLifecycleInspectorModal";
+import type { RaiseBlockerFormValues } from "../../modal/RaiseBlockerModal";
+import type { RescheduleTaskFormValues } from "../../modal/RescheduleTaskModal";
+import { taskService, blockerService } from "../../../services";
+import type { BlockerCategory } from "../../../entities/blocker.entity";
+import { getManagerReviewQueue } from "./manager-utils";
+
 export default function ManagersDashboard({
   actorId,
   date = new Date().toISOString().slice(0, 10),
@@ -41,6 +48,7 @@ export default function ManagersDashboard({
   const [isAssignOpen, setIsAssignOpen] = useState(false);
   const [reviewItem, setReviewItem] = useState<DeliverableRow | null>(null);
 
+  const [inspectedTaskId, setInspectedTaskId] = useState<string | null>(null);
   const query = useManagerWorkspace(date);
   const executeAction = useManagerAction();
   const createTaskMutation = useCreateTask();
@@ -48,6 +56,67 @@ export default function ManagersDashboard({
   const acceptTaskMutation = useAcceptTask();
   const returnTaskMutation = useReturnTask();
   const data = query.data;
+
+  // 1. Action: Start Working (not_started -> in_progress)
+  const handleStartWork = async (taskId: string) => {
+    await executeAction.mutateAsync(async () => {
+      await taskService.updateTaskStatus(taskId, "in_progress", actorId);
+    });
+  };
+
+  // 2. Action: Submit for Acceptance Gate (in_progress -> submitted)
+  const handleSubmitForGate = async (taskId: string) => {
+    await executeAction.mutateAsync(async () => {
+      await taskService.submitTask(
+        taskId,
+        actorId,
+        "Delivered for manager gate verification",
+      );
+    });
+    // Auto-close inspector or keep it updated
+    setInspectedTaskId(null);
+  };
+
+  // 3. Action: Raise Blocker
+  const handleRaiseBlocker = async (
+    taskId: string,
+    values: RaiseBlockerFormValues,
+  ) => {
+    await executeAction.mutateAsync(async () => {
+      await blockerService.raiseBlocker({
+        taskId,
+        actorId,
+        category: values.category as BlockerCategory,
+        ownerId: values.resolverId,
+        description: values.description,
+      });
+      await taskService.updateTaskStatus(taskId, "blocked", actorId);
+    });
+  };
+
+  // 4. Action: Reschedule Due Date
+  const handleReschedule = async (
+    taskId: string,
+    values: RescheduleTaskFormValues,
+  ) => {
+    await executeAction.mutateAsync(async () => {
+      await taskService.rescheduleTask(
+        taskId,
+        values.newDueDate,
+        values.reason,
+        actorId,
+      );
+    });
+  };
+
+  // 3. Inspect Click Handler: match the risk signal to its task
+  const handleInspectRisk = (risk: AttentionRadarItem) => {
+    const taskId = data?.signals.attentionItems.find(
+      (item) => item.id === risk.id,
+    )?.taskId;
+
+    if (taskId) setInspectedTaskId(taskId);
+  };
 
   if (!data) {
     return (
@@ -76,17 +145,17 @@ export default function ManagersDashboard({
     data.projects.find((p) => p.id === id)?.name ?? "Unknown Project";
 
   // 1. Data Mapping: Manager Acceptance Gate (Image 3)
-  const submittedTasks: DeliverableRow[] = data.tasks
-    .filter((t) => t.status === "submitted")
-    .map((t) => ({
-      id: t.id,
-      title: t.title,
-      description: t.description,
-      projectName: projectName(t.projectId),
-      submittedByName: personName(t.assigneeId),
-      complexity: t.complexity ?? "mid",
-      rawTask: t,
-    }));
+  const submittedTasks: DeliverableRow[] = getManagerReviewQueue(
+    data.tasks,
+  ).map((t) => ({
+    id: t.id,
+    title: t.title,
+    description: t.description,
+    projectName: projectName(t.projectId),
+    submittedByName: personName(t.assigneeId),
+    complexity: t.complexity ?? "mid",
+    rawTask: t,
+  }));
 
   // 2. Data Mapping: Audit Ledger Rows (Image 2)
   const auditRows: LedgerDisplayRow[] = data.ledger.map((record) => {
@@ -210,11 +279,11 @@ export default function ManagersDashboard({
         />
       )}
 
-      {/* SECTION 3: OPERATIONAL RADAR (IMAGE 4) */}
+      {/* SECTION 3: OPERATIONAL RADAR */}
       {(view === "overview" || view === "risk_queue") && (
         <OperationalRadar
           items={attentionItems}
-          onInspect={(risk) => console.log("Inspecting:", risk)}
+          onInspect={handleInspectRisk}
         />
       )}
 
@@ -242,6 +311,19 @@ export default function ManagersDashboard({
         onClose={() => setReviewItem(null)}
         onAccept={handleAcceptDeliverable}
         onReturn={handleReturnDeliverable}
+        loading={acceptTaskMutation.isPending || returnTaskMutation.isPending}
+      />
+
+      {/* 4. THE DIAGNOSTIC & LIFECYCLE MODAL */}
+      <TaskLifecycleInspectorModal
+        taskId={inspectedTaskId}
+        opened={!!inspectedTaskId}
+        onClose={() => setInspectedTaskId(null)}
+        data={data}
+        onStartWork={handleStartWork}
+        onSubmitForGate={handleSubmitForGate}
+        onRaiseBlocker={handleRaiseBlocker}
+        onReschedule={handleReschedule}
         loading={executeAction.isPending}
       />
     </ManagerTemplate>

@@ -56,12 +56,52 @@ export function calculateOperationalSignals(
 
     // B. Check Last Activity & Staleness (adjusted for leave)
     const taskLedger = ledger.filter((l) => l.subjectId === task.id);
-    const lastActivityTimestamp =
-      taskLedger.length > 0
-        ? taskLedger.reduce((latest, l) =>
-            dayjs(l.occurredAt).isAfter(dayjs(latest.occurredAt)) ? l : latest,
-          ).occurredAt
-        : task.createdAt;
+    const latestTaskEvent = taskLedger.reduce<LedgerRecord | null>(
+      (latest, event) =>
+        !latest || dayjs(event.occurredAt).isAfter(dayjs(latest.occurredAt))
+          ? event
+          : latest,
+      null,
+    );
+    const latestReviewEvent = taskLedger
+      .filter((event) =>
+        [
+          "task_returned",
+          "task_submitted",
+          "task_accepted",
+          "task_cancelled",
+        ].includes(event.type),
+      )
+      .reduce<LedgerRecord | null>(
+        (latest, event) =>
+          !latest || dayjs(event.occurredAt).isAfter(dayjs(latest.occurredAt))
+            ? event
+            : latest,
+        null,
+      );
+    const lastActivityTimestamp = latestTaskEvent?.occurredAt ?? task.createdAt;
+
+    if (
+      task.status === "in_progress" &&
+      latestReviewEvent?.type === "task_returned"
+    ) {
+      const reviewer = personMap.get(latestReviewEvent.actorId);
+      attentionItems.push({
+        id: `returned-for-rework-${task.id}`,
+        taskId: task.id,
+        projectId: task.projectId,
+        taskTitle: task.title,
+        projectName,
+        assigneeId: task.assigneeId,
+        assigneeName,
+        signalType: "returned_for_rework",
+        severity: "warning",
+        headline: `Returned for Work: ${task.title}`,
+        details: `${reviewer?.name ?? "Manager"} returned this deliverable for rework: ${latestReviewEvent.reason ?? "Review requested"}`,
+        dueDate: task.dueDate,
+        complexity: task.complexity,
+      });
+    }
 
     const rawInactiveWorkingDays = getWorkingDaysElapsed(
       lastActivityTimestamp,

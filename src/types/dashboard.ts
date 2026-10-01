@@ -173,6 +173,7 @@ export interface RiskSignal {
   signalType:
     | "silent_overrun"
     | "aging_blocker"
+    | "returned_for_rework"
     | "aging_wip"
     | "stale_inactivity"
     | "overdue"

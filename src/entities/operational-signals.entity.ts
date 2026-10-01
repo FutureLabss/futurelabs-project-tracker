@@ -8,6 +8,7 @@ export type SignalType =
   | "silent_overrun"
   | "aging_wip"
   | "aging_blocker"
+  | "returned_for_rework"
   | "stale_inactivity"
   | "overdue"
   | "imminent_unstarted"
