@@ -32,6 +32,7 @@ import {  AdminView, DashboardLayoutConfig, DashboardPanel as DashboardPanelConf
 
 import MemberDashboard from './horizons/member/MemberDashboard';
 import AdminDashboard from './horizons/admin/AdminDashboard';
+import ManagerDashboard from './horizons/manager/ManagerDashboard';
 import { useMediaQuery } from "@mantine/hooks";
 
 interface RoleDashboardLayoutProps {
@@ -269,6 +270,12 @@ export function RoleDashboardLayout({
               onViewChange={setAdminView}
             />
 
+        ) : config.role === 'manager' ? (
+            <ManagerDashboard
+              managerId={personId}
+              managerName={personName}
+              activeDate={activeDate}
+            />
         ) : (
         <Stack gap="xl" className="dashboard-shell">
           <Group justify="space-between" align="flex-start" gap="lg">
@@ -356,6 +363,7 @@ function TimeMachineBar({
     () => dayjs(activeDate).format("ddd, MMM D, YYYY"),
     [activeDate],
   );
+
 
   const shiftDate = (days: number) => {
     setActiveDate((currentDate) =>

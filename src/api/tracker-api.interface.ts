@@ -3,12 +3,38 @@ import { Project } from "../entities/project.entity";
 import { Task, TaskStatus } from "../entities/task.entity";
 import { Blocker } from "../entities/blocker.entity";
 import { Availability } from "../entities/availability.entity";
-import { LedgerRecord } from "../entities/ledger-record.entity";
+import { LedgerRecord, LedgerSubjectType, LedgerChangeType } from "../entities/ledger-record.entity";
 import { OperationalSignalsPayload } from "../entities/operational-signals.entity";
 import { CreateTaskDto } from "../dtos/create-task.dto";
 import { RaiseBlockerDto } from "../dtos/raise-blocker.dto";
 import { CreateProjectDto } from "../dtos/create-project.dto";
 import { RecordLeaveDto } from "../dtos/record-leave.dto";
+import { CreatePersonDto } from "../dtos/create-person.dto";
+import {
+  UpdatePersonProfileDto,
+  ChangePersonRoleDto,
+  SetPersonStatusDto,
+  RevokePersonSessionsDto,
+} from "../dtos/manage-person.dto";
+
+export interface TaskFilter {
+  projectId?: string;
+  assigneeId?: string;
+  status?: TaskStatus[];
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface LedgerFilter {
+  subjectId?: string;
+  subjectType?: LedgerSubjectType;
+  actorId?: string;
+  type?: LedgerChangeType;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
 
 export interface ITrackerApi {
   getProjectMembers(): Promise<
@@ -32,11 +58,8 @@ export interface ITrackerApi {
   ): Promise<Project>;
 
   // Tasks
-  getTasks(filter?: {
-    projectId?: string;
-    assigneeId?: string;
-    status?: TaskStatus[];
-  }): Promise<Task[]>;
+  getTasks(filter?: TaskFilter): Promise<Task[]>;
+  getTasksCount(filter?: TaskFilter): Promise<number>;
   getTaskById(id: string): Promise<Task | null>;
   createTask(dto: CreateTaskDto): Promise<Task>;
   assignTask(
@@ -73,14 +96,18 @@ export interface ITrackerApi {
   getPersons(): Promise<Person[]>;
   getAvailability(personId?: string): Promise<Availability[]>;
   recordAvailability(dto: RecordLeaveDto): Promise<Availability>;
+  createPerson(dto: CreatePersonDto): Promise<Person>;
+  updateProfile(dto: UpdatePersonProfileDto): Promise<Person>;
+  changeUserRole(dto: ChangePersonRoleDto): Promise<Person>;
+  setPersonStatus(dto: SetPersonStatusDto): Promise<Person>;
+  revokePersonSessions(dto: RevokePersonSessionsDto): Promise<void>;
 
   // Immutable Ledger & Signals
-  getLedger(filter?: {
-    subjectId?: string;
-    actorId?: string;
-  }): Promise<LedgerRecord[]>;
+  getLedger(filter?: LedgerFilter): Promise<LedgerRecord[]>;
+  getLedgerCount(filter?: LedgerFilter): Promise<number>;
   getDerivedSignals(simulatedDate: string): Promise<OperationalSignalsPayload>;
 
   // Reset to seed
   resetToSeedData(): Promise<void>;
+  supportsDemoReset(): boolean;
 }

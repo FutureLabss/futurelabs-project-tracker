@@ -1,4 +1,9 @@
-export type LedgerSubjectType = "project" | "task" | "blocker" | "availability";
+export type LedgerSubjectType =
+  | "project"
+  | "task"
+  | "blocker"
+  | "availability"
+  | "person";
 
 export type LedgerChangeType =
   | "project_member_added"
@@ -16,7 +21,12 @@ export type LedgerChangeType =
   | "task_accepted"
   | "task_returned"
   | "task_cancelled"
-  | "leave_recorded";
+  | "leave_recorded"
+  | "person_created"
+  | "profile_updated"
+  | "role_changed"
+  | "status_changed"
+  | "sessions_revoked";
 
 export interface LedgerRecord {
   id: string;

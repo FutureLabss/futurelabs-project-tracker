@@ -286,3 +286,169 @@ test("admin lifecycle, project membership, audit, and session authorization", as
     await db.close();
   }
 });
+
+test("people administration: create, update profile, role change, status, last-admin guard, session revocation", async () => {
+  const db = new PGlite();
+  const admin = "10000000-0000-4000-8000-000000000001";
+  const member = "10000000-0000-4000-8000-000000000002";
+  const manager = "10000000-0000-4000-8000-000000000003";
+  const sessions = {
+    [admin]: "20000000-0000-4000-8000-000000000001",
+    [member]: "20000000-0000-4000-8000-000000000002",
+    [manager]: "20000000-0000-4000-8000-000000000003",
+  };
+  const asUser = (id, fn, jti = sessions[id]) =>
+    db.transaction(async (tx) => {
+      await tx.exec("set local role authenticated");
+      await tx.query(
+        "select set_config('request.jwt.claim.sub',$1,true),set_config('request.jwt.claims',$2,true)",
+        [id, JSON.stringify({ iss: "project-tracker", jti })],
+      );
+      return fn(tx);
+    });
+  const rpc = (id, fn, operation, payload) =>
+    asUser(
+      id,
+      async (tx) =>
+        (
+          await tx.query(`select public.${fn}($1,$2::jsonb) as result`, [
+            operation,
+            JSON.stringify(payload),
+          ])
+        ).rows[0].result,
+    );
+  const mutate = (operation, payload, id = admin) =>
+    rpc(id, "tracker_mutate", operation, payload);
+  const govern = (operation, payload, id = admin) =>
+    rpc(id, "tracker_admin_mutate", operation, payload);
+
+  try {
+    await db.exec(
+      "create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,raw_user_meta_data jsonb default '{}'); create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$; grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;",
+    );
+    await db.exec(
+      "alter default privileges grant execute on functions to anon, authenticated;",
+    );
+    const directory = new URL("../supabase/migrations/", import.meta.url);
+    for (const file of readdirSync(directory)
+      .filter((f) => f.endsWith(".sql"))
+      .sort())
+      await db.transaction(async (tx) => {
+        await tx.exec(readFileSync(new URL(file, directory), "utf8"));
+      });
+
+    for (const [id, role] of [
+      [admin, "admin"],
+      [member, "member"],
+      [manager, "manager"],
+    ]) {
+      await db.query(
+        "insert into profiles(id,name,email,role,status) values($1,$2::text,$2::text || '@example.test',$2::text::user_role,'active')",
+        [id, role],
+      );
+      await db.query(
+        "insert into tracker_sessions(id,lms_user_id,expires_at) values($1,$2,now()+interval '15 minutes')",
+        [sessions[id], id],
+      );
+    }
+
+    // 1. Non-admin cannot create a person
+    await assert.rejects(
+      govern("create_person", { name: "Bob", email: "bob@example.test", role: "member" }, member),
+      /Administrator/,
+    );
+
+
+    // 2. Admin creates a person
+    const created = await govern("create_person", {
+      name: "Bob Builder",
+      email: "bob@example.test",
+      role: "member",
+      title: "Core Engineer",
+    });
+    assert.equal(created.name, "Bob Builder");
+    assert.equal(created.email, "bob@example.test");
+    assert.equal(created.role, "member");
+    assert.equal(created.status, "active");
+
+    const personEvent = await db.query(
+      "select type, subject_type, actor_id from ledger_records where subject_id = $1 order by occurred_at desc limit 1",
+      [created.id],
+    );
+
+
+    assert.equal(personEvent.rows[0].type, "person_created");
+    assert.equal(personEvent.rows[0].subject_type, "person");
+    assert.equal(personEvent.rows[0].actor_id, admin);
+
+    // 3. Admin updates person profile
+    const updated = await govern("update_profile", {
+      person_id: created.id,
+      name: "Robert Builder",
+      title: "Lead Engineer",
+    });
+    assert.equal(updated.name, "Robert Builder");
+    assert.equal(updated.title, "Lead Engineer");
+
+    // 4. Last active admin protection: cannot demote the only active admin
+    await assert.rejects(
+      govern("change_role", { person_id: admin, role: "member" }),
+      /Cannot demote the last active administrator/,
+    );
+
+    // 5. Last active admin protection: cannot deactivate the only active admin
+    await assert.rejects(
+      govern("set_person_status", { person_id: admin, status: "inactive" }),
+      /Cannot deactivate the last active administrator/,
+    );
+
+
+    // 6. Demoting a manager to member unassigns project lead
+    const project = await mutate("create_project", {
+      name: "Managed project",
+      goal: "Test manager unassignment",
+      start_date: "2026-09-01",
+      target_date: "2026-10-01",
+      manager_id: manager,
+    });
+    const projBefore = await db.query("select manager_id from projects where id = $1", [project.id]);
+    assert.equal(projBefore.rows[0].manager_id, manager);
+
+    await govern("change_role", { person_id: manager, role: "member" });
+    const projAfter = await db.query("select manager_id from projects where id = $1", [project.id]);
+    assert.equal(projAfter.rows[0].manager_id, null);
+
+    // 7. Deactivating member revokes their active sessions
+    await db.query(
+      "insert into tracker_sessions(id,lms_user_id,expires_at) values($1,$2,now()+interval '15 minutes')",
+      ["30000000-0000-4000-8000-000000000001", created.id],
+    );
+    const activeSessionsBefore = await db.query(
+      "select count(*) as count from tracker_sessions where lms_user_id = $1 and revoked_at is null",
+      [created.id],
+    );
+    assert.equal(Number(activeSessionsBefore.rows[0].count), 1);
+
+    await govern("set_person_status", { person_id: created.id, status: "inactive" });
+    const activeSessionsAfter = await db.query(
+      "select count(*) as count from tracker_sessions where lms_user_id = $1 and revoked_at is null",
+      [created.id],
+    );
+    assert.equal(Number(activeSessionsAfter.rows[0].count), 0);
+
+    // 8. Explicit session revocation
+    await db.query(
+      "insert into tracker_sessions(id,lms_user_id,expires_at) values($1,$2,now()+interval '15 minutes')",
+      ["30000000-0000-4000-8000-000000000002", member],
+    );
+    await govern("revoke_sessions", { person_id: member });
+    const memberActiveSessions = await db.query(
+      "select count(*) as count from tracker_sessions where lms_user_id = $1 and revoked_at is null",
+      [member],
+    );
+    assert.equal(Number(memberActiveSessions.rows[0].count), 0);
+  } finally {
+    await db.close();
+  }
+});
+

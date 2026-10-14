@@ -3,6 +3,7 @@ import type { ITrackerApi } from "../api/tracker-api.interface";
 type Backend = Pick<
   ITrackerApi,
   | "getTasks"
+  | "getTasksCount"
   | "getTaskById"
   | "createTask"
   | "assignTask"
@@ -20,6 +21,12 @@ export class TaskService {
     ...args: Parameters<Backend["getTasks"]>
   ): ReturnType<Backend["getTasks"]> {
     return this.api.getTasks(...args);
+  }
+
+  getTasksCount(
+    ...args: Parameters<Backend["getTasksCount"]>
+  ): ReturnType<Backend["getTasksCount"]> {
+    return this.api.getTasksCount(...args);
   }
 
   getTaskById(

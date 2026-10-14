@@ -18,4 +18,17 @@ export const demoMemberCredentials: Persona = {
   title: 'Frontend Engineer',
 };
 
-export const demoCredentials: Persona[] = [demoAdminCredentials, demoMemberCredentials];
+export const demoManagerCredentials: Persona = {
+  id: 'p-david',
+  name: 'David Kim',
+  email: 'manager@futurelabs.io',
+  password: 'Manager@2026',
+  role: 'manager',
+  title: 'Engineering Manager',
+};
+
+export const demoCredentials: Persona[] = [
+  demoAdminCredentials,
+  demoManagerCredentials,
+  demoMemberCredentials,
+];
