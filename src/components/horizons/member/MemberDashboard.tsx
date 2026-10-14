@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Button,
   Group,
@@ -9,7 +9,6 @@ import {
   Text,
   Title,
 } from '@mantine/core';
-
 import {
   IconClipboardList,
   IconClock,
@@ -22,22 +21,23 @@ import {
   IconUsers,
 } from '@tabler/icons-react';
 
+import { usePersons } from '../../../api/hooks/use-availability';
+import { useProjects } from '../../../api/hooks/use-projects';
+import { useTasks, useUpdateTaskStatus } from '../../../api/hooks/use-tasks';
+import type { MemberView } from '../../../types/dashboard';
+import { TaskBoard } from '../../task-board';
 import { MetricCard } from './atoms/MetricCard';
-import { PersonalTasksTable } from './organisms/PersonalTasksTable';
-import { SharedProjectsTable } from './organisms/SharedProjectsTable';
+import { MemberPageHeader } from './molecules/MemberPageHeader';
 import { AcceptedDeliverablesTable } from './organisms/AcceptedDeliverablesTable';
 import { CreateTaskModal } from './organisms/CreateTaskModal';
 import {
   MemberTaskActionModal,
   type MemberTaskAction,
 } from './organisms/MemberTaskActionModal';
-import { MemberPageHeader } from './molecules/MemberPageHeader';
+import { PersonalTasksTable } from './organisms/PersonalTasksTable';
+import { SharedProjectsTable } from './organisms/SharedProjectsTable';
+import { ProjectDetailsView } from './ProjectDetailsView';
 import { MemberTemplate } from './templates/MemberTemplate';
-import { MemberView } from '../../../types/dashboard';
-import { useTasks, useUpdateTaskStatus } from '../../../api/hooks/use-tasks';
-import { useProjects } from '../../../api/hooks/use-projects';
-import { usePersons } from '../../../api/hooks/use-availability';
-import { TaskBoard } from '../../task-board';
 
 interface MemberDashboardProps {
   personId: string;
@@ -50,75 +50,90 @@ export default function MemberDashboard({
   personName,
   memberView,
 }: MemberDashboardProps) {
-  const { data: myTasks = [] } = useTasks({ assigneeId: personId });
-  const { data: allTasks = [] } = useTasks();
-  const { data: projects = [] } = useProjects();
-  const { data: persons = [] } = usePersons();
-
-  const updateTaskStatusMutation = useUpdateTaskStatus();
-
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [myWorkViewMode, setMyWorkViewMode] = useState<'board' | 'table'>('board');
   const [teamViewMode, setTeamViewMode] = useState<'board' | 'table'>('table');
   const [createTaskOpened, setCreateTaskOpened] = useState(false);
   const [memberAction, setMemberAction] = useState<MemberTaskAction | null>(null);
 
+  const { data: myTasks = [] } = useTasks({ assigneeId: personId });
+  const { data: allTasks = [] } = useTasks();
+  const { data: projects = [] } = useProjects();
+  const { data: persons = [] } = usePersons();
+  const updateTaskStatusMutation = useUpdateTaskStatus();
+
+  useEffect(() => {
+    setActiveProjectId(null);
+  }, [memberView]);
+
   const activeTasks = myTasks.filter(
-    (t) => t.status !== 'accepted' && t.status !== 'cancelled',
+    (task) => task.status !== 'accepted' && task.status !== 'cancelled',
   );
-  const activeTasksCount = activeTasks.length;
 
   const getComplexityPoints = (complexity: string) => {
-    const c = complexity.toLowerCase();
-    if (c === 'high') return 3;
-    if (c === 'mid') return 2;
-    if (c === 'low') return 1;
+    const normalizedComplexity = complexity.toLowerCase();
+    if (normalizedComplexity === 'high') return 3;
+    if (normalizedComplexity === 'mid') return 2;
+    if (normalizedComplexity === 'low') return 1;
     return 0;
   };
 
   const sizeWeightedLoad = activeTasks.reduce(
-    (acc, t) => acc + getComplexityPoints(t.complexity),
+    (total, task) => total + getComplexityPoints(task.complexity),
     0,
   );
-
-  const todayStr = new Date().toISOString().split('T')[0];
-  const overdueTasksCount = activeTasks.filter((t) => t.dueDate < todayStr).length;
-
+  const today = new Date().toISOString().split('T')[0];
+  const overdueTasksCount = activeTasks.filter((task) => task.dueDate < today).length;
   const currentMonth = new Date().toISOString().slice(0, 7);
   const acceptedThisMonthTasks = myTasks.filter(
-    (t) => t.status === 'accepted' && t.acceptedAt?.startsWith(currentMonth),
+    (task) => task.status === 'accepted' && task.acceptedAt?.startsWith(currentMonth),
   );
-  const acceptedThisMonthCount = acceptedThisMonthTasks.length;
-  const acceptedThisMonthPts = acceptedThisMonthTasks.reduce(
-    (acc, t) => acc + getComplexityPoints(t.complexity),
+  const acceptedThisMonthPoints = acceptedThisMonthTasks.reduce(
+    (total, task) => total + getComplexityPoints(task.complexity),
     0,
   );
+
+  const openTaskAction = (
+    request: Parameters<
+      NonNullable<React.ComponentProps<typeof TaskBoard>['onTaskActionRequired']>
+    >[0],
+    taskTitle?: string,
+  ) => {
+    if (request.kind === 'blocker') {
+      setMemberAction({ kind: 'blocker', taskId: request.taskId, taskTitle });
+    } else if (request.kind === 'clear' && request.blockerId) {
+      setMemberAction({
+        kind: 'clear',
+        taskId: request.taskId,
+        blockerId: request.blockerId,
+        taskTitle,
+      });
+    } else if (request.kind === 'submit') {
+      setMemberAction({ kind: 'submit', taskId: request.taskId, taskTitle });
+    }
+  };
 
   return (
     <MemberTemplate
       header={
-        <MemberPageHeader
-          personName={personName}
-          personId={personId}
-          memberView={memberView}
-        />
+        !activeProjectId ? (
+          <MemberPageHeader
+            personName={personName}
+            personId={personId}
+            memberView={memberView}
+          />
+        ) : undefined
       }
       metricsGrid={
-        memberView !== 'completed' ? (
-          <SimpleGrid
-            cols={{
-              base: 1,
-              sm: 2,
-              lg: 4,
-            }}
-          >
+        !activeProjectId && memberView !== 'completed' ? (
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
             <MetricCard
               title="Active Tasks"
-              value={activeTasksCount}
+              value={activeTasks.length}
               description="In queue"
               color="blue"
               icon={<IconClipboardList size={18} />}
             />
-
             <MetricCard
               title="Size-Weighted Load"
               value={`${sizeWeightedLoad} pts`}
@@ -126,7 +141,6 @@ export default function MemberDashboard({
               color="grape"
               icon={<IconFlame size={18} />}
             />
-
             <MetricCard
               title="Overdue Tasks"
               value={overdueTasksCount}
@@ -134,11 +148,10 @@ export default function MemberDashboard({
               color="red"
               icon={<IconClock size={18} />}
             />
-
             <MetricCard
               title="Accepted This Month"
-              value={acceptedThisMonthCount}
-              description={`${acceptedThisMonthPts} complexity pts`}
+              value={acceptedThisMonthTasks.length}
+              description={`${acceptedThisMonthPoints} complexity pts`}
               color="teal"
               icon={<IconTrophy size={18} />}
             />
@@ -146,11 +159,14 @@ export default function MemberDashboard({
         ) : undefined
       }
     >
-      {/* =========================
-          CONTENT VIEWS
-      ========================= */}
+      {activeProjectId && (
+        <ProjectDetailsView
+          projectId={activeProjectId}
+          onBack={() => setActiveProjectId(null)}
+        />
+      )}
 
-      {memberView === 'my-work' && (
+      {!activeProjectId && memberView === 'my-work' && (
         <Paper withBorder radius="md" p="md">
           <Stack gap="md">
             <Group justify="space-between" align="center" wrap="wrap" gap="sm">
@@ -164,10 +180,10 @@ export default function MemberDashboard({
                 </Text>
               </Stack>
 
-              <Group gap="xs" wrap="nowrap">
+              <Group gap="xs" wrap="wrap">
                 <SegmentedControl
                   value={myWorkViewMode}
-                  onChange={(val) => setMyWorkViewMode(val as 'board' | 'table')}
+                  onChange={(value) => setMyWorkViewMode(value as 'board' | 'table')}
                   data={[
                     {
                       value: 'board',
@@ -204,47 +220,28 @@ export default function MemberDashboard({
                 tasks={activeTasks}
                 projects={projects}
                 people={persons}
-                onTaskStatusChange={async (taskId, targetStatus) => {
+                onTaskStatusChange={async (taskId, status) => {
                   await updateTaskStatusMutation.mutateAsync({
                     taskId,
-                    status: targetStatus,
+                    status,
                     actorId: personId,
                   });
                 }}
-                onTaskActionRequired={(req) => {
-                  const targetTask = activeTasks.find((t) => t.id === req.taskId);
-                  if (req.kind === 'blocker') {
-                    setMemberAction({
-                      kind: 'blocker',
-                      taskId: req.taskId,
-                      taskTitle: targetTask?.title,
-                    });
-                  } else if (req.kind === 'clear' && req.blockerId) {
-                    setMemberAction({
-                      kind: 'clear',
-                      taskId: req.taskId,
-                      blockerId: req.blockerId,
-                      taskTitle: targetTask?.title,
-                    });
-                  } else if (req.kind === 'submit') {
-                    setMemberAction({
-                      kind: 'submit',
-                      taskId: req.taskId,
-                      taskTitle: targetTask?.title,
-                    });
-                  }
+                onTaskActionRequired={(request) => {
+                  const task = activeTasks.find((item) => item.id === request.taskId);
+                  openTaskAction(request, task?.title);
                 }}
                 onCreateTask={() => setCreateTaskOpened(true)}
                 storageKey="futurelabs_member_taskboard_cols_v1"
               />
             ) : (
-              <PersonalTasksTable personId={personId} />
+              <PersonalTasksTable personId={personId} onProjectClick={setActiveProjectId} />
             )}
           </Stack>
         </Paper>
       )}
 
-      {memberView === 'team' && (
+      {!activeProjectId && memberView === 'team' && (
         <Paper withBorder radius="md" p="md">
           <Stack gap="md">
             <Group justify="space-between" align="center" wrap="wrap" gap="sm">
@@ -260,7 +257,7 @@ export default function MemberDashboard({
 
               <SegmentedControl
                 value={teamViewMode}
-                onChange={(val) => setTeamViewMode(val as 'board' | 'table')}
+                onChange={(value) => setTeamViewMode(value as 'board' | 'table')}
                 data={[
                   {
                     value: 'board',
@@ -291,46 +288,27 @@ export default function MemberDashboard({
                 people={persons}
                 readOnly={false}
                 canDragTask={(task) => task.assigneeId === personId}
-                onTaskStatusChange={async (taskId, targetStatus) => {
+                onTaskStatusChange={async (taskId, status) => {
                   await updateTaskStatusMutation.mutateAsync({
                     taskId,
-                    status: targetStatus,
+                    status,
                     actorId: personId,
                   });
                 }}
-                onTaskActionRequired={(req) => {
-                  const targetTask = allTasks.find((t) => t.id === req.taskId);
-                  if (req.kind === 'blocker') {
-                    setMemberAction({
-                      kind: 'blocker',
-                      taskId: req.taskId,
-                      taskTitle: targetTask?.title,
-                    });
-                  } else if (req.kind === 'clear' && req.blockerId) {
-                    setMemberAction({
-                      kind: 'clear',
-                      taskId: req.taskId,
-                      blockerId: req.blockerId,
-                      taskTitle: targetTask?.title,
-                    });
-                  } else if (req.kind === 'submit') {
-                    setMemberAction({
-                      kind: 'submit',
-                      taskId: req.taskId,
-                      taskTitle: targetTask?.title,
-                    });
-                  }
+                onTaskActionRequired={(request) => {
+                  const task = allTasks.find((item) => item.id === request.taskId);
+                  openTaskAction(request, task?.title);
                 }}
                 storageKey="futurelabs_team_taskboard_cols_v1"
               />
             ) : (
-              <SharedProjectsTable personId={personId} />
+              <SharedProjectsTable personId={personId} onProjectClick={setActiveProjectId} />
             )}
           </Stack>
         </Paper>
       )}
 
-      {memberView === 'completed' && (
+      {!activeProjectId && memberView === 'completed' && (
         <Paper withBorder radius="md" p="md">
           <Stack gap="md">
             <Group justify="space-between" align="flex-start">
@@ -345,18 +323,19 @@ export default function MemberDashboard({
               </Stack>
             </Group>
 
-            <AcceptedDeliverablesTable personId={personId} />
+            <AcceptedDeliverablesTable
+              personId={personId}
+              onProjectClick={setActiveProjectId}
+            />
           </Stack>
         </Paper>
       )}
 
-      {/* Member modals */}
       <CreateTaskModal
         opened={createTaskOpened}
         onClose={() => setCreateTaskOpened(false)}
         personId={personId}
       />
-
       <MemberTaskActionModal
         action={memberAction}
         actorId={personId}
