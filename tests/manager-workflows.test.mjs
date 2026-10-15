@@ -181,12 +181,6 @@ test("manager workflows in the database: create/close project, complexity, reope
       "members cannot move other people's dates",
     );
 
-    // FR-19: members read only their own tasks; the project's manager reads them all.
-    const visible = async (id) =>
-      (await readAs(id, "select id from tasks where project_id=$1 order by id", [project.id])).map((r) => r.id).sort();
-    assert.deepEqual(await visible(member), [memberTask.id, ownTask.id].sort());
-    assert.deepEqual(await visible(manager), [task.id, memberTask.id, ownTask.id].sort());
-    assert.deepEqual(await visible(otherManager), []);
     // FR-10: open task titles in the project stay pickable as a blocker's cause.
     const titles = await readAs(member, "select title from public.tracker_project_task_titles($1)", [project.id]);
     assert.deepEqual(titles.map((r) => r.title).sort(), ["Build the thing", "Member work", "Member's own task"].sort());

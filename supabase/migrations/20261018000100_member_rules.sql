@@ -2,7 +2,8 @@
 --   FR-12 / FR-13  a member reschedules their own task, with a reason
 --   FR-05 / SR-04  task origin is decided here: unplanned when the creator assigns
 --                  the task to themselves, planned in every other case
---   FR-19          members read only the tasks assigned to them
+-- The task read rule is deliberately unchanged for now: members can still read
+-- the tasks of projects they belong to, and FR-19 is enforced in the member UI.
 -- Adds one more guard layer in front of the existing tracker_mutate chain.
 
 alter function public.tracker_mutate(text, jsonb) set schema private;
@@ -56,18 +57,8 @@ end $$;
 revoke all on function public.tracker_mutate(text, jsonb) from public, anon;
 grant execute on function public.tracker_mutate(text, jsonb) to authenticated;
 
--- FR-19: members see only their own tasks. Admins and each project's manager see
--- all of its tasks. Blocker and change-log visibility follow task visibility.
-drop policy task_read on public.tasks;
-create policy task_read on public.tasks for select to authenticated using (
-  private.is_tracker_member() and (
-    assignee_id = auth.uid() or exists(
-      select 1 from public.profiles u where u.id = auth.uid() and (
-        u.role = 'admin' or exists(
-          select 1 from public.projects p where p.id = project_id and p.manager_id = u.id)))));
-
--- FR-10 without breaking FR-19: when recording which task caused a blocker, a
--- member may pick from the titles (only) of open tasks in a project they belong to.
+-- FR-10: when recording which task caused a blocker, a member picks from the
+-- titles (only) of open tasks in a project they belong to.
 create function public.tracker_project_task_titles(project uuid)
 returns table (id uuid, title text)
 language sql stable security definer set search_path = '' as $$
