@@ -9,6 +9,7 @@ import {
 import type { AttentionItem } from "../../entities/operational-signals.entity";
 import type { LedgerRecord } from "../../entities/ledger-record.entity";
 import type { Person } from "../../entities/person.entity";
+import { invalidateManagerQueries } from "./use-manager-actions";
 
 export interface ManagerAttentionItem extends AttentionItem {}
 
@@ -218,20 +219,6 @@ export function useManagerAction() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (action: () => Promise<unknown>) => action(),
-    onSuccess: async () => {
-      await Promise.all(
-        [
-          "manager-workspace",
-          "admin-workspace",
-          "projects",
-          "tasks",
-          "persons",
-          "blockers",
-          "availability",
-          "ledger",
-          "signals",
-        ].map((key) => client.invalidateQueries({ queryKey: [key] })),
-      );
-    },
+    onSuccess: () => invalidateManagerQueries(client),
   });
 }

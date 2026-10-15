@@ -2,7 +2,7 @@ import { ITrackerApi, TaskFilter, LedgerFilter } from "../tracker-api.interface"
 import { STORAGE_KEYS } from "./storage-keys";
 import { Person } from "../../entities/person.entity";
 import { Project } from "../../entities/project.entity";
-import { Task, TaskStatus } from "../../entities/task.entity";
+import { Task, TaskComplexity, TaskStatus } from "../../entities/task.entity";
 import { Blocker } from "../../entities/blocker.entity";
 import { Availability } from "../../entities/availability.entity";
 import { LedgerRecord } from "../../entities/ledger-record.entity";
@@ -573,6 +573,136 @@ export class MockLocalStorageApi implements ITrackerApi {
     });
 
     return tasks[index];
+  }
+
+  // --- MANAGER WORKFLOWS (mirror tracker_manager_mutate) ---
+
+  private requireManager(actorId: string) {
+    const actor = this.getCollection<Person>(STORAGE_KEYS.PERSONS).find(
+      (p) => p.id === actorId,
+    );
+    if (!actor || actor.role !== "manager" || actor.status === "inactive")
+      throw new Error("Manager access is required.");
+  }
+
+  /** Returns the task once the actor is confirmed as its active project's manager. */
+  private requireManagedTask(taskId: string, actorId: string) {
+    this.requireManager(actorId);
+    const tasks = this.getCollection<Task>(STORAGE_KEYS.TASKS);
+    const index = tasks.findIndex((t) => t.id === taskId);
+    if (index === -1) throw new Error("Task not found.");
+    const project = this.getCollection<Project>(STORAGE_KEYS.PROJECTS).find(
+      (p) => p.id === tasks[index].projectId,
+    );
+    if (project?.managerId !== actorId)
+      throw new Error("Only the project's manager can change this task.");
+    if (project.state !== "active")
+      throw new Error("Closed projects cannot be changed.");
+    return { tasks, index };
+  }
+
+  async createManagedProject(
+    dto: Omit<CreateProjectDto, "managerId">,
+  ): Promise<Project> {
+    await this.delay();
+    this.requireManager(dto.actorId);
+    if (!dto.name.trim()) throw new Error("A project name is required.");
+    if (dto.targetDate < dto.startDate)
+      throw new Error("The target date cannot be before the start date.");
+    return this.createProject({ ...dto, managerId: dto.actorId });
+  }
+
+  async closeManagedProject(
+    projectId: string,
+    actorId: string,
+  ): Promise<Project> {
+    await this.delay();
+    this.requireManager(actorId);
+    const projects = this.getCollection<Project>(STORAGE_KEYS.PROJECTS);
+    const project = projects.find((p) => p.id === projectId);
+    if (!project || project.managerId !== actorId)
+      throw new Error("Only the project's manager can close it.");
+    if (project.state !== "active")
+      throw new Error("An active project is required.");
+    if (
+      this.getCollection<Task>(STORAGE_KEYS.TASKS).some(
+        (t) =>
+          t.projectId === projectId &&
+          !["accepted", "cancelled"].includes(t.status),
+      )
+    )
+      throw new Error(
+        "Accept or cancel all open tasks before closing this project.",
+      );
+    project.state = "closed";
+    this.setCollection(STORAGE_KEYS.PROJECTS, projects);
+    this.appendLedgerRecord({
+      subjectId: projectId,
+      subjectType: "project",
+      actorId,
+      type: "project_closed",
+      fromValue: "active",
+      toValue: "closed",
+      reason: "Project completed",
+    });
+    return project;
+  }
+
+  async changeTaskComplexity(
+    taskId: string,
+    complexity: TaskComplexity,
+    actorId: string,
+    reason?: string,
+  ): Promise<Task> {
+    await this.delay();
+    const { tasks, index } = this.requireManagedTask(taskId, actorId);
+    const task = tasks[index];
+    if (task.status === "accepted" || task.status === "cancelled")
+      throw new Error("Completed or cancelled work cannot be modified.");
+    if (task.complexity === complexity)
+      throw new Error("The task already has this complexity.");
+    const oldComplexity = task.complexity;
+    task.complexity = complexity;
+    this.setCollection(STORAGE_KEYS.TASKS, tasks);
+    this.appendLedgerRecord({
+      subjectId: taskId,
+      subjectType: "task",
+      actorId,
+      type: "complexity_changed",
+      fromValue: oldComplexity,
+      toValue: complexity,
+      reason: reason?.trim() || null,
+    });
+    return task;
+  }
+
+  async reopenTask(
+    taskId: string,
+    actorId: string,
+    reason: string,
+  ): Promise<Task> {
+    await this.delay();
+    const { tasks, index } = this.requireManagedTask(taskId, actorId);
+    const task = tasks[index];
+    if (task.status !== "accepted")
+      throw new Error("Only accepted work can be reopened.");
+    if (!reason?.trim())
+      throw new Error("A reason is required when reopening work.");
+    task.status = "in_progress";
+    task.acceptedAt = null;
+    task.acceptedBy = null;
+    task.submittedAt = null;
+    this.setCollection(STORAGE_KEYS.TASKS, tasks);
+    this.appendLedgerRecord({
+      subjectId: taskId,
+      subjectType: "task",
+      actorId,
+      type: "task_reopened",
+      fromValue: "accepted",
+      toValue: "in_progress",
+      reason: reason.trim(),
+    });
+    return task;
   }
 
   // --- BLOCKERS ---

@@ -118,6 +118,10 @@ export type Database = {
         Args: { operation: string; payload: Json };
         Returns: Json;
       };
+      tracker_manager_mutate: {
+        Args: { operation: string; payload: Json };
+        Returns: Json;
+      };
       tracker_logout: { Args: Record<string, never>; Returns: undefined };
       tracker_mutate: {
         Args: { operation: string; payload: Json };
