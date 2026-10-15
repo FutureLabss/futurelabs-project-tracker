@@ -40,6 +40,7 @@ export interface MemberSignalSummary {
   acceptedCountThisMonth: number;
   acceptedWeightThisMonth: number;
   overdueCount: number;
+  staleTaskIds: string[]; // Active tasks with no change for STALE_INACTIVITY_WORKING_DAYS (leave-adjusted)
 }
 
 export interface ProjectHealthSummary {

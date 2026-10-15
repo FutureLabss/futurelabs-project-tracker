@@ -36,6 +36,7 @@ export function calculateOperationalSignals(
   );
 
   const attentionItems: AttentionItem[] = [];
+  const staleTaskIdSet = new Set<string>();
 
   // Helper map for quick lookups
   const personMap = new Map<string, Person>(persons.map((p) => [p.id, p]));
@@ -84,6 +85,7 @@ export function calculateOperationalSignals(
     const isStale =
       adjustedInactiveWorkingDays >=
       SYSTEM_CONFIG.STALE_INACTIVITY_WORKING_DAYS;
+    if (isStale) staleTaskIdSet.add(task.id);
 
     // C. Check Silent Overrun (Overdue + Stale) -> PINNED TOP PRIORITY CRITICAL
     if (isOverdue && isStale) {
@@ -298,6 +300,9 @@ export function calculateOperationalSignals(
       acceptedCountThisMonth: acceptedThisMonth.length,
       acceptedWeightThisMonth,
       overdueCount,
+      staleTaskIds: memberActiveTasks
+        .filter((t) => staleTaskIdSet.has(t.id))
+        .map((t) => t.id),
     };
   }
 

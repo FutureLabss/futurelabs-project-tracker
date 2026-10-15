@@ -8,6 +8,7 @@ import {
   IconUsers,
   IconUser,
   IconHistory,
+  IconSend,
 } from "@tabler/icons-react";
 import { DashboardLayoutConfig, UserRole } from "../types/dashboard";
 
@@ -19,13 +20,13 @@ export const roleDashboards: Record<UserRole, DashboardLayoutConfig> = {
     subtitle: "",
     navigation: [
       {
-        label: "Projects",
+        label: "My Work",
         icon: IconUser,
         memberView: "my-work",
         active: true,
       },
-      { label: "Tasks", icon: IconUsers, memberView: "team" },
-      { label: "History", icon: IconHistory, memberView: "completed" },
+      { label: "Submitted", icon: IconSend, memberView: "submitted" },
+      { label: "History", icon: IconHistory, memberView: "history" },
     ],
     metrics: [],
     primaryActions: [],

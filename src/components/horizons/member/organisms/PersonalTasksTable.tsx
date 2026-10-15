@@ -16,8 +16,10 @@ import {
 
 import { BlockedBadge } from '../atoms/BlockedBadge';
 import { ComplexityBadge } from '../atoms/ComplexityBadge';
-import { OverdueBadge } from '../atoms/OverdueBadge';
 import { StatusBadge } from '../atoms/StatusBadge';
+import { TaskFlagBadges } from '../atoms/TaskFlagBadges';
+import type { MemberTaskFlags } from '../../../../api/hooks/use-member-task-flags';
+import type { Task } from '../../../../entities/task.entity';
 
 import {
   ReusableTable,
@@ -35,11 +37,12 @@ import { TaskDiagnosticDrawer } from '../../../detail-views/TaskDiagnosticDrawer
 
 interface personTaskTableProps {
   personId:string;
+  getFlags: (task: Task) => MemberTaskFlags;
   onProjectClick?: (projectId: string) => void;
 }
 
 
-export function PersonalTasksTable({personId, onProjectClick}:personTaskTableProps) {
+export function PersonalTasksTable({personId, getFlags, onProjectClick}:personTaskTableProps) {
   const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null);
 
   const clickableCell = (taskId: string | number, children: React.ReactNode) => (
@@ -129,9 +132,7 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
           {task.dueDate}
         </Text>
 
-        {task.overdue && (
-          <OverdueBadge />
-        )}
+        {task.flags && <TaskFlagBadges flags={task.flags} />}
       </Stack>
     )),
   },
@@ -344,7 +345,12 @@ const handleSubmit = (taskId: string) => {
     );
   }
 
-  const mappedTasks: PersonalTask[] = tasks.map((task) => {
+  // FR-01 / FR-02: open work only, earliest due date first.
+  const openTasks = tasks
+    .filter((task) => task.status !== 'accepted' && task.status !== 'cancelled')
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+  const mappedTasks: PersonalTask[] = openTasks.map((task) => {
     const project = projects.find((p) => p.id === task.projectId);
     
     let complexity: PersonalTask['complexity'] = 'LOW (1 PT)';
@@ -361,17 +367,18 @@ const handleSubmit = (taskId: string) => {
     if (status === 'NOT STARTED') accessMode = 'START';
     if (status === 'IN PROGRESS') accessMode = 'SUBMIT';
 
-    const isOverdue = new Date(task.dueDate) < new Date() && task.status !== 'accepted' && task.status !== 'submitted';
+    const flags = getFlags(task);
 
     return {
-      id: task.id as any, // ID is string in Task but PersonalTask type might expect number. Casting to any to satisfy the table since ReusableTable accepts both
+      id: task.id,
       title: task.title,
       overview: task.description,
       project: project?.name || 'Unknown Project',
       projectId: task.projectId,
       complexity,
       dueDate: task.dueDate,
-      overdue: isOverdue,
+      overdue: flags.overdue,
+      flags,
       status,
       accessMode,
     };
