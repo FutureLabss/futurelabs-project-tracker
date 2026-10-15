@@ -79,3 +79,17 @@ test("blocker records count as project activity", () => {
   const blockerEvent = { ...rec("e", "b", "blocker_cleared", "2026-08-31T10:00:00Z"), subjectType: "blocker" };
   assert.equal(evaluateProjectRag(project(), [t], [blocker], [old, blockerEvent], DATE).status, "green");
 });
+
+test("aging work starts at the latest move into progress, in any ledger order", () => {
+  const { calculateOperationalSignals } = require("../src/domain/calculations/derived-signals.ts");
+  const t = task("t-any", { status: "in_progress", createdAt: "2026-08-01T09:00:00Z" });
+  const first = rec("first", "t-any", "status_changed", "2026-08-03T09:00:00Z", { toValue: "in_progress" });
+  const returned = rec("ret", "t-any", "task_returned", "2026-08-31T09:00:00Z", { toValue: "in_progress", reason: "r" });
+  const aging = (ledger) =>
+    calculateOperationalSignals([], [project()], [t], [], [], ledger, DATE).attentionItems.some(
+      (i) => i.signalType === "aging_wip",
+    );
+  assert.equal(aging([first, returned]), false, "oldest-first order");
+  assert.equal(aging([returned, first]), false, "newest-first order (Supabase)");
+  assert.equal(aging([first]), true, "without the return it has aged");
+});

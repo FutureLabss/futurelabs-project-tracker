@@ -152,16 +152,7 @@ export interface ProjectBreakdownItem {
   openTasksCount: number;
 }
 
-export interface PersonBreakdownItem {
-  personId: string;
-  name: string;
-  role: string;
-  status: string;
-  acceptedCount: number;
-  acceptedWeight: number;
-  returnsCount: number;
-  activeTasksCount: number;
-}
+// Per-person delivery comparisons were removed: NFR-02 forbids ranking or comparing people.
 
 /** A timestamp's calendar day in local time (not UTC), for period filters. */
 export const localDay = (timestamp: string) => dayjs(timestamp).format("YYYY-MM-DD");
@@ -267,52 +258,11 @@ export function calculatePeriodAnalytics(
     };
   });
 
-  const personBreakdown: PersonBreakdownItem[] = data.people.map((person) => {
-    const personAcceptedTasks = data.tasks.filter(
-      (t) =>
-        t.assigneeId === person.id &&
-        t.status === "accepted" &&
-        !!t.acceptedAt &&
-        t.acceptedAt.slice(0, 10) >= dateRange.startDate &&
-        t.acceptedAt.slice(0, 10) <= dateRange.endDate,
-    );
-    const personTaskIds = new Set(
-      data.tasks.filter((t) => t.assigneeId === person.id).map((t) => t.id),
-    );
-    const personReturns = data.ledger.filter((r) => {
-      const occurredDate = r.occurredAt.slice(0, 10);
-      return (
-        occurredDate >= dateRange.startDate &&
-        occurredDate <= dateRange.endDate &&
-        r.type === "task_returned" &&
-        personTaskIds.has(r.subjectId)
-      );
-    }).length;
-    const activeTasksCount = data.tasks.filter(
-      (t) => t.assigneeId === person.id && isOpen(t),
-    ).length;
-
-    return {
-      personId: person.id,
-      name: person.name,
-      role: person.role,
-      status: person.status ?? "active",
-      acceptedCount: personAcceptedTasks.length,
-      acceptedWeight: personAcceptedTasks.reduce(
-        (sum, t) => sum + getComplexityWeight(t.complexity),
-        0,
-      ),
-      returnsCount: personReturns,
-      activeTasksCount,
-    };
-  });
-
   return {
     current,
     previous,
     previousRange,
     trends,
     projectBreakdown,
-    personBreakdown,
   };
 }

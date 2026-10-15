@@ -32,6 +32,7 @@ export function TaskBoard({
   canDragTask,
   canDropTask,
   canDoMemberActions,
+  today,
   readOnly = false,
   emptyPlaceholder,
   headerRightContent,
@@ -276,6 +277,7 @@ export function TaskBoard({
               isDraggableColumn={!readOnly}
               canDragTask={canDragTask}
               canDoMemberActions={canDoMemberActions}
+              today={today}
               readOnly={readOnly}
               onTaskClick={onTaskClick}
               onTaskStatusChange={onTaskStatusChange}

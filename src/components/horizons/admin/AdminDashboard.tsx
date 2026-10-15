@@ -324,7 +324,7 @@ export default function AdminDashboard({
       ];
     if (view === "people")
       return [
-        ["Name", "Email", "Role", "Status", "Open tasks", "Complexity points"],
+        ["Name", "Email", "Role", "Status", "Open tasks", "Open work (complexity points)"],
         ...people.map((p) => [
           p.name,
           p.email,
@@ -409,8 +409,8 @@ export default function AdminDashboard({
             "Lead",
             "Accepted in Period",
             "Delivered Points",
-            "Returns (Rework)",
-            "Date Slips",
+            "Returned or Reopened",
+            "Due Dates Moved Later",
             "Open Tasks",
           ],
           ...periodAnalytics.projectBreakdown.map((p) => [
@@ -421,25 +421,6 @@ export default function AdminDashboard({
             p.returnsCount,
             p.dateChangesCount,
             p.openTasksCount,
-          ]),
-          [],
-          [
-            "Team Member",
-            "Role",
-            "Status",
-            "Accepted in Period",
-            "Delivered Points",
-            "Returns",
-            "Active Tasks",
-          ],
-          ...periodAnalytics.personBreakdown.map((p) => [
-            p.name,
-            p.role,
-            p.status,
-            p.acceptedCount,
-            p.acceptedWeight,
-            p.returnsCount,
-            p.activeTasksCount,
           ]),
         ];
       }
@@ -706,6 +687,7 @@ export default function AdminDashboard({
               people={data.people}
               onTaskClick={onTask}
               canDoMemberActions={(task) => task.assigneeId === actorId}
+              today={date}
               onTaskStatusChange={async (taskId, targetStatus) => {
                 await adminActionMutation.mutateAsync(() =>
                   taskService.updateTaskStatus(taskId, targetStatus, actorId),

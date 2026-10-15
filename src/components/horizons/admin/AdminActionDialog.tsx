@@ -204,6 +204,9 @@ export function AdminActionDialog({
   };
 
   const readField = (name: string) => String(formValues[name] ?? "").trim();
+  // The default applies only until the field is edited, so clearing a field sticks.
+  const fieldValue = (name: string, fallback: string) =>
+    name in formValues ? formValues[name] : fallback;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -430,7 +433,7 @@ export function AdminActionDialog({
       name="person"
       label={label}
       data={options(rows)}
-      value={readField("person") || defaultValue || null}
+      value={fieldValue("person", defaultValue ?? "") || null}
       onChange={(value) => updateField("person", value ?? "")}
       placeholder={placeholder}
       nothingFoundMessage="No eligible users found"
@@ -561,7 +564,7 @@ export function AdminActionDialog({
                   name="start"
                   type="date"
                   label="Start date"
-                  value={readField("start") || date}
+                  value={fieldValue("start", date)}
                   onChange={(event) =>
                     updateField("start", event.currentTarget.value)
                   }
@@ -572,7 +575,7 @@ export function AdminActionDialog({
                   name="end"
                   type="date"
                   label="Target date"
-                  value={readField("end") || date}
+                  value={fieldValue("end", date)}
                   onChange={(event) =>
                     updateField("end", event.currentTarget.value)
                   }
@@ -642,7 +645,7 @@ export function AdminActionDialog({
                   name="complexity"
                   label="Complexity"
                   data={["low", "mid", "high"]}
-                  value={readField("complexity") || "mid"}
+                  value={fieldValue("complexity", "mid")}
                   onChange={(value) =>
                     updateField("complexity", value ?? "mid")
                   }
@@ -653,7 +656,7 @@ export function AdminActionDialog({
                   name="origin"
                   label="Origin"
                   data={["planned", "unplanned"]}
-                  value={readField("origin") || "planned"}
+                  value={fieldValue("origin", "planned")}
                   onChange={(value) =>
                     updateField("origin", value ?? "planned")
                   }
@@ -665,7 +668,7 @@ export function AdminActionDialog({
                 name="due"
                 label="Due date"
                 type="date"
-                value={readField("due") || date}
+                value={fieldValue("due", date)}
                 onChange={(event) =>
                   updateField("due", event.currentTarget.value)
                 }
@@ -714,7 +717,7 @@ export function AdminActionDialog({
                 name="due"
                 type="date"
                 label="New due date"
-                value={readField("due") || task?.dueDate || ""}
+                value={fieldValue("due", task?.dueDate ?? "")}
                 onChange={(event) =>
                   updateField("due", event.currentTarget.value)
                 }
@@ -741,7 +744,7 @@ export function AdminActionDialog({
                 type="url"
                 label="Deliverable URL"
                 pattern="https?://.*"
-                value={readField("url") || task?.deliverableUrl || ""}
+                value={fieldValue("url", task?.deliverableUrl ?? "")}
                 onChange={(event) =>
                   updateField("url", event.currentTarget.value)
                 }
@@ -749,7 +752,7 @@ export function AdminActionDialog({
               <Textarea
                 name="description"
                 label="Submission notes"
-                value={readField("description") || task?.submissionNotes || ""}
+                value={fieldValue("description", task?.submissionNotes ?? "")}
                 onChange={(event) =>
                   updateField("description", event.currentTarget.value)
                 }
@@ -806,7 +809,7 @@ export function AdminActionDialog({
                     label: "Unclear requirement",
                   },
                 ]}
-                value={readField("category") || "external"}
+                value={fieldValue("category", "external")}
                 onChange={(value) =>
                   updateField("category", value ?? "external")
                 }
@@ -829,7 +832,7 @@ export function AdminActionDialog({
                 data={data.tasks
                   .filter((t) => t.id !== task?.id && isTaskOpen(t.status))
                   .map((t) => ({ value: t.id, label: t.title }))}
-                value={readField("dependency") || null}
+                value={fieldValue("dependency", "") || null}
                 onChange={(value) => updateField("dependency", value ?? "")}
                 searchable
                 clearable
@@ -844,7 +847,7 @@ export function AdminActionDialog({
                   name="start"
                   type="date"
                   label="First day"
-                  value={readField("start") || date}
+                  value={fieldValue("start", date)}
                   onChange={(event) =>
                     updateField("start", event.currentTarget.value)
                   }
@@ -855,7 +858,7 @@ export function AdminActionDialog({
                   name="end"
                   type="date"
                   label="Last day"
-                  value={readField("end") || date}
+                  value={fieldValue("end", date)}
                   onChange={(event) =>
                     updateField("end", event.currentTarget.value)
                   }

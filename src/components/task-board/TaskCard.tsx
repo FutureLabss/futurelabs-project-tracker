@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 import { useState, type DragEvent } from "react";
 import {
   Card,
@@ -33,6 +34,8 @@ interface TaskCardProps {
   isDraggable?: boolean;
   /** False hides Start, Raise blocker and Submit (the assignee's own actions). */
   memberActionsAllowed?: boolean;
+  /** YYYY-MM-DD used for overdue / due-today. */
+  today?: string;
   onTaskClick?: (taskId: string) => void;
   onStatusChange?: (targetStatus: TaskStatus) => void;
   onActionRequired?: (action: {
@@ -56,6 +59,7 @@ export function TaskCard({
   assignee,
   isDraggable = true,
   memberActionsAllowed = true,
+  today,
   onTaskClick,
   onStatusChange,
   onActionRequired,
@@ -64,7 +68,7 @@ export function TaskCard({
 }: TaskCardProps) {
   const [isDragging, setIsDragging] = useState(false);
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = today ?? dayjs().format("YYYY-MM-DD");
   const isOverdue =
     task.dueDate < todayStr &&
     task.status !== "accepted" &&

@@ -213,11 +213,8 @@ test("period analytics calculates throughput, rework rate, slips, and trends", (
   assert.equal(analytics.projectBreakdown[0].projectName, "Alpha");
   assert.equal(analytics.projectBreakdown[0].acceptedCount, 2);
 
-  // Person breakdown includes team member summary
-  const devSummary = analytics.personBreakdown.find((p) => p.personId === "dev-1");
-  assert.ok(devSummary);
-  assert.equal(devSummary.acceptedCount, 2);
-  assert.equal(devSummary.returnsCount, 1);
+  // NFR-02: no per-person delivery comparison is produced.
+  assert.equal(analytics.personBreakdown, undefined);
 });
 
 

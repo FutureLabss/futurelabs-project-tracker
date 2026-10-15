@@ -249,6 +249,7 @@ export default function MemberDashboard({
                     openTaskAction(request, task?.title);
                   }}
                   onTaskClick={setDrawerTaskId}
+                  today={date}
                   onCreateTask={() => setCreateTaskOpened(true)}
                   storageKey="futurelabs_member_taskboard_cols_v1"
                 />

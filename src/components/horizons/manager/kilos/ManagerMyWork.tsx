@@ -16,6 +16,7 @@ interface ManagerMyWorkProps {
   projects: Project[];
   people: Person[];
   actorId: string;
+  date: string;
   onTaskClick: (taskId: string) => void;
   onStatusChange: (taskId: string, status: TaskStatus) => Promise<void>;
   onCreateTask: () => void;
@@ -29,6 +30,7 @@ export function ManagerMyWork({
   projects,
   people,
   actorId,
+  date,
   onTaskClick,
   onStatusChange,
   onCreateTask,
@@ -60,6 +62,7 @@ export function ManagerMyWork({
           projects={projects}
           people={people}
           onTaskClick={onTaskClick}
+          today={date}
           onTaskStatusChange={(taskId, status) => onStatusChange(taskId, status)}
           onTaskActionRequired={(request) => {
             const title = openTasks.find((t) => t.id === request.taskId)?.title;
