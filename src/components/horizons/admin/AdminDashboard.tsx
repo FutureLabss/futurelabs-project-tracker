@@ -510,46 +510,40 @@ export default function AdminDashboard({
       isFetching={query.isFetching}
       onRefresh={() => void query.refetch()}
       onExport={exportReport}
-      onNewProject={() => setAction({ kind: "project" })}
-      onResetDemo={() => setResetModalOpen(true)}
+      // Portfolio is the admin home: only it carries New project, Reset demo and the summary cards.
+      onNewProject={view === "portfolio" ? () => setAction({ kind: "project" }) : undefined}
+      onResetDemo={view === "portfolio" ? () => setResetModalOpen(true) : undefined}
       canResetDemo={canResetDemo}
       queryError={query.isError ? query.error.message : undefined}
       exportError={exportError}
       exportNotice={exportNotice}
       onClearExportNotice={() => setExportNotice("")}
       metricsGrid={
+        view === "portfolio" && (
         <SimpleGrid cols={{ base: 1, xs: 2, xl: 4 }}>
           <MetricCard
             label="Active projects"
             value={activeProjects.length}
             detail={`${activeProjects.filter((p) => !p.managerId).length} without a lead`}
-            onClick={() => changeView("portfolio")}
           />
           <MetricCard
             label="Accepted in 30 days"
             value={metrics.acceptedThroughput30d}
             detail={`${metrics.acceptedWeight30d} complexity points`}
-            onClick={() => {
-              changeView("analytics");
-              setReport("throughput");
-            }}
           />
           <MetricCard
             label="Review queue"
             value={data.tasks.filter((t) => t.status === "submitted").length}
             detail="Submitted deliverables awaiting acceptance"
-            onClick={() => {
-              changeView("tasks", "submitted");
-            }}
           />
           <MetricCard
             label="Critical risks"
             value={data.signals.attentionItems.filter((r) => r.severity === "critical")
               .length}
             detail="Signals requiring investigation"
-            onClick={() => changeView("risks")}
           />
         </SimpleGrid>
+        )
       }
       controls={
         <TextInput
