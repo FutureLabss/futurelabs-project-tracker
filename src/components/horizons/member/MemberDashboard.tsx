@@ -249,14 +249,19 @@ export default function MemberDashboard({
                     openTaskAction(request, task?.title);
                   }}
                   onTaskClick={setDrawerTaskId}
+                  today={date}
                   onCreateTask={() => setCreateTaskOpened(true)}
                   storageKey="futurelabs_member_taskboard_cols_v1"
                 />
               ) : (
                 <PersonalTasksTable
                   personId={personId}
+                  date={date}
                   getFlags={getFlags}
                   onProjectClick={setActiveProjectId}
+                  onSubmitTask={(task) =>
+                    setMemberAction({ kind: 'submit', taskId: task.id, taskTitle: task.title })
+                  }
                 />
               )}
             </Stack>
@@ -315,6 +320,7 @@ export default function MemberDashboard({
         onClose={() => setMemberAction(null)}
       />
       <TaskDiagnosticDrawer
+        date={date}
         opened={!!drawerTaskId}
         onClose={() => setDrawerTaskId(null)}
         taskId={drawerTaskId}

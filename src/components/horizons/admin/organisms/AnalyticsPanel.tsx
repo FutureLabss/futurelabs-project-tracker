@@ -29,11 +29,15 @@ import {
   IconFolders,
   IconTrendingDown,
   IconTrendingUp,
-  IconUsers,
 } from "@tabler/icons-react";
 import { PersonLink } from "../atoms/PersonLink";
 import { EmptyState } from "../atoms/EmptyState";
 import { BlockerCategoryCard } from "../molecules/BlockerCategoryCard";
+import { MonthlyTrendCard } from "../molecules/MonthlyTrendCard";
+import type {
+  BlockerCategoryReport,
+  MonthlyDeliveryRow,
+} from "../../../../domain/calculations/admin-insights";
 import { TaskList } from "../AdminDetails";
 import type { Task } from "../../../../entities/task.entity";
 import type { AdminWorkspace } from "../../../../api/hooks/use-admin-workspace";
@@ -47,6 +51,8 @@ import type {
 interface AnalyticsPanelProps {
   data: AdminWorkspace;
   blockerAnalytics: BlockerCategoryCount[];
+  blockerReport: BlockerCategoryReport[];
+  monthlyRows: MonthlyDeliveryRow[];
   reportTasks: Task[];
   report: string;
   filter: string;
@@ -69,6 +75,8 @@ interface AnalyticsPanelProps {
 export function AnalyticsPanel({
   data,
   blockerAnalytics,
+  blockerReport,
+  monthlyRows,
   reportTasks,
   report,
   filter,
@@ -254,7 +262,7 @@ export function AnalyticsPanel({
             </Group>
 
             <Text size="xs" c="dimmed">
-              {periodAnalytics.current.totalReturns} returns / {periodAnalytics.current.totalSubmissions} submissions
+              {periodAnalytics.current.totalReturns} returned or reopened / {periodAnalytics.current.totalSubmissions} submissions
             </Text>
 
             <Group gap={4} wrap="nowrap">
@@ -283,7 +291,7 @@ export function AnalyticsPanel({
             <Group justify="space-between" align="flex-start" wrap="nowrap">
               <Stack gap={2}>
                 <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
-                  Unplanned Capacity
+                  Unplanned Work
                 </Text>
                 <Text fz={28} fw={800} style={{ lineHeight: 1 }}>
                   {periodAnalytics.current.unplannedCapacityPercent.toFixed(1)}%
@@ -295,7 +303,7 @@ export function AnalyticsPanel({
             </Group>
 
             <Text size="xs" c="dimmed">
-              {periodAnalytics.current.unplannedAcceptedWeight} unplanned of {totalDeliveredPoints} delivered pts
+              {periodAnalytics.current.unplannedAcceptedWeight} of {totalDeliveredPoints} pts created in the period were self-assigned
             </Text>
 
             <Group gap={4} wrap="nowrap">
@@ -339,7 +347,7 @@ export function AnalyticsPanel({
             </Group>
 
             <Text size="xs" c="dimmed">
-              Rescheduled tasks in period
+              Due dates moved later in period
             </Text>
 
             <Group gap={4} wrap="nowrap">
@@ -355,6 +363,8 @@ export function AnalyticsPanel({
           </Stack>
         </Card>
       </SimpleGrid>
+
+      <MonthlyTrendCard rows={monthlyRows} />
 
       {/* Report Navigation Tabs */}
       <Tabs
@@ -377,13 +387,13 @@ export function AnalyticsPanel({
             value="rework"
             leftSection={<IconArrowBackUp size={15} />}
           >
-            Returned Work
+            Returned or Reopened
           </Tabs.Tab>
           <Tabs.Tab
             value="unplanned"
             leftSection={<IconCompass size={15} />}
           >
-            Unplanned Open Work
+            Unplanned Work
           </Tabs.Tab>
           <Tabs.Tab
             value="slips"
@@ -401,7 +411,7 @@ export function AnalyticsPanel({
             value="breakdown"
             leftSection={<IconChartBar size={15} />}
           >
-            Project & Team Breakdown
+            Project Breakdown
           </Tabs.Tab>
         </Tabs.List>
       </Tabs>
@@ -409,13 +419,17 @@ export function AnalyticsPanel({
       {/* Report Sub-Views */}
       {report === "blockers" && (
         <SimpleGrid cols={{ base: 1, sm: 2, xl: 4 }} spacing="md">
-          {blockerAnalytics.map((b) => (
+          {blockerReport.map((b) => (
             <BlockerCategoryCard
               key={b.category}
               category={b.category}
               label={b.label}
-              activeCount={b.activeCount}
-              avgResolutionDays={b.avgResolutionDays}
+              activeCount={b.openNow}
+              raisedInPeriod={b.raisedInPeriod}
+              projectNames={b.projectNames}
+              avgResolutionDays={
+                blockerAnalytics.find((a) => a.category === b.category)?.avgResolutionDays ?? 0
+              }
               isSelected={filter === b.category}
               onToggle={(cat) =>
                 onFilterChange(filter === cat ? "all" : cat)
@@ -437,7 +451,7 @@ export function AnalyticsPanel({
                 </Title>
               </Group>
               <Badge variant="light" color="teal">
-                {periodAnalytics.projectBreakdown.length} active projects
+                {periodAnalytics.projectBreakdown.length} projects
               </Badge>
             </Group>
 
@@ -542,114 +556,6 @@ export function AnalyticsPanel({
             </Table.ScrollContainer>
           </Card>
 
-          {/* Team Member Delivery in Period */}
-          <Card withBorder radius="md" p="md">
-            <Group justify="space-between" align="center" mb="md">
-              <Group gap="xs">
-                <IconUsers size={20} color="var(--mantine-color-blue-filled)" />
-                <Title order={4} size="h5">
-                  Team Member Delivery in Period
-                </Title>
-              </Group>
-              <Badge variant="light" color="blue">
-                {periodAnalytics.personBreakdown.length} contributors
-              </Badge>
-            </Group>
-
-            <Table.ScrollContainer minWidth={700}>
-              <Table highlightOnHover verticalSpacing="sm">
-                <Table.Thead>
-                  <Table.Tr>
-                    {[
-                      "Team Member",
-                      "Role",
-                      "Status",
-                      "Accepted",
-                      "Points Delivered",
-                      "Returns",
-                      "Active Tasks",
-                    ].map((h) => (
-                      <Table.Th
-                        key={h}
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: "var(--mantine-color-dimmed)",
-                        }}
-                      >
-                        {h}
-                      </Table.Th>
-                    ))}
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {periodAnalytics.personBreakdown.map((person) => (
-                    <Table.Tr key={person.personId}>
-                      <Table.Td>
-                        <Group gap={6} wrap="nowrap">
-                          <Avatar size="xs" radius="xl" color="blue">
-                            {person.name.slice(0, 2).toUpperCase()}
-                          </Avatar>
-                          <Anchor
-                            component="button"
-                            ta="left"
-                            fw={600}
-                            onClick={() => onPerson(person.personId)}
-                          >
-                            {person.name}
-                          </Anchor>
-                        </Group>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge size="xs" variant="outline" color="gray">
-                          {person.role}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge
-                          size="xs"
-                          variant="light"
-                          color={person.status === "inactive" ? "gray" : "teal"}
-                        >
-                          {person.status}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge variant="light" color="teal">
-                          {person.acceptedCount}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Text fw={600} size="sm">
-                          {person.acceptedWeight} pts
-                        </Text>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge
-                          variant="light"
-                          color={person.returnsCount > 0 ? "red" : "gray"}
-                        >
-                          {person.returnsCount}
-                        </Badge>
-                      </Table.Td>
-                      <Table.Td>
-                        <Badge size="sm" variant="outline" color="gray">
-                          {person.activeTasksCount} active
-                        </Badge>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                  {!periodAnalytics.personBreakdown.length && (
-                    <Table.Tr>
-                      <Table.Td colSpan={7}>
-                        <EmptyState message="No team member activity recorded in this window." />
-                      </Table.Td>
-                    </Table.Tr>
-                  )}
-                </Table.Tbody>
-              </Table>
-            </Table.ScrollContainer>
-          </Card>
         </Stack>
       ) : (
         <>

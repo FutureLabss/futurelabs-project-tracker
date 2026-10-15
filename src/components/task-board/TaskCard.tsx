@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 import { useState, type DragEvent } from "react";
 import {
   Card,
@@ -31,6 +32,10 @@ interface TaskCardProps {
   project?: TaskBoardProject;
   assignee?: TaskBoardPerson;
   isDraggable?: boolean;
+  /** False hides Start, Raise blocker and Submit (the assignee's own actions). */
+  memberActionsAllowed?: boolean;
+  /** YYYY-MM-DD used for overdue / due-today. */
+  today?: string;
   onTaskClick?: (taskId: string) => void;
   onStatusChange?: (targetStatus: TaskStatus) => void;
   onActionRequired?: (action: {
@@ -53,6 +58,8 @@ export function TaskCard({
   project,
   assignee,
   isDraggable = true,
+  memberActionsAllowed = true,
+  today,
   onTaskClick,
   onStatusChange,
   onActionRequired,
@@ -61,7 +68,7 @@ export function TaskCard({
 }: TaskCardProps) {
   const [isDragging, setIsDragging] = useState(false);
 
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = today ?? dayjs().format("YYYY-MM-DD");
   const isOverdue =
     task.dueDate < todayStr &&
     task.status !== "accepted" &&
@@ -174,7 +181,7 @@ export function TaskCard({
                 >
                   View Details
                 </Menu.Item>
-                {task.status === "not_started" && onStatusChange && (
+                {task.status === "not_started" && memberActionsAllowed && onStatusChange && (
                   <Menu.Item
                     onClick={() => onStatusChange("in_progress")}
                     leftSection={<IconArrowRight size={14} />}
@@ -182,7 +189,7 @@ export function TaskCard({
                     Start Work
                   </Menu.Item>
                 )}
-                {task.status !== "blocked" && onActionRequired && (
+                {task.status !== "blocked" && memberActionsAllowed && onActionRequired && (
                   <Menu.Item
                     color="red"
                     onClick={() =>
@@ -210,6 +217,7 @@ export function TaskCard({
                 {task.status !== "submitted" &&
                   task.status !== "accepted" &&
                   task.status !== "cancelled" &&
+                  memberActionsAllowed &&
                   onActionRequired && (
                     <Menu.Item
                       onClick={() =>

@@ -368,8 +368,27 @@ export class MockLocalStorageApi implements ITrackerApi {
     return tasks.find((t) => t.id === id) || null;
   }
 
+  async getProjectTaskTitles(projectId: string): Promise<{ id: string; title: string }[]> {
+    await this.delay();
+    return this.getCollection<Task>(STORAGE_KEYS.TASKS)
+      .filter((t) => t.projectId === projectId && t.status !== "accepted" && t.status !== "cancelled")
+      .map((t) => ({ id: t.id, title: t.title }))
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }
+
+  /** Admins, or the manager of this project (mirrors private.can_manage_project). */
+  private canManageProject(projectId: string, actorId: string): boolean {
+    const actor = this.getCollection<Person>(STORAGE_KEYS.PERSONS).find((p) => p.id === actorId);
+    if (actor?.role === "admin") return true;
+    const project = this.getCollection<Project>(STORAGE_KEYS.PROJECTS).find((p) => p.id === projectId);
+    return actor?.role === "manager" && project?.managerId === actorId;
+  }
+
   async createTask(dto: CreateTaskDto): Promise<Task> {
     await this.delay();
+    // FR-05: members only create work for themselves.
+    if (!this.canManageProject(dto.projectId, dto.actorId) && dto.assigneeId !== dto.actorId)
+      throw new Error("Task creation is not permitted.");
     const tasks = this.getCollection<Task>(STORAGE_KEYS.TASKS);
     const newTask: Task = {
       id: `task-${crypto.randomUUID()}`,
@@ -379,7 +398,8 @@ export class MockLocalStorageApi implements ITrackerApi {
       assigneeId: dto.assigneeId,
       status: "not_started",
       complexity: dto.complexity,
-      origin: dto.origin,
+      // SR-04: unplanned when the creator assigns it to themselves, planned otherwise.
+      origin: dto.assigneeId === dto.actorId ? "unplanned" : "planned",
       dueDate: dto.dueDate,
       submittedAt: null,
       acceptedAt: null,
@@ -430,6 +450,12 @@ export class MockLocalStorageApi implements ITrackerApi {
     return tasks[index];
   }
 
+  /** Mirrors the database: only the assignee starts, submits or blocks their own work. */
+  private requireAssignee(task: Task, actorId: string) {
+    if (task.assigneeId !== actorId)
+      throw new Error("Only the task's assignee can start it, submit it or raise a blocker on it.");
+  }
+
   async updateTaskStatus(
     taskId: string,
     status: TaskStatus,
@@ -439,6 +465,7 @@ export class MockLocalStorageApi implements ITrackerApi {
     const tasks = this.getCollection<Task>(STORAGE_KEYS.TASKS);
     const index = tasks.findIndex((t) => t.id === taskId);
     if (index === -1) throw new Error(`Task ${taskId} not found`);
+    if (status === "not_started" || status === "in_progress") this.requireAssignee(tasks[index], actorId);
 
     const oldStatus = tasks[index].status;
     tasks[index].status = status;
@@ -500,6 +527,11 @@ export class MockLocalStorageApi implements ITrackerApi {
     const tasks = this.getCollection<Task>(STORAGE_KEYS.TASKS);
     const index = tasks.findIndex((t) => t.id === taskId);
     if (index === -1) throw new Error(`Task ${taskId} not found`);
+    // FR-12 / FR-25: the assignee or the project's manager (or an admin).
+    if (tasks[index].assigneeId !== actorId && !this.canManageProject(tasks[index].projectId, actorId))
+      throw new Error("This operation requires the project manager.");
+    if (tasks[index].status === "accepted" || tasks[index].status === "cancelled")
+      throw new Error("Completed or cancelled work cannot be modified.");
 
     const oldDueDate = tasks[index].dueDate;
     tasks[index].dueDate = newDueDate;
@@ -528,6 +560,7 @@ export class MockLocalStorageApi implements ITrackerApi {
     const tasks = this.getCollection<Task>(STORAGE_KEYS.TASKS);
     const index = tasks.findIndex((t) => t.id === taskId);
     if (index === -1) throw new Error(`Task ${taskId} not found`);
+    this.requireAssignee(tasks[index], actorId);
 
     const oldStatus = tasks[index].status;
     tasks[index].status = "submitted";
@@ -749,6 +782,9 @@ export class MockLocalStorageApi implements ITrackerApi {
 
   async raiseBlocker(dto: RaiseBlockerDto): Promise<Blocker> {
     await this.delay();
+    const blockedTask = this.getCollection<Task>(STORAGE_KEYS.TASKS).find((t) => t.id === dto.taskId);
+    if (!blockedTask) throw new Error(`Task ${dto.taskId} not found`);
+    this.requireAssignee(blockedTask, dto.actorId);
     const blockers = this.getCollection<Blocker>(STORAGE_KEYS.BLOCKERS);
     const newBlocker: Blocker = {
       id: `blocker-${crypto.randomUUID()}`,

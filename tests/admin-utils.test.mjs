@@ -160,6 +160,19 @@ test("period analytics calculates throughput, rework rate, slips, and trends", (
         subjectId: "t-1",
         actorId: "mgr-1",
         occurredAt: "2026-09-12T08:00:00Z",
+        fromValue: "2026-09-14",
+        toValue: "2026-09-18",
+      },
+      {
+        // Moving a due date earlier is not a slip (FR-58 / SR-14).
+        id: "l-5",
+        type: "task_redated",
+        subjectType: "task",
+        subjectId: "t-1",
+        actorId: "mgr-1",
+        occurredAt: "2026-09-13T08:00:00Z",
+        fromValue: "2026-09-18",
+        toValue: "2026-09-16",
       },
     ],
     blockers: [],
@@ -200,10 +213,23 @@ test("period analytics calculates throughput, rework rate, slips, and trends", (
   assert.equal(analytics.projectBreakdown[0].projectName, "Alpha");
   assert.equal(analytics.projectBreakdown[0].acceptedCount, 2);
 
-  // Person breakdown includes team member summary
-  const devSummary = analytics.personBreakdown.find((p) => p.personId === "dev-1");
-  assert.ok(devSummary);
-  assert.equal(devSummary.acceptedCount, 2);
-  assert.equal(devSummary.returnsCount, 1);
+  // NFR-02: no per-person delivery comparison is produced.
+  assert.equal(analytics.personBreakdown, undefined);
 });
 
+
+test("period metrics for one project ignore other projects' acceptances", () => {
+  const { calculatePeriodMetrics } = require("../src/components/horizons/admin/admin-utils.ts");
+  const task = (id, projectId) => ({ id, projectId, status: "accepted", complexity: "mid", origin: "planned", acceptedAt: "2026-09-15T10:00:00Z", createdAt: "2026-09-01T10:00:00Z" });
+  const data = {
+    tasks: [task("a", "p1"), task("b", "p2")],
+    blockers: [],
+    ledger: [
+      { id: "1", type: "task_accepted", subjectType: "task", subjectId: "a", actorId: "m", occurredAt: "2026-09-15T10:00:00Z" },
+      { id: "2", type: "task_accepted", subjectType: "task", subjectId: "b", actorId: "m", occurredAt: "2026-09-15T10:00:00Z" },
+    ],
+  };
+  const range = { startDate: "2026-09-01", endDate: "2026-09-30" };
+  assert.equal(calculatePeriodMetrics(data, range, "p1").acceptedCount, 1);
+  assert.equal(calculatePeriodMetrics(data, range).acceptedCount, 2);
+});

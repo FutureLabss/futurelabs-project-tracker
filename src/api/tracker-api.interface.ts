@@ -61,6 +61,8 @@ export interface ITrackerApi {
   getTasks(filter?: TaskFilter): Promise<Task[]>;
   getTasksCount(filter?: TaskFilter): Promise<number>;
   getTaskById(id: string): Promise<Task | null>;
+  /** Titles of open tasks in a project the caller can access (FR-10 blocker cause picker). */
+  getProjectTaskTitles(projectId: string): Promise<{ id: string; title: string }[]>;
   createTask(dto: CreateTaskDto): Promise<Task>;
   assignTask(
     taskId: string,

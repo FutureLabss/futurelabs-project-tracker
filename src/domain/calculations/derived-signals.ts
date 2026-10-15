@@ -170,16 +170,14 @@ export function calculateOperationalSignals(
 
     // E. Check Aging WIP (In Progress beyond complexity threshold)
     if (task.status === "in_progress") {
-      const inProgEvents = ledger.filter(
-        (l) =>
-          l.subjectId === task.id &&
-          l.type === "status_changed" &&
-          l.toValue === "in_progress",
-      );
-      const inProgStart =
-        inProgEvents.length > 0
-          ? inProgEvents[inProgEvents.length - 1].occurredAt
-          : task.createdAt;
+      // Latest move into progress by time, whatever order the backend returned
+      // the ledger in; returns, reopens and cleared blockers also re-enter it.
+      const inProgStart = ledger
+        .filter((l) => l.subjectId === task.id && l.toValue === "in_progress")
+        .reduce(
+          (latest, l) => (l.occurredAt > latest ? l.occurredAt : latest),
+          task.createdAt,
+        );
 
       const inProgressDays = getWorkingDaysElapsed(inProgStart, simulatedDate);
       const maxAllowedDays =

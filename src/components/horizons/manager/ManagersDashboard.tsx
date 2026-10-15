@@ -397,6 +397,7 @@ export default function ManagersDashboard({
           projects={data.projects}
           people={data.people}
           actorId={actorId}
+          date={date}
           onTaskClick={setInspectedTaskId}
           onStatusChange={(taskId, status) =>
             executeAction.mutateAsync(() => taskService.updateTaskStatus(taskId, status, actorId)).then(() => undefined)
