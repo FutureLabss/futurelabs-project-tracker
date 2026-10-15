@@ -46,6 +46,14 @@ export function useCloseManagedProject() {
   );
 }
 
+// FR-22: managers run the team of their own projects.
+export function useSetManagedProjectMember() {
+  return useManagerMutation(
+    ({ projectId, personId, included, actorId }: { projectId: string; personId: string; included: boolean; actorId: string }) =>
+      projectService.setManagedProjectMember(projectId, personId, included, actorId),
+  );
+}
+
 // FR-24
 export function useReassignTask() {
   return useManagerMutation(

@@ -90,6 +90,12 @@ export interface ITrackerApi {
   // Manager workflows: only the project's own manager (never an administrator)
   createManagedProject(dto: Omit<CreateProjectDto, "managerId">): Promise<Project>;
   closeManagedProject(projectId: string, actorId: string): Promise<Project>;
+  setManagedProjectMember(
+    projectId: string,
+    personId: string,
+    included: boolean,
+    actorId: string,
+  ): Promise<void>;
   changeTaskComplexity(
     taskId: string,
     complexity: TaskComplexity,

@@ -54,6 +54,40 @@ export class MockLocalStorageApi implements ITrackerApi {
     actorId: string,
   ): Promise<void> {
     this.requireAdmin(actorId);
+    await this.updateProjectMembership(projectId, personId, included, actorId, "Project access updated");
+  }
+
+  async setManagedProjectMember(
+    projectId: string,
+    personId: string,
+    included: boolean,
+    actorId: string,
+  ): Promise<void> {
+    await this.delay();
+    this.requireManager(actorId);
+    const project = this.getCollection<Project>(STORAGE_KEYS.PROJECTS).find((p) => p.id === projectId);
+    if (!project || project.managerId !== actorId)
+      throw new Error("Only the project's manager can change its team.");
+    const person = this.getCollection<Person>(STORAGE_KEYS.PERSONS).find((p) => p.id === personId);
+    if (included && (!person || person.status === "inactive" || !["member", "manager"].includes(person.role)))
+      throw new Error("Select an active member or manager.");
+    await this.updateProjectMembership(
+      projectId,
+      personId,
+      included,
+      actorId,
+      included ? "Added by the project manager" : "Removed by the project manager",
+    );
+  }
+
+  /** Shared membership rules for the admin and manager paths. */
+  private async updateProjectMembership(
+    projectId: string,
+    personId: string,
+    included: boolean,
+    actorId: string,
+    reason: string,
+  ): Promise<void> {
     const project = await this.getProjectById(projectId);
     if (!project || project.state !== "active")
       throw new Error("An active project is required.");
@@ -95,7 +129,7 @@ export class MockLocalStorageApi implements ITrackerApi {
       type: included ? "project_member_added" : "project_member_removed",
       fromValue: included ? null : personId,
       toValue: included ? personId : null,
-      reason: "Project access updated",
+      reason,
     });
   }
   async closeProject(projectId: string, actorId: string): Promise<Project> {

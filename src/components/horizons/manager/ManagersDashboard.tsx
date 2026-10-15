@@ -5,7 +5,7 @@ import {
   useManagerWorkspace,
   useManagerAction,
 } from "../../../api/hooks/use-manager-workspace";
-import { useAssignTask, useCreateTask } from "../../../api/hooks/use-tasks";
+import { useCreateTask } from "../../../api/hooks/use-tasks";
 import {
   invalidateManagerQueries,
   useManagerAcceptTask,
@@ -20,7 +20,6 @@ import {
   projectIdOfRecord,
   scopeToManagedProjects,
 } from "../../../domain/calculations/manager-insights";
-import type { TaskComplexity } from "../../../entities/task.entity";
 
 import type { ManagerView } from "../../../types/dashboard";
 import { ManagerTemplate } from "./templates/ManagerTemplate";
@@ -78,7 +77,6 @@ export default function ManagersDashboard({
   const executeAction = useManagerAction();
   const queryClient = useQueryClient();
   const createTaskMutation = useCreateTask();
-  const assignTaskMutation = useAssignTask();
   const acceptTaskMutation = useManagerAcceptTask();
   const returnTaskMutation = useManagerReturnTask();
   const data = query.data;
@@ -252,38 +250,21 @@ export default function ManagersDashboard({
   };
 
   // Handlers
-  const normalizeComplexity = (value: string): TaskComplexity => {
-    const normalized = value
-      .toLowerCase()
-      .replace(/\s*\(\d+\s*pt\)\s*$/i, "")
-      .trim();
-
-    if (normalized === "low") return "low";
-    if (normalized === "mid" || normalized === "medium") return "mid";
-    if (normalized === "high" || normalized === "critical") return "high";
-
-    return "mid";
-  };
-
+  // FR-22 / FR-23: one create call; the task is unplanned only when the
+  // manager assigns it to themselves (SR-04).
   const handleAssignWork = async (values: AssignWorkFormValues) => {
-    await executeAction.mutateAsync(async () => {
-      const created = await createTaskMutation.mutateAsync({
+    await executeAction.mutateAsync(() =>
+      createTaskMutation.mutateAsync({
         title: values.title,
         projectId: values.projectId,
-        description: values.justification,
+        description: values.description,
         assigneeId: values.assigneeId,
-        complexity: normalizeComplexity(values.complexity),
+        complexity: values.complexity,
         dueDate: values.dueDate,
-        origin: "planned",
+        origin: values.assigneeId === actorId ? "unplanned" : "planned",
         actorId,
-      });
-
-      await assignTaskMutation.mutateAsync({
-        taskId: created.id,
-        assigneeId: values.assigneeId,
-        actorId,
-      });
-    });
+      }),
+    );
   };
 
   const handleAcceptDeliverable = async (
@@ -350,7 +331,14 @@ export default function ManagersDashboard({
 
       {view === "projects" && (
         <>
-          <ManagedProjectsPanel rows={forecastRows} actorId={actorId} date={date} recentWeeks={FORECAST_WEEKS} />
+          <ManagedProjectsPanel
+            rows={forecastRows}
+            actorId={actorId}
+            date={date}
+            recentWeeks={FORECAST_WEEKS}
+            people={data.people}
+            members={data.members}
+          />
           <DeliveryTrendsPanel tasks={scope.tasks} ledger={scope.ledger} date={date} />
         </>
       )}
@@ -409,8 +397,11 @@ export default function ManagersDashboard({
         onClose={() => setIsAssignOpen(false)}
         onSubmit={handleAssignWork}
         loading={executeAction.isPending}
-        projects={data.projects}
+        projects={scope.projects.filter((p) => p.state === "active")}
         people={data.people}
+        members={data.members}
+        managerId={actorId}
+        date={date}
       />
 
       {/* REVIEW DELIVERABLE MODAL */}

@@ -276,6 +276,18 @@ export class SupabaseTrackerApi implements ITrackerApi {
       }),
     );
   }
+  async setManagedProjectMember(
+    projectId: string,
+    personId: string,
+    included: boolean,
+    _actorId: string,
+  ) {
+    await this.managerMutate("set_project_member", {
+      project_id: projectId,
+      person_id: personId,
+      included,
+    });
+  }
   async changeTaskComplexity(
     taskId: string,
     complexity: Parameters<ITrackerApi["changeTaskComplexity"]>[1],

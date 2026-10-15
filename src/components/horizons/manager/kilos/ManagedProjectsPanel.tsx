@@ -12,7 +12,7 @@ import {
   Textarea,
   Tooltip,
 } from "@mantine/core";
-import { IconFolder, IconFolderPlus, IconLock } from "@tabler/icons-react";
+import { IconFolder, IconFolderPlus, IconLock, IconUsersGroup } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import { ReusableTable, type ColumnDef } from "../../../Table/ReusableTab";
 import type { ProjectForecastRow } from "../../../../domain/calculations/manager-insights";
@@ -20,18 +20,25 @@ import {
   useCloseManagedProject,
   useCreateManagedProject,
 } from "../../../../api/hooks/use-manager-actions";
+import type { Person } from "../../../../entities/person.entity";
+import type { Project } from "../../../../entities/project.entity";
+import type { ProjectMember } from "../../../../entities/project-member.entity";
+import { ProjectTeamModal } from "./ProjectTeamModal";
 
 interface ManagedProjectsPanelProps {
   rows: ProjectForecastRow[];
   actorId: string;
   date: string;
   recentWeeks: number;
+  people: Person[];
+  members: ProjectMember[];
 }
 
 const formatRate = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(1));
 
 /** FR-20 / FR-21 / FR-45 / FR-46 */
-export function ManagedProjectsPanel({ rows, actorId, date, recentWeeks }: ManagedProjectsPanelProps) {
+export function ManagedProjectsPanel({ rows, actorId, date, recentWeeks, people, members }: ManagedProjectsPanelProps) {
+  const [teamProject, setTeamProject] = useState<Project | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [closing, setClosing] = useState<ProjectForecastRow | null>(null);
   const [form, setForm] = useState({ name: "", goal: "", startDate: date, targetDate: date });
@@ -133,6 +140,15 @@ export function ManagedProjectsPanel({ rows, actorId, date, recentWeeks }: Manag
       header: "",
       render: (r) =>
         r.project.state === "active" ? (
+          <Group gap={4} wrap="nowrap">
+          <Button
+            size="xs"
+            variant="subtle"
+            leftSection={<IconUsersGroup size={14} />}
+            onClick={() => setTeamProject(r.project)}
+          >
+            Team ({members.filter((m) => m.projectId === r.project.id).length})
+          </Button>
           <Tooltip label={r.openTasks > 0 ? "Accept or cancel all open tasks first" : "Close this project"}>
             <Button
               size="xs"
@@ -148,6 +164,7 @@ export function ManagedProjectsPanel({ rows, actorId, date, recentWeeks }: Manag
               Close
             </Button>
           </Tooltip>
+          </Group>
         ) : null,
     },
   ];
@@ -168,6 +185,14 @@ export function ManagedProjectsPanel({ rows, actorId, date, recentWeeks }: Manag
         columns={columns}
         data={rows.map((r) => ({ ...r, id: r.project.id }))}
         emptyLabel="You don't manage any projects yet. Create one to get started."
+      />
+
+      <ProjectTeamModal
+        project={teamProject}
+        people={people}
+        members={members}
+        actorId={actorId}
+        onClose={() => setTeamProject(null)}
       />
 
       <Modal opened={createOpen} onClose={() => setCreateOpen(false)} title="New project" centered>

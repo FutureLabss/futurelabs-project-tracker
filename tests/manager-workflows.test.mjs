@@ -41,6 +41,15 @@ test("manager workflows in the database: create/close project, complexity, reope
         ])
       ).rows[0].result;
     });
+  const readAs = (id, sql, params = []) =>
+    db.transaction(async (tx) => {
+      await tx.exec("set local role authenticated");
+      await tx.query(
+        "select set_config('request.jwt.claim.sub',$1,true),set_config('request.jwt.claims',$2,true)",
+        [id, JSON.stringify({ iss: "project-tracker", jti: session(id) })],
+      );
+      return (await tx.query(sql, params)).rows;
+    });
   const manage = (operation, payload, id = manager) =>
     rpc(id, "tracker_manager_mutate", operation, payload);
   const mutate = (operation, payload, id = manager) =>
@@ -105,6 +114,41 @@ test("manager workflows in the database: create/close project, complexity, reope
       assignee_id: manager,
     });
 
+    // FR-22: the manager runs their project's team, then can assign work to members.
+    const memberTaskInput = {
+      project_id: project.id,
+      title: "Member work",
+      complexity: "low",
+      origin: "planned",
+      due_date: "2026-10-01",
+      assignee_id: member,
+    };
+    await assert.rejects(mutate("create_task", memberTaskInput), /no project access/);
+    const access = { project_id: project.id, person_id: member, included: true };
+    await assert.rejects(manage("set_project_member", access, otherManager), /project's manager/);
+    await assert.rejects(manage("set_project_member", access, admin), /Manager access/);
+    await assert.rejects(
+      manage("set_project_member", { ...access, person_id: admin }),
+      /active member or manager/,
+    );
+    await manage("set_project_member", access);
+    assert.equal((await ledger(project.id, "project_member_added"))[0].actor_id, manager);
+    assert.deepEqual(
+      (await readAs(manager, "select lms_user_id from project_members where project_id=$1", [project.id])).map(
+        (r) => r.lms_user_id,
+      ),
+      [member],
+      "a manager can read their project's team",
+    );
+    assert.equal(
+      (await readAs(otherManager, "select 1 from project_members where project_id=$1", [project.id])).length,
+      0,
+      "other managers cannot read it",
+    );
+    const memberTask = await mutate("create_task", memberTaskInput);
+    assert.equal(memberTask.assignee_id, member);
+    await assert.rejects(manage("set_project_member", { ...access, included: false }), /Reassign open tasks/);
+
     // FR-26: complexity change is audited and limited to the project's manager.
     const changed = await manage("change_complexity", { task_id: task.id, complexity: "high", reason: "Scope grew" });
     assert.equal(changed.complexity, "high");
@@ -148,6 +192,9 @@ test("manager workflows in the database: create/close project, complexity, reope
     // FR-21: closing needs all work finished and only the project's manager may do it.
     await assert.rejects(manage("close_project", { project_id: project.id }), /open tasks/);
     await mutate("update_task_status", { task_id: task.id, status: "cancelled" });
+    await mutate("update_task_status", { task_id: memberTask.id, status: "cancelled" });
+    await manage("set_project_member", { ...access, included: false });
+    assert.equal((await ledger(project.id, "project_member_removed")).length, 1);
     await assert.rejects(manage("close_project", { project_id: project.id }, otherManager), /project's manager/);
     const closed = await manage("close_project", { project_id: project.id });
     assert.equal(closed.state, "closed");
@@ -192,6 +239,19 @@ test("manager workflows in the local demo adapter mirror the database rules", as
   const events = await reportingService.getLedger({ subjectId: "task-1" });
   assert.ok(events.some((e) => e.type === "complexity_changed" && e.fromValue === "mid" && e.toValue === "high"));
   assert.ok(events.some((e) => e.type === "task_reopened" && e.reason === "Bug found"));
+
+  // FR-22 in the demo adapter
+  await assert.rejects(projectService.setManagedProjectMember(project.id, "p-alex", true, "p-sarah"), /Manager access/);
+  await assert.rejects(
+    projectService.setManagedProjectMember(project.id, "p-sarah", true, "p-david"),
+    /active member or manager/,
+  );
+  const isMember = async () =>
+    (await projectService.getProjectMembers()).some((m) => m.projectId === project.id && m.personId === "p-alex");
+  await projectService.setManagedProjectMember(project.id, "p-alex", true, "p-david");
+  assert.equal(await isMember(), true);
+  await projectService.setManagedProjectMember(project.id, "p-alex", false, "p-david");
+  assert.equal(await isMember(), false);
 
   await assert.rejects(projectService.closeManagedProject("proj-iam", "p-david"), /open tasks/);
   const closed = await projectService.closeManagedProject(project.id, "p-david");

@@ -1,15 +1,19 @@
-import { Stack, TextInput, Textarea, Select } from "@mantine/core";
-import { useEffect, useMemo } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useEffect, useState } from "react";
+import { Alert, Group, SegmentedControl, Select, Stack, Text, TextInput, Textarea } from "@mantine/core";
 import { ReusableModal } from "./ReuseableModal";
+import type { Person } from "../../entities/person.entity";
+import type { Project } from "../../entities/project.entity";
+import type { ProjectMember } from "../../entities/project-member.entity";
+import type { TaskComplexity } from "../../entities/task.entity";
 
 export interface AssignWorkFormValues {
   title: string;
   projectId: string;
-  assigneeId: string;
-  complexity: string;
+  /** null leaves the task unassigned (FR-23). */
+  assigneeId: string | null;
+  complexity: TaskComplexity;
   dueDate: string;
-  justification: string;
+  description: string;
 }
 
 interface AssignWorkModalProps {
@@ -17,10 +21,17 @@ interface AssignWorkModalProps {
   onClose: () => void;
   onSubmit: (values: AssignWorkFormValues) => Promise<void>;
   loading?: boolean;
-  projects: Array<{ id: string; name: string }>;
-  people: Array<{ id: string; name: string }>;
+  /** Active projects the manager manages. */
+  projects: Project[];
+  people: Person[];
+  members: ProjectMember[];
+  managerId: string;
+  date: string;
 }
 
+const UNASSIGNED = "__unassigned__";
+
+/** FR-22 / FR-23: create a task in a managed project, for a project member or nobody yet. */
 export function AssignWorkModal({
   opened,
   onClose,
@@ -28,183 +39,142 @@ export function AssignWorkModal({
   loading = false,
   projects,
   people,
+  members,
+  managerId,
+  date,
 }: AssignWorkModalProps) {
-  const fallbackProjects = [
-    { id: "identity-access-engine", name: "Identity & Access Engine" },
-    {
-      id: "data-ingestion-analytics-pipeline",
-      name: "Data Ingestion & Analytics pipeline",
-    },
-    { id: "mobile-sdk-onboarding", name: "Moblie SDK Onboarding" },
-  ];
-
-  const projectOptions = useMemo(
-    () => (projects.length > 0 ? projects : fallbackProjects),
-    [projects],
-  );
-  const personOptions = useMemo(
-    () => (people.length > 0 ? people : [{ id: "manager", name: "Manager" }]),
-    [people],
-  );
-
-  const defaultFormValues = useMemo<AssignWorkFormValues>(
-    () => ({
-      title: "",
-      projectId: projectOptions[0]?.id ?? "",
-      assigneeId: personOptions[0]?.id ?? "",
-      complexity: "LOW (1 PT)",
-      dueDate: new Date().toISOString().slice(0, 10),
-      justification: "Planned task created",
-    }),
-    [projectOptions, personOptions],
-  );
-
-  const { control, handleSubmit, reset } = useForm<AssignWorkFormValues>({
-    defaultValues: defaultFormValues,
+  const emptyForm = (): AssignWorkFormValues & { assignee: string } => ({
+    title: "",
+    projectId: projects.length === 1 ? projects[0].id : "",
+    assigneeId: null,
+    assignee: UNASSIGNED,
+    complexity: "mid",
+    dueDate: date,
+    description: "",
   });
+  const [form, setForm] = useState(emptyForm);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (opened) {
-      reset(defaultFormValues);
+      setForm(emptyForm());
+      setError(null);
     }
-  }, [opened, defaultFormValues, reset]);
+    // Reset only when the dialog opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened]);
 
-  const handleFormSubmit = handleSubmit(async (values) => {
-    const trimmed = {
-      ...values,
-      title: values.title.trim(),
-      projectId: values.projectId?.trim() ?? "",
-      assigneeId: values.assigneeId?.trim() ?? "",
-      dueDate: values.dueDate?.trim() ?? "",
-      justification: values.justification.trim(),
-    };
+  // Only people who can work on the chosen project: its members and the manager.
+  const teamIds = new Set(members.filter((m) => m.projectId === form.projectId).map((m) => m.personId));
+  const assignable = people.filter(
+    (p) => p.status !== "inactive" && p.role !== "admin" && (teamIds.has(p.id) || p.id === managerId),
+  );
 
-    if (
-      !trimmed.title ||
-      !trimmed.projectId ||
-      !trimmed.assigneeId ||
-      !trimmed.dueDate ||
-      !trimmed.justification
-    ) {
+  const submit = async () => {
+    setError(null);
+    if (!form.title.trim() || !form.projectId || !form.dueDate) {
+      setError("A title, a project and a due date are required.");
       return;
     }
-
-    await onSubmit(trimmed);
-    reset(defaultFormValues);
-    onClose();
-  });
+    try {
+      await onSubmit({
+        title: form.title.trim(),
+        projectId: form.projectId,
+        assigneeId: form.assignee === UNASSIGNED ? null : form.assignee,
+        complexity: form.complexity,
+        dueDate: form.dueDate,
+        description: form.description.trim(),
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The task could not be created.");
+    }
+  };
 
   return (
     <ReusableModal
       opened={opened}
       onClose={onClose}
       title="Assign Work"
-      submitLabel="Assign Work"
+      submitLabel="Create task"
       loading={loading}
-      onSubmit={handleFormSubmit}
+      onSubmit={submit}
     >
       <Stack gap="sm">
-        <Controller
-          name="title"
-          control={control}
-          rules={{ required: true }}
-          render={({ field }) => (
-            <TextInput
-              label="Deliverable Title"
-              placeholder="e.g. Implement SMS 2FA Fallback"
-              required
-              {...field}
-            />
-          )}
+        {projects.length === 0 && (
+          <Alert color="orange" variant="light">
+            You don't manage any active project yet. Create one on the Projects tab first.
+          </Alert>
+        )}
+        <TextInput
+          label="Task title"
+          placeholder="e.g. Implement SMS 2FA fallback"
+          required
+          value={form.title}
+          onChange={(e) => setForm({ ...form, title: e.currentTarget.value })}
         />
-
-        <Controller
-          name="projectId"
-          control={control}
-          rules={{ required: true }}
-          render={({ field }) => (
-            <Select
-              label="Project"
-              placeholder="Select project"
-              data={projectOptions.map((p) => ({ value: p.id, label: p.name }))}
-              value={field.value ?? ""}
-              onChange={(value) => field.onChange(value ?? "")}
-              searchable
-              clearable={false}
-              nothingFoundMessage="No project found"
-              required
-            />
-          )}
+        <Select
+          label="Project"
+          placeholder="Select one of your projects"
+          data={projects.map((p) => ({ value: p.id, label: p.name }))}
+          value={form.projectId || null}
+          onChange={(value) => setForm({ ...form, projectId: value ?? "", assignee: UNASSIGNED })}
+          searchable
+          allowDeselect={false}
+          required
         />
-
-        <Controller
-          name="assigneeId"
-          control={control}
-          rules={{ required: true }}
-          render={({ field }) => (
-            <Select
-              label="Assignee"
-              placeholder="Select assignee"
-              data={personOptions.map((p) => ({ value: p.id, label: p.name }))}
-              value={field.value ?? ""}
-              onChange={(value) => field.onChange(value ?? "")}
-              searchable
-              clearable={false}
-              nothingFoundMessage="No assignee found"
-              required
-            />
-          )}
+        <Select
+          label="Assignee"
+          description={
+            form.projectId && assignable.length <= 1
+              ? "Add people to this project from its Team button on the Projects tab."
+              : undefined
+          }
+          data={[
+            { value: UNASSIGNED, label: "Unassigned" },
+            ...assignable.map((p) => ({ value: p.id, label: p.id === managerId ? `${p.name} (me)` : p.name })),
+          ]}
+          value={form.assignee}
+          onChange={(value) => setForm({ ...form, assignee: value ?? UNASSIGNED })}
+          disabled={!form.projectId}
+          searchable
+          allowDeselect={false}
         />
-
-        <Controller
-          name="complexity"
-          control={control}
-          rules={{ required: true }}
-          render={({ field }) => (
-            <Select
-              label="Complexity"
+        <Group grow align="flex-start">
+          <Stack gap={4}>
+            <Text size="sm" fw={500}>
+              Complexity
+            </Text>
+            <SegmentedControl
+              value={form.complexity}
+              onChange={(value) => setForm({ ...form, complexity: value as TaskComplexity })}
               data={[
-                "LOW (1 PT)",
-                "MID (2 PT)",
-                "HIGH (3 PT)",
-                "CRITICAL (5 PT)",
+                { value: "low", label: "Low (1)" },
+                { value: "mid", label: "Mid (2)" },
+                { value: "high", label: "High (3)" },
               ]}
-              value={field.value ?? "LOW (1 PT)"}
-              onChange={(value) => field.onChange(value ?? "LOW (1 PT)")}
-              required
             />
-          )}
+          </Stack>
+          <TextInput
+            type="date"
+            label="Due date"
+            required
+            value={form.dueDate}
+            onChange={(e) => setForm({ ...form, dueDate: e.currentTarget.value })}
+          />
+        </Group>
+        <Textarea
+          label="Description (optional)"
+          autosize
+          minRows={2}
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.currentTarget.value })}
         />
-
-        <Controller
-          name="dueDate"
-          control={control}
-          rules={{ required: true }}
-          render={({ field }) => (
-            <TextInput
-              type="date"
-              label="Due date"
-              value={field.value ?? ""}
-              onChange={(event) => field.onChange(event.currentTarget.value)}
-              required
-            />
-          )}
-        />
-
-        <Controller
-          name="justification"
-          control={control}
-          rules={{ required: true }}
-          render={({ field }) => (
-            <Textarea
-              label="Mandatory Audit Ledger Note"
-              placeholder="Mandatory reason for assignment / creation"
-              required
-              value={field.value ?? ""}
-              onChange={(event) => field.onChange(event.currentTarget.value)}
-            />
-          )}
-        />
+        {error && (
+          <Alert color="red" variant="light">
+            {error}
+          </Alert>
+        )}
       </Stack>
     </ReusableModal>
   );
