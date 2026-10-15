@@ -1,11 +1,13 @@
 import dayjs from "dayjs";
+import type { Availability } from "../../entities/availability.entity";
 import type { Blocker } from "../../entities/blocker.entity";
+import type { AttentionItem } from "../../entities/operational-signals.entity";
 import type { LedgerRecord } from "../../entities/ledger-record.entity";
 import type { Person } from "../../entities/person.entity";
 import type { Project } from "../../entities/project.entity";
 import type { Task } from "../../entities/task.entity";
 import { SYSTEM_CONFIG } from "../config/system-thresholds";
-import { getWorkingDaysBetween, getWorkingDaysElapsed } from "./working-days";
+import { getLeaveDaysInInterval, getWorkingDaysBetween, getWorkingDaysElapsed } from "./working-days";
 
 const weightOf = (task: Task) => SYSTEM_CONFIG.COMPLEXITY_WEIGHTS[task.complexity] ?? 0;
 const isOpen = (task: Task) => task.status !== "accepted" && task.status !== "cancelled";
@@ -219,4 +221,111 @@ export function reworkShare(ledger: LedgerRecord[], taskIds: Set<string>, from: 
       .map((r) => r.subjectId),
   );
   return share(reworked.size, submitted.size);
+}
+
+export interface StaleRow {
+  task: Task;
+  lastActivityAt: string;
+  inactiveWorkingDays: number;
+}
+
+/**
+ * FR-39 / SR-09 / SR-13: open tasks with no recorded change for the stale
+ * threshold, not counting days the assignee was on leave. Same rule as the
+ * derived signals, but reported on its own rather than only when overdue.
+ */
+export function staleTasks(
+  tasks: Task[],
+  ledger: LedgerRecord[],
+  availabilities: Availability[],
+  date: string,
+): StaleRow[] {
+  return tasks
+    .filter(isOpen)
+    .map((task) => {
+      const lastActivityAt = ledger
+        .filter((r) => r.subjectId === task.id)
+        .reduce((latest, r) => (r.occurredAt > latest ? r.occurredAt : latest), task.createdAt);
+      const raw = getWorkingDaysElapsed(lastActivityAt, date);
+      const leave = task.assigneeId
+        ? getLeaveDaysInInterval(task.assigneeId, lastActivityAt, date, availabilities)
+        : 0;
+      return { task, lastActivityAt, inactiveWorkingDays: Math.max(0, raw - leave) };
+    })
+    .filter((row) => row.inactiveWorkingDays >= SYSTEM_CONFIG.STALE_INACTIVITY_WORKING_DAYS)
+    .sort((a, b) => b.inactiveWorkingDays - a.inactiveWorkingDays);
+}
+
+/**
+ * FR-31 / FR-32: one attention list for the manager's projects. Starts from
+ * the derived signals and adds what they leave out: blocked tasks from the
+ * first day, not-started work due soon, and inactive work that is not overdue.
+ * Overdue-and-stale entries (silent overruns) always come first.
+ */
+export function managerAttentionList(
+  signalItems: AttentionItem[],
+  scope: ManagerScope,
+  extra: {
+    blockers: OpenBlockerRow[];
+    dueSoon: DueSoonRow[];
+    stale: StaleRow[];
+    personName: (id: string | null) => string;
+  },
+): AttentionItem[] {
+  const projectIds = new Set(scope.projects.map((p) => p.id));
+  const projectName = (id: string) => scope.projects.find((p) => p.id === id)?.name ?? "Unknown project";
+  const items = signalItems.filter((i) => i.projectId && projectIds.has(i.projectId));
+  const covered = (taskId: string, types: AttentionItem["signalType"][]) =>
+    items.some((i) => i.taskId === taskId && types.includes(i.signalType));
+  const base = (task: Task) => ({
+    taskId: task.id,
+    projectId: task.projectId,
+    taskTitle: task.title,
+    projectName: projectName(task.projectId),
+    assigneeId: task.assigneeId,
+    assigneeName: extra.personName(task.assigneeId),
+    dueDate: task.dueDate,
+    complexity: task.complexity,
+  });
+
+  for (const row of extra.blockers) {
+    if (!row.task || covered(row.task.id, ["aging_blocker", "silent_overrun"])) continue;
+    items.push({
+      ...base(row.task),
+      id: `blocked-${row.blocker.id}`,
+      signalType: "blocked",
+      severity: "warning",
+      headline: `Blocked: ${row.task.title}`,
+      details: `Blocked for ${row.daysOpen} working day(s). ${extra.personName(row.blocker.ownerId)} can clear it.`,
+      daysStalled: row.daysOpen,
+    });
+  }
+  for (const row of extra.dueSoon) {
+    if (covered(row.task.id, ["imminent_unstarted"])) continue;
+    items.push({
+      ...base(row.task),
+      id: `due-soon-${row.task.id}`,
+      signalType: "imminent_unstarted",
+      severity: "warning",
+      headline: `Not started, due soon: ${row.task.title}`,
+      details:
+        row.workingDaysRemaining === 0
+          ? `Due today (${row.task.dueDate}) and not started.`
+          : `Due ${row.task.dueDate}, ${row.workingDaysRemaining} working day(s) left, not started.`,
+    });
+  }
+  for (const row of extra.stale) {
+    if (covered(row.task.id, ["silent_overrun", "stale_inactivity"])) continue;
+    items.push({
+      ...base(row.task),
+      id: `stale-${row.task.id}`,
+      signalType: "stale_inactivity",
+      severity: "warning",
+      headline: `No recent activity: ${row.task.title}`,
+      details: `No change recorded for ${row.inactiveWorkingDays} working day(s).`,
+      daysStalled: row.inactiveWorkingDays,
+    });
+  }
+  const rank = (i: AttentionItem) => (i.signalType === "silent_overrun" ? 0 : i.severity === "critical" ? 1 : 2);
+  return items.sort((a, b) => rank(a) - rank(b) || (b.daysStalled ?? 0) - (a.daysStalled ?? 0));
 }

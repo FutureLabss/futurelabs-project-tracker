@@ -11,8 +11,9 @@ interface OperationalRadarProps {
 }
 
 export function OperationalRadar({ items, onInspect }: OperationalRadarProps) {
-  const criticalItems = items.filter((item) => item.severity === "critical");
-  const warningItems = items.filter((item) => item.severity !== "critical");
+  // FR-32: only overdue-and-stale work (silent overruns) is pinned above everything else.
+  const criticalItems = items.filter((item) => item.signalType === "silent_overrun");
+  const warningItems = items.filter((item) => item.signalType !== "silent_overrun");
 
   return (
     <Paper withBorder radius="md" p="md" bg="white">
@@ -34,7 +35,7 @@ export function OperationalRadar({ items, onInspect }: OperationalRadarProps) {
           )}
         </Group>
         <Text size="xs" c="dimmed">
-          Ranked deterministically by temporal risk • Click Inspect on any card
+          Every item opens its task • Silent overruns first
         </Text>
       </Group>
 
@@ -64,7 +65,7 @@ export function OperationalRadar({ items, onInspect }: OperationalRadarProps) {
             <Group gap={4}>
               <IconAlertTriangle size={14} color="#f59f00" />
               <Text size="xs" fw={700} c="yellow.8" tt="uppercase" lts={0.5}>
-                Aging WIP, Blockers & Unassigned Items
+                Everything else needing attention
               </Text>
             </Group>
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">

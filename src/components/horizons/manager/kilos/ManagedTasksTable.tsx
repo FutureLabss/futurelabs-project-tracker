@@ -22,7 +22,7 @@ const STATUS_COLORS: Record<Task["status"], string> = {
   cancelled: "dark",
 };
 
-type StatusFilter = "open" | "accepted" | "cancelled" | "all";
+type StatusFilter = "open" | "unassigned" | "accepted" | "cancelled" | "all";
 
 /** Every task in the manager's projects; clicking one opens the inspector and its controls. */
 export function ManagedTasksTable({ tasks, projects, people, onTaskClick }: ManagedTasksTableProps) {
@@ -34,6 +34,8 @@ export function ManagedTasksTable({ tasks, projects, people, onTaskClick }: Mana
     .filter((t) => {
       if (status === "all") return true;
       if (status === "open") return t.status !== "accepted" && t.status !== "cancelled";
+      if (status === "unassigned")
+        return !t.assigneeId && t.status !== "accepted" && t.status !== "cancelled";
       return t.status === status;
     })
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
@@ -78,6 +80,7 @@ export function ManagedTasksTable({ tasks, projects, people, onTaskClick }: Mana
             allowDeselect={false}
             data={[
               { value: "open", label: "Open" },
+              { value: "unassigned", label: "Unassigned (open)" },
               { value: "accepted", label: "Accepted" },
               { value: "cancelled", label: "Cancelled" },
               { value: "all", label: "All statuses" },

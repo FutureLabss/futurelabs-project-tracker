@@ -3,6 +3,19 @@ import { Paper, Group, Text, Badge, Button, Box, Stack } from "@mantine/core";
 import { IconAlertTriangle, IconFlame } from "@tabler/icons-react";
 import type { AttentionRadarItem } from "../../../horizons/manager/kilos/OperationalRadar";
 
+const SIGNAL_LABELS: Record<AttentionRadarItem["signalType"], string> = {
+  silent_overrun: "SILENT OVERRUN",
+  aging_blocker: "AGING BLOCKER",
+  blocked: "BLOCKED",
+  returned_for_rework: "RETURNED FOR WORK",
+  aging_wip: "IN PROGRESS TOO LONG",
+  stale_inactivity: "NO RECENT ACTIVITY",
+  overdue: "OVERDUE",
+  imminent_unstarted: "NOT STARTED, DUE SOON",
+  unowned_task: "UNASSIGNED",
+  unmanaged_project: "NO MANAGER",
+};
+
 interface RiskSignalCardProps {
   risk: AttentionRadarItem;
   onInspect: (risk: AttentionRadarItem) => void;
@@ -42,11 +55,7 @@ export function RiskSignalCard({ risk, onInspect }: RiskSignalCardProps) {
                 )
               }
             >
-              {isCritical
-                ? "CRITICAL: SILENT OVERRUN"
-                : risk.signalType === "returned_for_rework"
-                  ? "RETURNED FOR WORK"
-                  : "WARNING"}
+              {isCritical ? `CRITICAL: ${SIGNAL_LABELS[risk.signalType]}` : SIGNAL_LABELS[risk.signalType]}
             </Badge>
             <Text size="xs" c="dimmed" fw={500}>
               {risk.projectName}
@@ -73,7 +82,7 @@ export function RiskSignalCard({ risk, onInspect }: RiskSignalCardProps) {
             size="compact-xs"
             onClick={() => onInspect(risk)} // Triggers modal opening
           >
-            {isCritical ? "Inspect Silent Overrun" : "Inspect Item"}
+            Inspect task
           </Button>
         </Group>
       </Stack>

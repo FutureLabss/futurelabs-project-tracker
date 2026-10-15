@@ -156,3 +156,47 @@ test("unplanned share and rework share respect the chosen period", () => {
   const rework = insights.reworkShare(ledger, new Set(tasks.map((t) => t.id)), "2026-08-01", "2026-08-31");
   assert.deepEqual([rework.part, rework.total, rework.percent], [1, 2, 50]);
 });
+
+test("inactive tasks: no change for the threshold, leave excluded, finished work ignored (FR-39)", () => {
+  const tasks = [
+    task("quiet", { createdAt: "2026-08-17T09:00:00Z" }),
+    task("busy", { createdAt: "2026-08-17T09:00:00Z" }),
+    task("on-leave", { createdAt: "2026-08-24T09:00:00Z", assigneeId: "p-zed" }),
+    task("done", { status: "accepted", createdAt: "2026-08-01T09:00:00Z", acceptedAt: "2026-08-02T09:00:00Z" }),
+  ];
+  const ledger = [event("x", "busy", "status_changed", "2026-08-31T09:00:00Z")];
+  const leave = [{ id: "a", personId: "p-zed", fromDate: "2026-08-24", toDate: "2026-08-28", note: "" }];
+  const rows = insights.staleTasks(tasks, ledger, leave, DATE);
+  assert.deepEqual(rows.map((r) => [r.task.id, r.inactiveWorkingDays]), [["quiet", 11]]);
+});
+
+test("attention list adds fresh blockers, due-soon and inactive work, silent overruns first (FR-31/32)", () => {
+  const scope = { projects: [projects[0]], tasks: [], blockers: [], ledger: [] };
+  const t = (id, extra) => task(id, extra);
+  const signalItems = [
+    { id: "s-other", taskId: "x", projectId: "proj-b", signalType: "overdue", severity: "warning", headline: "", details: "", projectName: "B", assigneeId: null, assigneeName: "" },
+    { id: "s-aging", taskId: "aging", projectId: "proj-a", signalType: "aging_wip", severity: "warning", headline: "", details: "", projectName: "A", assigneeId: null, assigneeName: "", daysStalled: 2 },
+    { id: "s-silent", taskId: "silent", projectId: "proj-a", signalType: "silent_overrun", severity: "critical", headline: "", details: "", projectName: "A", assigneeId: null, assigneeName: "", daysStalled: 1 },
+  ];
+  const blockedTask = t("blocked-1", { status: "blocked" });
+  const list = insights.managerAttentionList(signalItems, scope, {
+    blockers: [{ blocker: { id: "b1", ownerId: "p-zed" }, task: blockedTask, daysOpen: 1 }],
+    dueSoon: [{ task: t("soon", { status: "not_started" }), workingDaysRemaining: 1 }],
+    stale: [
+      { task: t("silent"), inactiveWorkingDays: 9, lastActivityAt: "2026-08-10T00:00:00Z" },
+      { task: t("quiet"), inactiveWorkingDays: 6, lastActivityAt: "2026-08-20T00:00:00Z" },
+    ],
+    personName: (id) => id ?? "Unassigned",
+  });
+  assert.equal(list[0].signalType, "silent_overrun", "silent overruns are pinned first");
+  assert.ok(!list.some((i) => i.projectId === "proj-b"), "other managers' projects are excluded");
+  const types = list.map((i) => `${i.taskId}:${i.signalType}`).sort();
+  assert.deepEqual(types, [
+    "aging:aging_wip",
+    "blocked-1:blocked",
+    "quiet:stale_inactivity",
+    "silent:silent_overrun",
+    "soon:imminent_unstarted",
+  ]);
+  assert.ok(list.every((i) => i.taskId), "every entry opens a task (FR-33)");
+});

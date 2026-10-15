@@ -13,6 +13,8 @@ import {
 } from "../../../api/hooks/use-manager-actions";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  managerAttentionList,
+  staleTasks,
   notStartedDueSoon,
   openBlockersByAge,
   openWorkByPerson,
@@ -55,6 +57,8 @@ import { DueSoonPanel } from "./kilos/DueSoonPanel";
 import { OpenBlockersPanel } from "./kilos/OpenBlockersPanel";
 import { ManagerMyWork } from "./kilos/ManagerMyWork";
 import { ManagerHistory } from "./kilos/ManagerHistory";
+import { TaskSignalPanel, type TaskSignalRow } from "./kilos/TaskSignalPanel";
+import { IconHourglassHigh, IconZzz } from "@tabler/icons-react";
 
 const FORECAST_WEEKS = 4;
 
@@ -134,12 +138,9 @@ export default function ManagersDashboard({
   };
 
   // 3. Inspect Click Handler: match the risk signal to its task
+  // FR-33: every attention item carries its task, so each one opens the inspector.
   const handleInspectRisk = (risk: AttentionRadarItem) => {
-    const taskId = data?.signals.attentionItems.find(
-      (item) => item.id === risk.id,
-    )?.taskId;
-
-    if (taskId) setInspectedTaskId(taskId);
+    if (risk.taskId) setInspectedTaskId(risk.taskId);
   };
 
   if (!data) {
@@ -177,18 +178,19 @@ export default function ManagersDashboard({
   });
   const managedProjectIds = new Set(scope.projects.map((p) => p.id));
 
-  // 1. Data Mapping: Manager Acceptance Gate (Image 3)
-  const submittedTasks: DeliverableRow[] = getManagerReviewQueue(
-    scope.tasks,
-  ).map((t) => ({
-    id: t.id,
-    title: t.title,
-    description: t.description,
-    projectName: projectName(t.projectId),
-    submittedByName: personName(t.assigneeId),
-    complexity: t.complexity ?? "mid",
-    rawTask: t,
-  }));
+  // 1. Data Mapping: Manager Acceptance Gate — FR-42: longest-waiting first.
+  const submittedTasks: DeliverableRow[] = getManagerReviewQueue(scope.tasks)
+    .map((t) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      projectName: projectName(t.projectId),
+      submittedByName: personName(t.assigneeId),
+      complexity: t.complexity ?? "mid",
+      waitingDays: t.submittedAt ? getWorkingDaysElapsed(t.submittedAt, date) : 0,
+      rawTask: t,
+    }))
+    .sort((a, b) => b.waitingDays - a.waitingDays);
 
   // 2. Data Mapping: Audit Ledger Rows (Image 2)
   const auditRows: LedgerDisplayRow[] = scope.ledger.map((record) => {
@@ -208,17 +210,23 @@ export default function ManagersDashboard({
       actorName: personName(record.actorId),
       eventType: record.type,
       transition,
-      justification: record.reason || "Planned task created",
+      justification: record.reason || "—",
     };
   });
 
-  // 3. Data Mapping: Operational Attention Radar (Image 4)
-  const attentionItems: AttentionRadarItem[] = (
-    data.signals?.attentionItems ?? []
-  )
-    .filter((item) => item.projectId && managedProjectIds.has(item.projectId))
-    .map((item) => ({
+  const activeBlockers = scope.blockers.filter((b) => !b.clearedAt);
+  const blockerRows = openBlockersByAge(scope.blockers, scope.tasks, date);
+  const dueSoonRows = notStartedDueSoon(scope.tasks, date);
+  const staleRows = staleTasks(scope.tasks, scope.ledger, data.availability, date);
+
+  // 3. Operational Attention Radar — FR-31: one list for everything needing attention.
+  const attentionItems: AttentionRadarItem[] = managerAttentionList(
+    data.signals?.attentionItems ?? [],
+    scope,
+    { blockers: blockerRows, dueSoon: dueSoonRows, stale: staleRows, personName },
+  ).map((item) => ({
     id: item.id,
+    taskId: item.taskId,
     headline: item.headline,
     details: item.details,
     projectName: item.projectName,
@@ -227,10 +235,23 @@ export default function ManagersDashboard({
     signalType: item.signalType as AttentionRadarItem["signalType"],
   }));
 
+  // FR-37 / FR-39 dedicated lists.
+  const toSignalRow = (task: (typeof scope.tasks)[number], detail: string): TaskSignalRow => ({
+    task,
+    projectName: projectName(task.projectId),
+    assigneeName: personName(task.assigneeId),
+    detail,
+  });
+  const agingRows = (data.signals?.attentionItems ?? [])
+    .filter((i) => i.signalType === "aging_wip" && i.taskId)
+    .map((i) => ({ item: i, task: scope.tasks.find((t) => t.id === i.taskId) }))
+    .filter((r): r is { item: typeof r.item; task: NonNullable<typeof r.task> } => !!r.task)
+    .map((r) => toSignalRow(r.task, r.item.details));
+  const inactiveRows = staleRows.map((r) =>
+    toSignalRow(r.task, `${r.inactiveWorkingDays} working days (last change ${r.lastActivityAt.slice(0, 10)})`),
+  );
+
   // 4. Data Mapping: Metrics (Image 1)
-  const activeBlockers = scope.blockers.filter((b) => !b.clearedAt);
-  const blockerRows = openBlockersByAge(scope.blockers, scope.tasks, date);
-  const dueSoonRows = notStartedDueSoon(scope.tasks, date);
   const workloadRows = openWorkByPerson(scope.tasks, data.people);
   const forecastRows = projectForecasts(scope.projects, scope.tasks, scope.ledger, date, FORECAST_WEEKS);
   // Team overview cards: real figures for the manager's own projects only.
@@ -326,6 +347,24 @@ export default function ManagersDashboard({
         <>
           <DueSoonPanel rows={dueSoonRows} projects={scope.projects} people={data.people} onTaskClick={setInspectedTaskId} />
           <OpenBlockersPanel rows={blockerRows} people={data.people} onTaskClick={setInspectedTaskId} />
+          <TaskSignalPanel
+            title="In Progress Too Long"
+            subtitle="Past the expected working days for their complexity"
+            icon={<IconHourglassHigh size={20} color="#fa5252" />}
+            rows={agingRows}
+            detailHeader="Why"
+            emptyLabel="Nothing has been in progress longer than expected."
+            onTaskClick={setInspectedTaskId}
+          />
+          <TaskSignalPanel
+            title="No Recent Activity"
+            subtitle={`No change for ${SYSTEM_CONFIG.STALE_INACTIVITY_WORKING_DAYS}+ working days (leave excluded)`}
+            icon={<IconZzz size={20} color="#868e96" />}
+            rows={inactiveRows}
+            detailHeader="Inactive for"
+            emptyLabel="Every open task has had recent activity."
+            onTaskClick={setInspectedTaskId}
+          />
         </>
       )}
 

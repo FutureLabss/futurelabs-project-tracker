@@ -178,9 +178,11 @@ export interface RiskSignal {
   projectName: string;
   assigneeName: string;
   severity: "critical" | "warning" | "normal";
+  taskId?: string;
   signalType:
     | "silent_overrun"
     | "aging_blocker"
+    | "blocked"
     | "returned_for_rework"
     | "aging_wip"
     | "stale_inactivity"

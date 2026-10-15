@@ -11,6 +11,8 @@ export interface DeliverableRow {
   projectName: string;
   submittedByName: string;
   complexity: TaskComplexity;
+  /** Working days since submission. */
+  waitingDays: number;
   rawTask: unknown;
 }
 
@@ -34,8 +36,7 @@ export function AcceptanceGate({
             {d.title}
           </Text>
           <Text size="xs" c="dimmed">
-            {d.description ||
-              "Client-side permission router gates matching backend permission claims."}
+            {d.description || "No description"}
           </Text>
         </Box>
       ),
@@ -59,6 +60,14 @@ export function AcceptanceGate({
     {
       header: "Complexity",
       render: (d) => <ComplexityBadge complexity={d.complexity} />,
+    },
+    {
+      header: "Waiting",
+      render: (d) => (
+        <Text size="sm" fw={600} c={d.waitingDays >= 3 ? "orange.7" : "dark.6"}>
+          {d.waitingDays} working day{d.waitingDays === 1 ? "" : "s"}
+        </Text>
+      ),
     },
     {
       header: "Action",
