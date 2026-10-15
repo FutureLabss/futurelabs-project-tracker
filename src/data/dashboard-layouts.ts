@@ -8,6 +8,9 @@ import {
   IconUsers,
   IconUser,
   IconHistory,
+  IconFolder,
+  IconListDetails,
+  IconTrophy,
   IconSend,
 } from "@tabler/icons-react";
 import { DashboardLayoutConfig, UserRole } from "../types/dashboard";
@@ -48,10 +51,28 @@ export const roleDashboards: Record<UserRole, DashboardLayoutConfig> = {
     subtitle:
       "Review submitted work, rebalance load, and remove delivery blockers.",
     navigation: [
-      { label: "Team overview", icon: IconLayoutDashboard, active: true },
-      { label: "Review gate", icon: IconClipboardCheck },
-      { label: "Workload", icon: IconUsers },
-      { label: "Risk queue", icon: IconAlertTriangle },
+      {
+        label: "Team overview",
+        icon: IconLayoutDashboard,
+        managerView: "overview",
+        active: true,
+      },
+      { label: "My Work", icon: IconUser, managerView: "my_work" },
+      {
+        label: "Review gate",
+        icon: IconClipboardCheck,
+        managerView: "review_gate",
+      },
+      { label: "Projects", icon: IconFolder, managerView: "projects" },
+      { label: "Tasks", icon: IconListDetails, managerView: "tasks" },
+      { label: "Workload", icon: IconUsers, managerView: "workload" },
+      {
+        label: "Risk queue",
+        icon: IconAlertTriangle,
+        managerView: "risk_queue",
+      },
+      { label: "Change feed", icon: IconHistory, managerView: "change_feed" },
+      { label: "History", icon: IconTrophy, managerView: "history" },
     ],
     metrics: [],
     primaryActions: [

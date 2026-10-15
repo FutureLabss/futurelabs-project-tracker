@@ -12,6 +12,8 @@ type Backend = Pick<
   | "submitTask"
   | "acceptTask"
   | "returnTask"
+  | "changeTaskComplexity"
+  | "reopenTask"
 >;
 
 export class TaskService {
@@ -75,5 +77,17 @@ export class TaskService {
     ...args: Parameters<Backend["returnTask"]>
   ): ReturnType<Backend["returnTask"]> {
     return this.api.returnTask(...args);
+  }
+
+  changeTaskComplexity(
+    ...args: Parameters<Backend["changeTaskComplexity"]>
+  ): ReturnType<Backend["changeTaskComplexity"]> {
+    return this.api.changeTaskComplexity(...args);
+  }
+
+  reopenTask(
+    ...args: Parameters<Backend["reopenTask"]>
+  ): ReturnType<Backend["reopenTask"]> {
+    return this.api.reopenTask(...args);
   }
 }
