@@ -1,4 +1,5 @@
-import { Paper, Group, Text, Badge } from '@mantine/core';
+import { useState } from "react";
+import { Paper, Group, Text, Badge, Select } from '@mantine/core';
 import { IconHistory } from '@tabler/icons-react';
 import { ReusableTable, type ColumnDef } from '../../../Table/ReusableTab';
 import dayjs from "dayjs";
@@ -6,6 +7,8 @@ import dayjs from "dayjs";
 export interface LedgerDisplayRow {
   id: string;
   occurredAt: string;
+  actorId: string;
+  projectId: string | null;
   actorName: string;
   eventType: string;
   transition: string;
@@ -15,9 +18,26 @@ export interface LedgerDisplayRow {
 interface AuditLedgerProps {
   ledgerRows: LedgerDisplayRow[];
   loading?: boolean;
+  projects: { id: string; name: string }[];
+  people: { id: string; name: string }[];
 }
 
-export function AuditLedger({ ledgerRows, loading }: AuditLedgerProps) {
+const readableType = (type: string) => type.replace(/_/g, " ");
+
+/** FR-48 / FR-49: changes in the manager's projects, newest first, filterable. */
+export function AuditLedger({ ledgerRows, loading, projects, people }: AuditLedgerProps) {
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [actorId, setActorId] = useState<string | null>(null);
+  const [eventType, setEventType] = useState<string | null>(null);
+
+  const actorIds = new Set(ledgerRows.map((r) => r.actorId));
+  const eventTypes = [...new Set(ledgerRows.map((r) => r.eventType))].sort();
+  const visibleRows = ledgerRows
+    .filter((r) => !projectId || r.projectId === projectId)
+    .filter((r) => !actorId || r.actorId === actorId)
+    .filter((r) => !eventType || r.eventType === eventType)
+    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+
   const getBadgeColor = (type: string) => {
     switch (type.toLowerCase()) {
       case "task_created":
@@ -45,7 +65,7 @@ export function AuditLedger({ ledgerRows, loading }: AuditLedgerProps) {
       render: (r) => (
         <Text size="xs" c="dimmed">
           {dayjs(r.occurredAt).isValid()
-            ? dayjs(r.occurredAt).format("hh:mm:ss A")
+            ? dayjs(r.occurredAt).format("YYYY-MM-DD hh:mm A")
             : r.occurredAt}
         </Text>
       ),
@@ -93,12 +113,41 @@ export function AuditLedger({ ledgerRows, loading }: AuditLedgerProps) {
             Immutable Project Audit Ledger
           </Text>
         </Group>
-        <Text size="xs" c="dimmed">
-          Append-only event stream • Click any row to inspect raw record
-        </Text>
+        <Group gap="xs">
+          <Select
+            size="xs"
+            placeholder="All projects"
+            clearable
+            data={projects.map((p) => ({ value: p.id, label: p.name }))}
+            value={projectId}
+            onChange={setProjectId}
+          />
+          <Select
+            size="xs"
+            placeholder="All people"
+            clearable
+            searchable
+            data={people.filter((p) => actorIds.has(p.id)).map((p) => ({ value: p.id, label: p.name }))}
+            value={actorId}
+            onChange={setActorId}
+          />
+          <Select
+            size="xs"
+            placeholder="All change types"
+            clearable
+            data={eventTypes.map((t) => ({ value: t, label: readableType(t) }))}
+            value={eventType}
+            onChange={setEventType}
+          />
+        </Group>
       </Group>
 
-      <ReusableTable columns={columns} data={ledgerRows} loading={loading} />
+      <ReusableTable
+        columns={columns}
+        data={visibleRows}
+        loading={loading}
+        emptyLabel="No changes match these filters."
+      />
     </Paper>
   );
 }

@@ -13,7 +13,13 @@ export type AdminView =
 
 export type MemberView = "my-work" | "team" | "completed";
 export type ManagerView =
-  "overview" | "review_gate" | "workload" | "risk_queue";
+  | "overview"
+  | "review_gate"
+  | "projects"
+  | "tasks"
+  | "workload"
+  | "risk_queue"
+  | "change_feed";
 
 export type DashboardTone =
   "teal" | "blue" | "orange" | "red" | "violet" | "gray";

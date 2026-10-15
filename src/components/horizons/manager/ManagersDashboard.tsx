@@ -5,12 +5,19 @@ import {
   useManagerWorkspace,
   useManagerAction,
 } from "../../../api/hooks/use-manager-workspace";
+import { useAssignTask, useCreateTask } from "../../../api/hooks/use-tasks";
 import {
-  useAcceptTask,
-  useAssignTask,
-  useCreateTask,
-  useReturnTask,
-} from "../../../api/hooks/use-tasks";
+  useManagerAcceptTask,
+  useManagerReturnTask,
+} from "../../../api/hooks/use-manager-actions";
+import {
+  notStartedDueSoon,
+  openBlockersByAge,
+  openWorkByPerson,
+  projectForecasts,
+  projectIdOfRecord,
+  scopeToManagedProjects,
+} from "../../../domain/calculations/manager-insights";
 import type { TaskComplexity } from "../../../entities/task.entity";
 
 import type { ManagerView } from "../../../types/dashboard";
@@ -33,6 +40,15 @@ import type { RescheduleTaskFormValues } from "../../modal/RescheduleTaskModal";
 import { taskService, blockerService } from "../../../services";
 import type { BlockerCategory } from "../../../entities/blocker.entity";
 import { getManagerReviewQueue } from "./manager-utils";
+import { ManagerTaskControls } from "./kilos/ManagerTaskControls";
+import { ManagedProjectsPanel } from "./kilos/ManagedProjectsPanel";
+import { DeliveryTrendsPanel } from "./kilos/DeliveryTrendsPanel";
+import { ManagedTasksTable } from "./kilos/ManagedTasksTable";
+import { WorkloadPanel } from "./kilos/WorkloadPanel";
+import { DueSoonPanel } from "./kilos/DueSoonPanel";
+import { OpenBlockersPanel } from "./kilos/OpenBlockersPanel";
+
+const FORECAST_WEEKS = 4;
 
 export default function ManagersDashboard({
   actorId,
@@ -53,8 +69,8 @@ export default function ManagersDashboard({
   const executeAction = useManagerAction();
   const createTaskMutation = useCreateTask();
   const assignTaskMutation = useAssignTask();
-  const acceptTaskMutation = useAcceptTask();
-  const returnTaskMutation = useReturnTask();
+  const acceptTaskMutation = useManagerAcceptTask();
+  const returnTaskMutation = useManagerReturnTask();
   const data = query.data;
 
   // 1. Action: Start Working (not_started -> in_progress)
@@ -144,9 +160,18 @@ export default function ManagersDashboard({
   const projectName = (id: string | null | undefined) =>
     data.projects.find((p) => p.id === id)?.name ?? "Unknown Project";
 
+  // FR-50: the page only covers projects this manager manages.
+  const scope = scopeToManagedProjects(actorId, {
+    projects: data.projects,
+    tasks: data.tasks,
+    blockers: data.blockers,
+    ledger: data.ledger,
+  });
+  const managedProjectIds = new Set(scope.projects.map((p) => p.id));
+
   // 1. Data Mapping: Manager Acceptance Gate (Image 3)
   const submittedTasks: DeliverableRow[] = getManagerReviewQueue(
-    data.tasks,
+    scope.tasks,
   ).map((t) => ({
     id: t.id,
     title: t.title,
@@ -158,7 +183,7 @@ export default function ManagersDashboard({
   }));
 
   // 2. Data Mapping: Audit Ledger Rows (Image 2)
-  const auditRows: LedgerDisplayRow[] = data.ledger.map((record) => {
+  const auditRows: LedgerDisplayRow[] = scope.ledger.map((record) => {
     let transition = record.reason || "Updated";
     if (record.fromValue && record.toValue) {
       transition = `${record.fromValue} → ${record.toValue}`;
@@ -170,6 +195,8 @@ export default function ManagersDashboard({
     return {
       id: record.id,
       occurredAt: record.occurredAt,
+      actorId: record.actorId,
+      projectId: projectIdOfRecord(record, scope),
       actorName: personName(record.actorId),
       eventType: record.type,
       transition,
@@ -180,7 +207,9 @@ export default function ManagersDashboard({
   // 3. Data Mapping: Operational Attention Radar (Image 4)
   const attentionItems: AttentionRadarItem[] = (
     data.signals?.attentionItems ?? []
-  ).map((item) => ({
+  )
+    .filter((item) => item.projectId && managedProjectIds.has(item.projectId))
+    .map((item) => ({
     id: item.id,
     headline: item.headline,
     details: item.details,
@@ -191,7 +220,11 @@ export default function ManagersDashboard({
   }));
 
   // 4. Data Mapping: Metrics (Image 1)
-  const activeBlockers = data.blockers.filter((b) => !b.clearedAt);
+  const activeBlockers = scope.blockers.filter((b) => !b.clearedAt);
+  const blockerRows = openBlockersByAge(scope.blockers, scope.tasks, date);
+  const dueSoonRows = notStartedDueSoon(scope.tasks, date);
+  const workloadRows = openWorkByPerson(scope.tasks, data.people);
+  const forecastRows = projectForecasts(scope.projects, scope.tasks, scope.ledger, date, FORECAST_WEEKS);
   const agingWipCount =
     data.signals?.attentionItems?.filter((i) => i.signalType === "aging_wip")
       .length ?? 0;
@@ -239,7 +272,7 @@ export default function ManagersDashboard({
   ) => {
     await acceptTaskMutation.mutateAsync({
       taskId: deliverable.id,
-      managerId: actorId,
+      actorId,
     });
     setReviewItem(null);
   };
@@ -250,7 +283,7 @@ export default function ManagersDashboard({
   ) => {
     await returnTaskMutation.mutateAsync({
       taskId: deliverable.id,
-      managerId: actorId,
+      actorId,
       reason: note,
     });
     setReviewItem(null);
@@ -287,11 +320,38 @@ export default function ManagersDashboard({
         />
       )}
 
+      {view === "risk_queue" && (
+        <>
+          <DueSoonPanel rows={dueSoonRows} projects={scope.projects} people={data.people} onTaskClick={setInspectedTaskId} />
+          <OpenBlockersPanel rows={blockerRows} people={data.people} onTaskClick={setInspectedTaskId} />
+        </>
+      )}
+
+      {view === "projects" && (
+        <>
+          <ManagedProjectsPanel rows={forecastRows} actorId={actorId} date={date} recentWeeks={FORECAST_WEEKS} />
+          <DeliveryTrendsPanel tasks={scope.tasks} ledger={scope.ledger} date={date} />
+        </>
+      )}
+
+      {view === "tasks" && (
+        <ManagedTasksTable
+          tasks={scope.tasks}
+          projects={scope.projects}
+          people={data.people}
+          onTaskClick={setInspectedTaskId}
+        />
+      )}
+
+      {view === "workload" && <WorkloadPanel rows={workloadRows} />}
+
       {/* SECTION 1.2: AUDIT LEDGER (IMAGE 2) */}
-      {view === "overview" && (
+      {(view === "overview" || view === "change_feed") && (
         <AuditLedger
           ledgerRows={auditRows}
           loading={query.isFetching || executeAction.isPending}
+          projects={scope.projects}
+          people={data.people}
         />
       )}
 
@@ -325,6 +385,15 @@ export default function ManagersDashboard({
         onRaiseBlocker={handleRaiseBlocker}
         onReschedule={handleReschedule}
         loading={executeAction.isPending}
+        renderManagerControls={(task) => (
+          <ManagerTaskControls
+            task={task}
+            people={data.people}
+            members={data.members}
+            projectManagerId={data.projects.find((p) => p.id === task.projectId)?.managerId ?? null}
+            actorId={actorId}
+          />
+        )}
       />
     </ManagerTemplate>
   );

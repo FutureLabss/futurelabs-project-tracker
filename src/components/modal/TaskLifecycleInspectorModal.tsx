@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Modal,
   Box,
@@ -41,6 +41,8 @@ interface TaskLifecycleInspectorModalProps {
   onRaiseBlocker: (taskId: string, values: RaiseBlockerFormValues) => Promise<void>;
   onReschedule: (taskId: string, values: RescheduleTaskFormValues) => Promise<void>;
   loading?: boolean;
+  /** Manager-only controls (reassign, complexity, cancel, reopen) for the given task. */
+  renderManagerControls?: (task: ManagerWorkspace["tasks"][number]) => ReactNode;
 }
 
 export function TaskLifecycleInspectorModal({
@@ -53,6 +55,7 @@ export function TaskLifecycleInspectorModal({
   onRaiseBlocker,
   onReschedule,
   loading = false,
+  renderManagerControls,
 }: TaskLifecycleInspectorModalProps) {
   const [raiseBlockerOpen, setRaiseBlockerOpen] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -255,6 +258,15 @@ export function TaskLifecycleInspectorModal({
                 </Button>
               </Group>
             </Box>
+
+            {renderManagerControls && (
+              <Box>
+                <Text size="xs" fw={700} c="dimmed" tt="uppercase" lts={0.5} mb="xs">
+                  Manager Controls
+                </Text>
+                {renderManagerControls(task)}
+              </Box>
+            )}
 
             {/* 3. AGING WIP INDICATOR (Visible In Progress - Image 2) */}
             {isInProgress && (
