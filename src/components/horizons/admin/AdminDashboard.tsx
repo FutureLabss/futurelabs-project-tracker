@@ -48,6 +48,8 @@ import { GovernancePanel } from "./organisms/GovernancePanel";
 import { PeopleGrid } from "./organisms/PeopleGrid";
 import { AnalyticsPanel } from "./organisms/AnalyticsPanel";
 import { AdminTemplate } from "./templates/AdminTemplate";
+import { RiskWatchlists } from "./organisms/RiskWatchlists";
+import { inactiveProjects, unattendedTasks } from "../../../domain/calculations/admin-insights";
 
 const headings: Record<AdminView, [string, string]> = {
   portfolio: [
@@ -198,6 +200,17 @@ export default function AdminDashboard({
       matches(r.headline, r.details, r.projectName, r.assigneeName) &&
       (filter === "all" || filter === r.signalType) &&
       (!projectFilter || r.projectId === projectFilter),
+  );
+  // FR-54 / FR-55 watchlists, following the Risks view's project filter and search.
+  const unattended = unattendedTasks(data.tasks, data.blockers, data.ledger, date).filter(
+    (r) =>
+      (!projectFilter || r.task.projectId === projectFilter) &&
+      matches(r.task.title, projectName(r.task.projectId), personName(r.task.assigneeId)),
+  );
+  const inactive = inactiveProjects(data.projects, data.tasks, data.blockers, data.ledger, date).filter(
+    (r) =>
+      (!projectFilter || r.project.id === projectFilter) &&
+      matches(r.project.name, personName(r.project.managerId)),
   );
   const people = data.people.filter((p) =>
     matches(p.name, p.email, p.title, p.role),
@@ -765,11 +778,10 @@ export default function AdminDashboard({
                   data={[
                     "all",
                     "silent_overrun",
+                    "overdue",
                     "aging_wip",
                     "aging_blocker",
-                    "stale_inactivity",
-                    "overdue",
-                    "imminent_unstarted",
+                    "returned_for_rework",
                     "unowned_task",
                     "unmanaged_project",
                   ].map((value) => ({ value, label: readable(value) }))}
@@ -793,6 +805,15 @@ export default function AdminDashboard({
               </Group>
             </Group>
           </Card>
+
+          <RiskWatchlists
+            unattended={unattended}
+            inactive={inactive}
+            projectName={projectName}
+            personName={personName}
+            onTask={onTask}
+            onProject={onProject}
+          />
 
           {!risks.length && (
             <Card withBorder p="xl" radius="md">
