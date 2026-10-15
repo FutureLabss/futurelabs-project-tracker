@@ -2,7 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../lib/supabase/database.types";
 import { mapProfile } from "../api/supabase/mappers";
 import {
+  clearTrackerSession,
+  getTrackerRefreshToken,
   getTrackerToken,
+  setTrackerRefreshToken,
   setTrackerToken,
 } from "../lib/supabase/tracker-session";
 
@@ -15,6 +18,7 @@ export class AuthService {
     (event: string, session: TrackerSession | null) => void
   >();
   private exchange: Promise<TrackerSession> | null = null;
+  private refreshing: Promise<TrackerSession | null> | null = null;
   constructor(
     private readonly client: SupabaseClient<Database>,
     private readonly passwordClient?: SupabaseClient<Database> | null,
@@ -30,6 +34,9 @@ export class AuthService {
       password,
     });
     if (error) throw new Error(error.message);
+    if (data.session?.refresh_token) {
+      setTrackerRefreshToken(data.session.refresh_token);
+    }
     try {
       return await this.exchangeProof({
         access_token: data.session.access_token,
@@ -82,9 +89,47 @@ export class AuthService {
           "Local session cleared, but server logout could not be confirmed. The session expires within 15 minutes.",
         );
     } finally {
-      setTrackerToken(null);
+      clearTrackerSession();
       this.notify(null);
     }
+  }
+  async refreshSession(): Promise<TrackerSession | null> {
+    const refreshToken = getTrackerRefreshToken();
+    const passwordClient = this.passwordClient;
+    if (
+      !refreshToken ||
+      !passwordClient ||
+      typeof passwordClient.auth?.refreshSession !== "function"
+    ) {
+      return null;
+    }
+    if (this.refreshing) return this.refreshing;
+    this.refreshing = (async () => {
+      try {
+        const { data, error } = await passwordClient.auth.refreshSession({
+          refresh_token: refreshToken,
+        });
+        if (error || !data.session?.access_token) {
+          return null;
+        }
+        if (data.session.refresh_token) {
+          setTrackerRefreshToken(data.session.refresh_token);
+        }
+        return await this.exchangeProof({
+          access_token: data.session.access_token,
+        });
+      } catch {
+        return null;
+      } finally {
+        this.refreshing = null;
+        try {
+          await passwordClient.auth.signOut?.({ scope: "local" });
+        } catch {
+          // ignore cleanup failures
+        }
+      }
+    })();
+    return this.refreshing;
   }
   async getSession(): Promise<TrackerSession | null> {
     const token = getTrackerToken();
@@ -99,14 +144,17 @@ export class AuthService {
         typeof claims.sub !== "string" ||
         typeof claims.exp !== "number" ||
         claims.exp * 1000 <= Date.now()
-      )
+      ) {
+        const refreshed = await this.refreshSession();
+        if (refreshed) return refreshed;
         throw new Error();
+      }
       await this.getProfile(claims.sub);
       if (getTrackerToken() !== token) return null;
       return { user: { id: claims.sub }, expires_at: claims.exp };
     } catch {
       if (getTrackerToken() !== token) return null;
-      setTrackerToken(null);
+      clearTrackerSession();
       this.notify(null);
       throw new Error(
         "Your Tracker session expired or access was revoked. Please sign in again.",

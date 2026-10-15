@@ -19,6 +19,11 @@ const fs = require("node:fs");
     await page.getByRole("option", { name: option, exact: true }).click();
   };
   const confirm = async (name) => {
+    assert.equal(
+      await dialog(name).count(),
+      1,
+      `Expected single instance of dialog "${name}"`,
+    );
     await dialog(name).getByRole("button", { name, exact: true }).click();
     await dialog(name).waitFor({ state: "hidden" });
   };
@@ -191,7 +196,19 @@ const fs = require("node:fs");
       .click();
     await confirm("Close project");
     await page.keyboard.press("Escape");
-    await page.getByRole("button", { name: "All tasks", exact: true }).click();
+    await page
+      .getByRole("button", { name: "New project", exact: true })
+      .click();
+    await dialog("Create project")
+      .getByLabel("Project name")
+      .fill("Identity & Access Engine (IAM v2)");
+    await dialog("Create project")
+      .getByLabel("Goal and expected outcome")
+      .fill("Core enterprise IAM infrastructure");
+    await dialog("Create project").getByLabel("Start date").fill("2026-09-01");
+    await dialog("Create project").getByLabel("Target date").fill("2026-10-31");
+    await confirm("Create project");
+    await page.getByRole("button", { name: "Tasks", exact: true }).click();
     await page
       .getByRole("button", { name: "Create task", exact: true })
       .click();
@@ -213,7 +230,7 @@ const fs = require("node:fs");
     await confirm("Cancel task");
     await page.keyboard.press("Escape");
     await page
-      .getByRole("button", { name: "Team directory", exact: true })
+      .getByRole("button", { name: "Team", exact: true })
       .click();
     await page
       .getByRole("button", { name: "Record leave", exact: true })
@@ -231,10 +248,10 @@ const fs = require("node:fs");
       .waitFor();
     await page.keyboard.press("Escape");
     for (const [nav, heading] of [
-      ["Health analytics", "Delivery analytics"],
+      ["Analytics", "Delivery analytics"],
       ["Governance", "Governance"],
-      ["Org risks", "Organization risks"],
-      ["Activity ledger", "Activity ledger"],
+      ["Risks", "Organization risks"],
+      ["Activity", "Activity ledger"],
     ]) {
       await page.getByRole("button", { name: nav, exact: true }).click();
       await page.getByRole("heading", { name: heading, exact: true }).waitFor();
@@ -277,7 +294,7 @@ const fs = require("node:fs");
     await page
       .getByRole("button", { name: "Expand navigation", exact: true })
       .click();
-    await page.getByRole("button", { name: "All tasks", exact: true }).click();
+    await page.getByRole("button", { name: "Tasks", exact: true }).click();
     await page
       .getByRole("heading", { name: "All tasks", exact: true })
       .waitFor();

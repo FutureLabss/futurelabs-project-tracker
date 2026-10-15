@@ -1,22 +1,44 @@
 import { useState } from "react";
 import {
   Alert,
+  Badge,
   Button,
   Card,
   Group,
   Loader,
+  Modal,
   Select,
+  SegmentedControl,
   SimpleGrid,
   Stack,
   Text,
   TextInput,
 } from "@mantine/core";
-import { useAdminWorkspace } from "../../../api/hooks/use-admin-workspace";
+import {
+  IconAlertTriangle,
+  IconLayoutKanban,
+  IconTable,
+} from "@tabler/icons-react";
+import {
+  useAdminWorkspace,
+  useAdminAction,
+} from "../../../api/hooks/use-admin-workspace";
+import { useCanResetDemo, useResetToSeed } from "../../../api/hooks/use-signals";
+import { taskService } from "../../../services";
+import { TaskBoard } from "../../task-board";
 import type { AdminView } from "../../../types/dashboard";
 import type { LedgerRecord } from "../../../entities/ledger-record.entity";
 import { AdminActionDialog, type AdminAction } from "./AdminActionDialog";
 import { AdminDetails, LedgerList, TaskList } from "./AdminDetails";
-import { downloadCsv, isOpen, readable } from "./admin-utils";
+import {
+  type AnalyticsPreset,
+  type DateRange,
+  calculatePeriodAnalytics,
+  computeDateRange,
+  downloadCsv,
+  isOpen,
+  readable,
+} from "./admin-utils";
 import { MetricCard } from "./atoms/MetricCard";
 import { EmptyState } from "./atoms/EmptyState";
 import { RiskSignalCard } from "./molecules/RiskSignalCard";
@@ -69,6 +91,9 @@ export default function AdminDashboard({
   onViewChange: (view: AdminView) => void;
 }) {
   const query = useAdminWorkspace(date);
+  const canResetDemo = useCanResetDemo();
+  const resetMutation = useResetToSeed();
+  const [resetModalOpen, setResetModalOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Partial<Record<AdminView, string>>>(
     {},
@@ -86,6 +111,17 @@ export default function AdminDashboard({
   const [record, setRecord] = useState<LedgerRecord | null>(null);
   const [exportError, setExportError] = useState("");
   const [exportNotice, setExportNotice] = useState("");
+  const [taskViewMode, setTaskViewMode] = useState<"board" | "table">("board");
+  const adminActionMutation = useAdminAction();
+
+  const [analyticsPreset, setAnalyticsPreset] = useState<AnalyticsPreset>("30d");
+  const defaultMonthAgo = new Date(`${date}T00:00:00`);
+  defaultMonthAgo.setDate(defaultMonthAgo.getDate() - 30);
+  const [customRange, setCustomRange] = useState<DateRange>({
+    startDate: defaultMonthAgo.toISOString().slice(0, 10),
+    endDate: date,
+  });
+
   const data = query.data;
   const changeView = (next: AdminView, nextFilter = "all") => {
     setSearch("");
@@ -165,15 +201,27 @@ export default function AdminDashboard({
       ) &&
       (filter === "all" || filter === r.subjectType),
   );
-  const monthAgo = new Date(`${date}T00:00:00`);
-  monthAgo.setDate(monthAgo.getDate() - 30);
+
+  const effectiveRange = computeDateRange(analyticsPreset, date, customRange);
+  const periodAnalytics = {
+    ...calculatePeriodAnalytics(data, effectiveRange, projectFilter),
+    currentRange: effectiveRange,
+  };
+
   const reportTaskIds = new Set(
     data.ledger
-      .filter((r) =>
-        report === "rework"
+      .filter((r) => {
+        const occurred = r.occurredAt.slice(0, 10);
+        if (
+          occurred < effectiveRange.startDate ||
+          occurred > effectiveRange.endDate
+        ) {
+          return false;
+        }
+        return report === "rework"
           ? r.type === "task_returned"
-          : r.type === "task_redated",
-      )
+          : r.type === "task_redated";
+      })
       .map((r) => r.subjectId),
   );
   const reportTasks = data.tasks.filter(
@@ -183,8 +231,8 @@ export default function AdminDashboard({
       (report === "throughput"
         ? t.status === "accepted" &&
           !!t.acceptedAt &&
-          new Date(t.acceptedAt) >= monthAgo &&
-          t.acceptedAt.slice(0, 10) <= date
+          t.acceptedAt.slice(0, 10) >= effectiveRange.startDate &&
+          t.acceptedAt.slice(0, 10) <= effectiveRange.endDate
         : report === "unplanned"
           ? t.origin === "unplanned" && isOpen(t)
           : report === "blockers"
@@ -278,6 +326,119 @@ export default function AdminDashboard({
           r.reason,
         ]),
       ];
+    if (view === "analytics") {
+      const summaryRows = [
+        ["Report Scope", "Delivery Analytics"],
+        ["Reporting Date", date],
+        [
+          "Date Window",
+          `${effectiveRange.startDate} to ${effectiveRange.endDate} (${analyticsPreset})`,
+        ],
+        ["Active Report Tab", report],
+        [
+          "Project Filter",
+          projectFilter ? projectName(projectFilter) : "All Projects",
+        ],
+        ["Org Total Tasks", data.tasks.length],
+        ["Filtered View Tasks", reportTasks.length],
+        [],
+        ["Summary Metric", "Current Period", "Previous Period", "Trend Delta"],
+        [
+          "Accepted Deliverables",
+          periodAnalytics?.current.acceptedCount ?? 0,
+          periodAnalytics?.previous.acceptedCount ?? 0,
+          periodAnalytics?.trends.acceptedDelta ?? 0,
+        ],
+        [
+          "Complexity Points Delivered",
+          periodAnalytics?.current.acceptedWeight ?? 0,
+          periodAnalytics?.previous.acceptedWeight ?? 0,
+          periodAnalytics?.trends.weightDelta ?? 0,
+        ],
+        [
+          "Rework Rate (%)",
+          `${(periodAnalytics?.current.reworkRatePercent ?? 0).toFixed(1)}%`,
+          `${(periodAnalytics?.previous.reworkRatePercent ?? 0).toFixed(1)}%`,
+          `${(periodAnalytics?.trends.reworkRateDelta ?? 0).toFixed(1)}%`,
+        ],
+        [
+          "Date Changes / Slips",
+          periodAnalytics?.current.dateChanges ?? 0,
+          periodAnalytics?.previous.dateChanges ?? 0,
+          periodAnalytics?.trends.dateChangesDelta ?? 0,
+        ],
+        [],
+      ];
+
+      if (report === "breakdown" && periodAnalytics) {
+        return [
+          ...summaryRows,
+          [
+            "Project",
+            "Lead",
+            "Accepted in Period",
+            "Delivered Points",
+            "Returns (Rework)",
+            "Date Slips",
+            "Open Tasks",
+          ],
+          ...periodAnalytics.projectBreakdown.map((p) => [
+            p.projectName,
+            p.managerName,
+            p.acceptedCount,
+            p.acceptedWeight,
+            p.returnsCount,
+            p.dateChangesCount,
+            p.openTasksCount,
+          ]),
+          [],
+          [
+            "Team Member",
+            "Role",
+            "Status",
+            "Accepted in Period",
+            "Delivered Points",
+            "Returns",
+            "Active Tasks",
+          ],
+          ...periodAnalytics.personBreakdown.map((p) => [
+            p.name,
+            p.role,
+            p.status,
+            p.acceptedCount,
+            p.acceptedWeight,
+            p.returnsCount,
+            p.activeTasksCount,
+          ]),
+        ];
+      }
+
+      return [
+        ...summaryRows,
+        [
+          "Task",
+          "Project",
+          "Owner",
+          "Status",
+          "Complexity",
+          "Origin",
+          "Due",
+          "Submitted",
+          "Accepted",
+        ],
+        ...reportTasks.map((t) => [
+          t.title,
+          projectName(t.projectId),
+          personName(t.assigneeId),
+          t.status,
+          t.complexity,
+          t.origin,
+          t.dueDate,
+          t.submittedAt,
+          t.acceptedAt,
+        ]),
+      ];
+    }
     return [
       [
         "Task",
@@ -290,7 +451,7 @@ export default function AdminDashboard({
         "Submitted",
         "Accepted",
       ],
-      ...(view === "analytics" ? reportTasks : tasks).map((t) => [
+      ...tasks.map((t) => [
         t.title,
         projectName(t.projectId),
         personName(t.assigneeId),
@@ -338,6 +499,8 @@ export default function AdminDashboard({
       onRefresh={() => void query.refetch()}
       onExport={exportReport}
       onNewProject={() => setAction({ kind: "project" })}
+      onResetDemo={() => setResetModalOpen(true)}
+      canResetDemo={canResetDemo}
       queryError={query.isError ? query.error.message : undefined}
       exportError={exportError}
       exportNotice={exportNotice}
@@ -411,22 +574,30 @@ export default function AdminDashboard({
       }
     >
       {view === "portfolio" && (
-        <>
-          <Select
-            label="Portfolio filter"
-            value={filter}
-            onChange={(v) => setFilter(v ?? "all")}
-            maw={280}
-            data={[
-              { value: "all", label: "All projects" },
-              { value: "active", label: "Active" },
-              { value: "closed", label: "Closed" },
-              { value: "unmanaged", label: "Unmanaged" },
-              { value: "red", label: "Red" },
-              { value: "amber", label: "Amber" },
-              { value: "green", label: "Green" },
-            ]}
-          />
+        <Stack gap="md">
+          <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+            <SegmentedControl
+              size="sm"
+              value={filter}
+              onChange={(v) => setFilter(v)}
+              data={[
+                { value: "all", label: `All (${data.projects.length})` },
+                { value: "active", label: `Active (${activeProjects.length})` },
+                { value: "green", label: "On Track" },
+                { value: "amber", label: "Attention" },
+                { value: "red", label: "At Risk" },
+                {
+                  value: "unmanaged",
+                  label: `Needs Lead (${activeProjects.filter((p) => !p.managerId).length})`,
+                },
+                {
+                  value: "closed",
+                  label: `Closed (${data.projects.filter((p) => p.state === "closed").length})`,
+                },
+              ]}
+            />
+          </Group>
+
           <PortfolioTable
             projects={projects}
             data={data}
@@ -434,42 +605,108 @@ export default function AdminDashboard({
             onPerson={onPerson}
             onAssignLead={(projectId) => setAction({ kind: "lead", projectId })}
           />
-        </>
+        </Stack>
       )}
       {view === "tasks" && (
         <>
-          <Group align="flex-end" justify="space-between">
-            {projectSelect}
-            <Select
-              label="Task status"
-              value={filter}
-              onChange={(v) => setFilter(v ?? "all")}
-              data={[
-                "all",
-                "unassigned",
-                "not_started",
-                "in_progress",
-                "blocked",
-                "submitted",
-                "accepted",
-                "cancelled",
-              ].map((value) => ({ value, label: readable(value) }))}
-            />
-            <Button
-              onClick={() =>
+          <Group align="flex-end" justify="space-between" wrap="wrap" gap="sm">
+            <Group align="flex-end" gap="sm" wrap="wrap">
+              {projectSelect}
+              <Select
+                label="Task status"
+                value={filter}
+                onChange={(v) => setFilter(v ?? "all")}
+                data={[
+                  "all",
+                  "unassigned",
+                  "not_started",
+                  "in_progress",
+                  "blocked",
+                  "submitted",
+                  "accepted",
+                  "cancelled",
+                ].map((value) => ({ value, label: readable(value) }))}
+              />
+            </Group>
+            <Group align="flex-end" gap="sm" wrap="nowrap">
+              <SegmentedControl
+                value={taskViewMode}
+                onChange={(val) => setTaskViewMode(val as "board" | "table")}
+                data={[
+                  {
+                    value: "board",
+                    label: (
+                      <Group gap={6} wrap="nowrap">
+                        <IconLayoutKanban size={15} />
+                        <span>Board</span>
+                      </Group>
+                    ),
+                  },
+                  {
+                    value: "table",
+                    label: (
+                      <Group gap={6} wrap="nowrap">
+                        <IconTable size={15} />
+                        <span>Table</span>
+                      </Group>
+                    ),
+                  },
+                ]}
+              />
+              <Button
+                onClick={() =>
+                  setAction({
+                    kind: "task",
+                    projectId: projectFilter ?? undefined,
+                  })
+                }
+                disabled={!activeProjects.length}
+              >
+                Create task
+              </Button>
+            </Group>
+          </Group>
+
+          {taskViewMode === "board" ? (
+            <TaskBoard
+              tasks={tasks}
+              projects={data.projects}
+              people={data.people}
+              onTaskClick={onTask}
+              onTaskStatusChange={async (taskId, targetStatus) => {
+                await adminActionMutation.mutateAsync(() =>
+                  taskService.updateTaskStatus(taskId, targetStatus, actorId),
+                );
+              }}
+              onTaskActionRequired={(req) => {
+                if (req.kind === "blocker") {
+                  setAction({ kind: "blocker", taskId: req.taskId });
+                } else if (req.kind === "clear") {
+                  setAction({ kind: "clear", blockerId: req.blockerId });
+                } else if (req.kind === "submit") {
+                  setAction({ kind: "submit", taskId: req.taskId });
+                } else if (req.kind === "accept") {
+                  setAction({ kind: "accept", taskId: req.taskId });
+                } else if (req.kind === "return") {
+                  setAction({ kind: "return", taskId: req.taskId });
+                } else if (req.kind === "cancel") {
+                  setAction({ kind: "cancel", taskId: req.taskId });
+                } else if (req.kind === "start") {
+                  setAction({ kind: "start", taskId: req.taskId });
+                }
+              }}
+              onCreateTask={() =>
                 setAction({
                   kind: "task",
                   projectId: projectFilter ?? undefined,
                 })
               }
-              disabled={!activeProjects.length}
-            >
-              Create task
-            </Button>
-          </Group>
-          <Card withBorder>
-            <TaskList tasks={tasks} data={data} onTask={onTask} />
-          </Card>
+            />
+          ) : (
+            <Card withBorder>
+              <TaskList tasks={tasks} data={data} onTask={onTask} />
+            </Card>
+          )}
         </>
       )}
       {view === "governance" && (
@@ -502,28 +739,49 @@ export default function AdminDashboard({
         </>
       )}
       {view === "risks" && (
-        <>
-          <Group align="flex-end">
-            {projectSelect}
-            <Select
-              label="Signal"
-              value={filter}
-              onChange={(v) => setFilter(v ?? "all")}
-              data={[
-                "all",
-                "silent_overrun",
-                "aging_wip",
-                "aging_blocker",
-                "stale_inactivity",
-                "overdue",
-                "imminent_unstarted",
-                "unowned_task",
-                "unmanaged_project",
-              ].map((value) => ({ value, label: readable(value) }))}
-            />
-          </Group>
+        <Stack gap="md">
+          <Card withBorder p="sm" radius="md">
+            <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+              <Group gap="sm" wrap="wrap" align="center">
+                {projectSelect}
+                <Select
+                  label="Signal"
+                  value={filter}
+                  onChange={(v) => setFilter(v ?? "all")}
+                  data={[
+                    "all",
+                    "silent_overrun",
+                    "aging_wip",
+                    "aging_blocker",
+                    "stale_inactivity",
+                    "overdue",
+                    "imminent_unstarted",
+                    "unowned_task",
+                    "unmanaged_project",
+                  ].map((value) => ({ value, label: readable(value) }))}
+                  maw={260}
+                />
+              </Group>
+
+              <Group gap="xs">
+                <Badge
+                  size="md"
+                  variant="light"
+                  color={risks.length ? "red" : "teal"}
+                >
+                  {risks.length} active {risks.length === 1 ? "risk" : "risks"}
+                </Badge>
+                {risks.filter((r) => r.severity === "critical").length > 0 && (
+                  <Badge size="sm" variant="filled" color="red">
+                    {risks.filter((r) => r.severity === "critical").length} critical
+                  </Badge>
+                )}
+              </Group>
+            </Group>
+          </Card>
+
           {!risks.length && (
-            <Card withBorder>
+            <Card withBorder p="xl" radius="md">
               <EmptyState message="No matching risks for this reporting date." />
             </Card>
           )}
@@ -537,22 +795,28 @@ export default function AdminDashboard({
               }}
             />
           ))}
-        </>
+        </Stack>
       )}
       {view === "analytics" && (
         <>
           <AnalyticsPanel
             data={data}
-            metrics={metrics}
             blockerAnalytics={data.signals.blockerAnalytics}
             reportTasks={reportTasks}
             report={report}
             filter={filter}
-            dateChangeCount={data.ledger.filter((r) => r.type === "task_redated").length}
             onReportChange={setReport}
             onFilterChange={setFilter}
             onTask={onTask}
+            onProject={onProject}
+            onPerson={onPerson}
             projectSelect={projectSelect}
+            analyticsPreset={analyticsPreset}
+            onPresetChange={setAnalyticsPreset}
+            customRange={customRange}
+            onCustomRangeChange={setCustomRange}
+            periodAnalytics={periodAnalytics}
+            reportingDate={date}
           />
         </>
       )}
@@ -564,48 +828,79 @@ export default function AdminDashboard({
             availability={data.availability}
             date={date}
             onPerson={onPerson}
+            onAddPerson={() => setAction({ kind: "create-person" })}
             onRecordLeave={() => setAction({ kind: "leave" })}
           />
         </>
       )}
       {view === "ledger" && (
-        <>
-          <Select
-            label="Subject type"
-            value={filter}
-            onChange={(v) => setFilter(v ?? "all")}
-            data={["all", "project", "task", "blocker", "availability"]}
-            maw={280}
-          />
+        <Stack gap="md">
+          <Card withBorder p="sm" radius="md">
+            <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+              <Group gap="xs" align="center">
+                <Select
+                  label="Subject type"
+                  value={filter}
+                  onChange={(v) => setFilter(v ?? "all")}
+                  data={[
+                    "all",
+                    "project",
+                    "task",
+                    "blocker",
+                    "availability",
+                    "person",
+                  ]}
+                  maw={220}
+                />
+              </Group>
+
+              <Badge size="md" variant="light" color="teal">
+                {ledger.length} Recorded events
+              </Badge>
+            </Group>
+          </Card>
+
           <LedgerList records={ledger} data={data} onRecord={setRecord} />
-        </>
-      )}
-      {selection && (
-        <AdminDetails
-          selection={selection}
-          data={data}
-          onClose={() => setSelection(null)}
-          onProject={onProject}
-          onTask={onTask}
-          onPerson={onPerson}
-          onAction={setAction}
-          onRecord={setRecord}
-        />
-      )}
-      {action && (
-        <AdminActionDialog
-          action={action}
-          data={data}
-          actorId={actorId}
-          date={date}
-          onClose={() => setAction(null)}
-        />
+        </Stack>
       )}
       <LedgerRecordModal
         record={record}
         onClose={() => setRecord(null)}
         personName={personName}
       />
+      <Modal
+        opened={resetModalOpen}
+        onClose={() => setResetModalOpen(false)}
+        title="Reset Local Workspace"
+      >
+        <Stack gap="md">
+          <Alert color="orange" icon={<IconAlertTriangle size={16} />}>
+            This is a development and demo utility. It will wipe all local
+            changes from your browser storage and restore the initial Futurelabs
+            seed dataset.
+          </Alert>
+          <Text size="sm">
+            This operation only resets local browser storage
+            (VITE_DATA_BACKEND=local). Cloud Supabase data is never touched.
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setResetModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              loading={resetMutation.isPending}
+              onClick={async () => {
+                await resetMutation.mutateAsync();
+                setResetModalOpen(false);
+              }}
+            >
+              Reset to seed data
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </AdminTemplate>
+
   );
 }

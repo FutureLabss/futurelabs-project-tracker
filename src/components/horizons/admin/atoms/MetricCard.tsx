@@ -1,19 +1,29 @@
-import { Anchor, Card, Stack, Text } from "@mantine/core";
+import { Anchor, Card, Group, Stack, Text } from "@mantine/core";
 
 interface MetricCardProps {
   label: string;
   value: string | number;
   detail: string;
+  trendBadge?: React.ReactNode;
   onClick?: () => void;
 }
 
-export function MetricCard({ label, value, detail, onClick }: MetricCardProps) {
+export function MetricCard({
+  label,
+  value,
+  detail,
+  trendBadge,
+  onClick,
+}: MetricCardProps) {
   return (
     <Card withBorder radius="md" key={label}>
       <Stack gap={6}>
-        <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
-          {label}
-        </Text>
+        <Group justify="space-between" align="center">
+          <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+            {label}
+          </Text>
+          {trendBadge}
+        </Group>
         {onClick ? (
           <Anchor
             component="button"
@@ -36,3 +46,4 @@ export function MetricCard({ label, value, detail, onClick }: MetricCardProps) {
     </Card>
   );
 }
+

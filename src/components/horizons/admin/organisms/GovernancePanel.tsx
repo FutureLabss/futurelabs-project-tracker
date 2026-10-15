@@ -1,4 +1,18 @@
-import { Card, SimpleGrid, Stack, Title } from "@mantine/core";
+import {
+  Badge,
+  Card,
+  Group,
+  SimpleGrid,
+  Stack,
+  Text,
+  ThemeIcon,
+} from "@mantine/core";
+import {
+  IconChecklist,
+  IconClockHour4,
+  IconShieldCheck,
+  IconUserX,
+} from "@tabler/icons-react";
 import { UnmanagedProjectRow } from "../molecules/UnmanagedProjectRow";
 import { LeadCoverageCard } from "../molecules/LeadCoverageCard";
 import { TaskList } from "../AdminDetails";
@@ -34,13 +48,43 @@ export function GovernancePanel({
   onChangeView,
 }: GovernancePanelProps) {
   return (
-    <>
-      <SimpleGrid cols={{ base: 1, md: 2 }}>
-        <Card withBorder>
-          <Title order={2} size="h4">
-            Projects without a lead
-          </Title>
-          <Stack mt="md">
+    <Stack gap="md">
+      {/* Top Governance Grid: Lead Coverage & Unmanaged Projects */}
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+        <Card withBorder p="lg" radius="md">
+          <Group justify="space-between" mb="xs">
+            <Group gap="xs">
+              <ThemeIcon
+                size="md"
+                radius="md"
+                variant="light"
+                color={unmanagedProjects.length ? "orange" : "teal"}
+              >
+                {unmanagedProjects.length ? (
+                  <IconUserX size={18} />
+                ) : (
+                  <IconShieldCheck size={18} />
+                )}
+              </ThemeIcon>
+              <div>
+                <Text fw={600} size="sm">
+                  Projects without a lead
+                </Text>
+                <Text size="xs" c="dimmed">
+                  Active projects requiring a designated manager
+                </Text>
+              </div>
+            </Group>
+            <Badge
+              color={unmanagedProjects.length ? "orange" : "teal"}
+              variant="light"
+              size="sm"
+            >
+              {unmanagedProjects.length} attention
+            </Badge>
+          </Group>
+
+          <Stack gap="xs" mt="sm">
             {unmanagedProjects.map((p) => (
               <UnmanagedProjectRow
                 key={p.id}
@@ -50,28 +94,73 @@ export function GovernancePanel({
               />
             ))}
             {!unmanagedProjects.length && (
-              <EmptyState message="No unmanaged projects match this view." />
+              <EmptyState message="All active projects have designated leadership." />
             )}
           </Stack>
         </Card>
+
         <LeadCoverageCard
           activeProjectsCount={activeProjectsCount}
           managedProjectsCount={managedProjectsCount}
           onManageProjects={() => onChangeView("portfolio")}
         />
       </SimpleGrid>
-      <Card withBorder>
-        <Title order={2} size="h4" mb="md">
-          Unassigned open work
-        </Title>
+
+      {/* Unassigned Work Section */}
+      <Card withBorder p="lg" radius="md">
+        <Group justify="space-between" mb="sm">
+          <Group gap="xs">
+            <ThemeIcon size="md" radius="md" variant="light" color="blue">
+              <IconChecklist size={18} />
+            </ThemeIcon>
+            <div>
+              <Text fw={600} size="sm">
+                Unassigned open work
+              </Text>
+              <Text size="xs" c="dimmed">
+                Active tasks without an assigned contributor
+              </Text>
+            </div>
+          </Group>
+          <Badge
+            color={unassignedTasks.length ? "blue" : "gray"}
+            variant="light"
+            size="sm"
+          >
+            {unassignedTasks.length} unassigned
+          </Badge>
+        </Group>
+
         <TaskList tasks={unassignedTasks} data={data} onTask={onTask} />
       </Card>
-      <Card withBorder>
-        <Title order={2} size="h4" mb="md">
-          Deliverables awaiting review
-        </Title>
+
+      {/* Review Queue Section */}
+      <Card withBorder p="lg" radius="md">
+        <Group justify="space-between" mb="sm">
+          <Group gap="xs">
+            <ThemeIcon size="md" radius="md" variant="light" color="violet">
+              <IconClockHour4 size={18} />
+            </ThemeIcon>
+            <div>
+              <Text fw={600} size="sm">
+                Deliverables awaiting review
+              </Text>
+              <Text size="xs" c="dimmed">
+                Submitted work items pending quality inspection or acceptance
+              </Text>
+            </div>
+          </Group>
+          <Badge
+            color={submittedTasks.length ? "violet" : "gray"}
+            variant="light"
+            size="sm"
+          >
+            {submittedTasks.length} in review
+          </Badge>
+        </Group>
+
         <TaskList tasks={submittedTasks} data={data} onTask={onTask} />
       </Card>
-    </>
+    </Stack>
   );
 }

@@ -64,7 +64,6 @@ export function TaskLifecycleInspectorModal({
 
   const project = data.projects.find((p) => p.id === task.projectId);
   const assignee = data.people.find((p) => p.id === task.assigneeId);
-  const activeBlocker = data.blockers.find((b) => b.taskId === taskId && !b.clearedAt);
   const taskLedgerEvents = data.ledger.filter((l) => l.subjectId === taskId);
   const scheduleSlips = taskLedgerEvents.filter((l) => l.type === "task_redated");
 

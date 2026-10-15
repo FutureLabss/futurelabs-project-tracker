@@ -1,5 +1,10 @@
-import { Badge, Button, Group, Text, Title } from "@mantine/core";
-import { IconDownload, IconPlus, IconRefresh } from "@tabler/icons-react";
+import { Badge, Button, Group, Text, Title, Tooltip } from "@mantine/core";
+import {
+  IconAlertTriangle,
+  IconDownload,
+  IconPlus,
+  IconRefresh,
+} from "@tabler/icons-react";
 
 interface AdminPageHeaderProps {
   title: string;
@@ -9,6 +14,8 @@ interface AdminPageHeaderProps {
   onRefresh: () => void;
   onExport: () => void;
   onNewProject: () => void;
+  onResetDemo?: () => void;
+  canResetDemo?: boolean;
 }
 
 export function AdminPageHeader({
@@ -19,6 +26,8 @@ export function AdminPageHeader({
   onRefresh,
   onExport,
   onNewProject,
+  onResetDemo,
+  canResetDemo = true,
 }: AdminPageHeaderProps) {
   return (
     <Group justify="space-between" align="flex-start" mb="xl">
@@ -37,6 +46,28 @@ export function AdminPageHeader({
         </Text>
       </div>
       <Group gap="xs">
+        {onResetDemo &&
+          (canResetDemo ? (
+            <Button
+              variant="subtle"
+              color="red"
+              leftSection={<IconAlertTriangle size={16} />}
+              onClick={onResetDemo}
+            >
+              Reset demo
+            </Button>
+          ) : (
+            <Tooltip label="Demo reset is disabled for Supabase cloud to prevent data loss.">
+              <Button
+                variant="subtle"
+                color="gray"
+                disabled
+                leftSection={<IconAlertTriangle size={16} />}
+              >
+                Reset demo
+              </Button>
+            </Tooltip>
+          ))}
         <Button
           variant="default"
           leftSection={<IconRefresh size={16} />}
@@ -63,3 +94,4 @@ export function AdminPageHeader({
     </Group>
   );
 }
+

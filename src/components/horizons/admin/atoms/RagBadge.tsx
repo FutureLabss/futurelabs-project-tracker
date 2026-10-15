@@ -14,11 +14,57 @@ const colorMap: Record<RagStatus, string> = {
 
 export function RagBadge({ status, closed }: RagBadgeProps) {
   if (closed) {
-    return <Badge color="gray">Closed</Badge>;
+    return (
+      <Badge
+        variant="light"
+        color="gray"
+        radius="xl"
+        size="sm"
+        leftSection={
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              backgroundColor: "currentColor",
+              display: "inline-block",
+            }}
+          />
+        }
+      >
+        Closed
+      </Badge>
+    );
   }
+
+  const color = status ? colorMap[status] : "gray";
+  const label = status
+    ? status === "green"
+      ? "On Track"
+      : status === "amber"
+        ? "Attention"
+        : "At Risk"
+    : "Unknown";
+
   return (
-    <Badge color={status ? colorMap[status] : "gray"}>
-      {status ?? "Unknown"}
+    <Badge
+      variant="light"
+      color={color}
+      radius="xl"
+      size="sm"
+      leftSection={
+        <span
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            backgroundColor: "currentColor",
+            display: "inline-block",
+          }}
+        />
+      }
+    >
+      {label}
     </Badge>
   );
 }

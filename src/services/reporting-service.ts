@@ -7,7 +7,10 @@ import type { Availability } from "../entities/availability.entity";
 import type { LedgerRecord } from "../entities/ledger-record.entity";
 import type { ITrackerApi } from "../api/tracker-api.interface";
 
-type Backend = Pick<ITrackerApi, "getLedger" | "getDerivedSignals">;
+type Backend = Pick<
+  ITrackerApi,
+  "getLedger" | "getLedgerCount" | "getDerivedSignals"
+>;
 
 export class ReportingService {
   constructor(private readonly api: Backend) {}
@@ -39,6 +42,12 @@ export class ReportingService {
     ...args: Parameters<Backend["getLedger"]>
   ): ReturnType<Backend["getLedger"]> {
     return this.api.getLedger(...args);
+  }
+
+  getLedgerCount(
+    ...args: Parameters<Backend["getLedgerCount"]>
+  ): ReturnType<Backend["getLedgerCount"]> {
+    return this.api.getLedgerCount(...args);
   }
 
   getDerivedSignals(

@@ -19,3 +19,9 @@ export function useResetToSeed() {
     },
   });
 }
+
+export function useCanResetDemo(): boolean {
+  return demoService.supportsDemoReset();
+}
+
+

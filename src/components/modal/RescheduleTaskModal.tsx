@@ -1,4 +1,4 @@
-import { Modal, Stack, Text, TextInput, Textarea, Button, Group, Alert, Box } from "@mantine/core";
+import { Modal, Stack, Text, TextInput, Textarea, Button, Group, Alert } from "@mantine/core";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { useForm, Controller } from "react-hook-form";
 

@@ -1,6 +1,6 @@
 import type { ITrackerApi } from "../api/tracker-api.interface";
 
-type Backend = Pick<ITrackerApi, "resetToSeedData">;
+type Backend = Pick<ITrackerApi, "resetToSeedData" | "supportsDemoReset">;
 
 export class DemoService {
   constructor(private readonly api: Backend) {}
@@ -10,4 +10,9 @@ export class DemoService {
   ): ReturnType<Backend["resetToSeedData"]> {
     return this.api.resetToSeedData(...args);
   }
+
+  supportsDemoReset(): boolean {
+    return this.api.supportsDemoReset();
+  }
 }
+
