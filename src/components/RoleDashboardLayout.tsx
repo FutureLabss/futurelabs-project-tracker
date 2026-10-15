@@ -265,6 +265,7 @@ export function RoleDashboardLayout({
             personId={personId}
             personName={personName}
             memberView={memberView}
+            date={activeDate}
           />
         ) : config.role === "admin" ? (
           <AdminDashboard

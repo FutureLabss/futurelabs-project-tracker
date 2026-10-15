@@ -11,7 +11,7 @@ export type AdminView =
   | "people"
   | "ledger";
 
-export type MemberView = "my-work" | "team" | "completed";
+export type MemberView = "my-work" | "submitted" | "history";
 export type ManagerView =
   | "overview"
   | "my_work"
