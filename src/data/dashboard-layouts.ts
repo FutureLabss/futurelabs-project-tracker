@@ -10,6 +10,7 @@ import {
   IconHistory,
   IconFolder,
   IconListDetails,
+  IconTrophy,
 } from "@tabler/icons-react";
 import { DashboardLayoutConfig, UserRole } from "../types/dashboard";
 
@@ -70,6 +71,7 @@ export const roleDashboards: Record<UserRole, DashboardLayoutConfig> = {
         managerView: "risk_queue",
       },
       { label: "Change feed", icon: IconHistory, managerView: "change_feed" },
+      { label: "History", icon: IconTrophy, managerView: "history" },
     ],
     metrics: [],
     primaryActions: [

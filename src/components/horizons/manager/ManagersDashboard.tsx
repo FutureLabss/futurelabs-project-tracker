@@ -55,6 +55,7 @@ import { WorkloadPanel } from "./kilos/WorkloadPanel";
 import { DueSoonPanel } from "./kilos/DueSoonPanel";
 import { OpenBlockersPanel } from "./kilos/OpenBlockersPanel";
 import { ManagerMyWork } from "./kilos/ManagerMyWork";
+import { ManagerHistory } from "./kilos/ManagerHistory";
 
 const FORECAST_WEEKS = 4;
 
@@ -375,6 +376,18 @@ export default function ManagersDashboard({
           }
           onCreateTask={() => setIsAssignOpen(true)}
           onActionSaved={() => void invalidateManagerQueries(queryClient)}
+        />
+      )}
+
+      {view === "history" && (
+        <ManagerHistory
+          tasks={data.tasks}
+          projects={data.projects}
+          people={data.people}
+          actorId={actorId}
+          managedProjectIds={managedProjectIds}
+          date={date}
+          onTaskClick={setInspectedTaskId}
         />
       )}
 

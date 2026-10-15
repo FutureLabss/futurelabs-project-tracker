@@ -20,7 +20,8 @@ export type ManagerView =
   | "tasks"
   | "workload"
   | "risk_queue"
-  | "change_feed";
+  | "change_feed"
+  | "history";
 
 export type DashboardTone =
   "teal" | "blue" | "orange" | "red" | "violet" | "gray";
