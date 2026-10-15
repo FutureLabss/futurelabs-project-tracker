@@ -28,6 +28,8 @@ import {
 } from "@tabler/icons-react";
 import dayjs from "dayjs";
 import type { ManagerWorkspace } from "../../api/hooks/use-manager-workspace";
+import { getLeaveDaysInInterval, getWorkingDaysElapsed } from "../../domain/calculations/working-days";
+import { SYSTEM_CONFIG } from "../../domain/config/system-thresholds";
 import { RaiseBlockerModal, type RaiseBlockerFormValues } from "./RaiseBlockerModal";
 import { RescheduleTaskModal, type RescheduleTaskFormValues } from "./RescheduleTaskModal";
 
@@ -82,6 +84,20 @@ export function TaskLifecycleInspectorModal({
   const isInProgress = isAssignee && task.status === "in_progress";
   const isClosed = task.status === "accepted" || task.status === "cancelled";
   const isOverdue = !isClosed && dayjs(date).isAfter(dayjs(task.dueDate), "day");
+
+  // Aging WIP: working days since the task last entered "in progress", minus the
+  // assignee's leave, against the expected days for its complexity.
+  const inProgressSince =
+    taskLedgerEvents
+      .filter((l) => l.toValue === "in_progress")
+      .reduce<string | null>((latest, l) => (!latest || l.occurredAt > latest ? l.occurredAt : latest), null) ??
+    task.createdAt;
+  const leaveDays = task.assigneeId
+    ? getLeaveDaysInInterval(task.assigneeId, inProgressSince, date, data.availability)
+    : 0;
+  const agingDays = Math.max(0, getWorkingDaysElapsed(inProgressSince, date) - leaveDays);
+  const agingThreshold = SYSTEM_CONFIG.AGING_WIP_WORKING_DAYS[task.complexity];
+  const agingOver = agingDays > agingThreshold;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -206,7 +222,7 @@ export function TaskLifecycleInspectorModal({
                   <Text size="xs" c="dimmed">
                     {task.createdAt
                       ? dayjs(task.createdAt).format("M/D/YYYY, h:mm:ss A")
-                      : "9/30/2026, 2:05:20 PM"}
+                      : "—"}
                   </Text>
                 </SimpleGrid>
               </Stack>
@@ -280,7 +296,7 @@ export function TaskLifecycleInspectorModal({
             )}
 
             {/* 3. AGING WIP INDICATOR (Visible In Progress - Image 2) */}
-            {isInProgress && (
+            {task.status === "in_progress" && (
               <Paper withBorder p="md" radius="sm" bg="white">
                 <Group justify="space-between" mb="xs">
                   <Group gap={6}>
@@ -289,13 +305,21 @@ export function TaskLifecycleInspectorModal({
                       Aging WIP Indicator
                     </Text>
                   </Group>
-                  <Badge color="teal" variant="filled" size="xs">
-                    0 / 10 WORKING DAYS
+                  <Badge color={agingOver ? "red" : "teal"} variant="filled" size="xs">
+                    {agingDays} / {agingThreshold} WORKING DAYS
                   </Badge>
                 </Group>
-                <Progress value={5} color="teal" size="sm" radius="xs" mb="xs" />
+                <Progress
+                  value={Math.min(100, (agingDays / agingThreshold) * 100)}
+                  color={agingOver ? "red" : "teal"}
+                  size="sm"
+                  radius="xs"
+                  mb="xs"
+                />
                 <Text size="xs" c="dimmed">
-                  Complexity threshold: 10 days (HIGH complexity).
+                  In progress since {dayjs(inProgressSince).format("YYYY-MM-DD")}
+                  {leaveDays > 0 ? ` (excluding ${leaveDays} leave day${leaveDays === 1 ? "" : "s"})` : ""}.
+                  Expected at most {agingThreshold} working days for {task.complexity.toUpperCase()} complexity.
                 </Text>
               </Paper>
             )}

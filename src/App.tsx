@@ -6,11 +6,8 @@ import { demoCredentials } from "./data/admin-credentials";
 import { roleDashboards } from "./data/dashboard-layouts";
 import { Persona } from "./types/dashboard";
 
-// import ManagersDashboard from "./components/horizons/manager/ManagersDashboard";
-
 import { backendConfig } from "./lib/supabase/client";
 import { SupabaseApp } from "./app/SupabaseApp";
-
 
 export function App() {
   if (
@@ -36,27 +33,10 @@ function DemoApp() {
   }
 
   return (
-    <><RoleDashboardLayout
+    <RoleDashboardLayout
       config={roleDashboards[activePerson.role]}
       personId={activePerson.id}
-      onLogout={() => setActivePerson(null)} /></>
+      onLogout={() => setActivePerson(null)}
+    />
   );
 }
-
-
-
-
-
-
-// export function App() {
-//   const actorId = "demo-manager";
-
-//   return (
-//     <>
-//       <ManagersDashboard actorId={actorId} />
-//     </>
-//   );
-// }
-
-
-
