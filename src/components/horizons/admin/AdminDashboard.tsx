@@ -37,8 +37,15 @@ import {
   computeDateRange,
   downloadCsv,
   isOpen,
+  localDay,
   readable,
 } from "./admin-utils";
+import dayjs from "dayjs";
+import {
+  acceptanceEvents,
+  blockerCategoryReport,
+  monthlyDelivery,
+} from "../../../domain/calculations/admin-insights";
 import { MetricCard } from "./atoms/MetricCard";
 import { EmptyState } from "./atoms/EmptyState";
 import { RiskSignalCard } from "./molecules/RiskSignalCard";
@@ -118,10 +125,8 @@ export default function AdminDashboard({
   const adminActionMutation = useAdminAction();
 
   const [analyticsPreset, setAnalyticsPreset] = useState<AnalyticsPreset>("30d");
-  const defaultMonthAgo = new Date(`${date}T00:00:00`);
-  defaultMonthAgo.setDate(defaultMonthAgo.getDate() - 30);
   const [customRange, setCustomRange] = useState<DateRange>({
-    startDate: defaultMonthAgo.toISOString().slice(0, 10),
+    startDate: dayjs(date).subtract(30, "day").format("YYYY-MM-DD"),
     endDate: date,
   });
 
@@ -233,42 +238,43 @@ export default function AdminDashboard({
     currentRange: effectiveRange,
   };
 
+  // Task lists behind each analytics report, using the same rules as the figures.
+  const inPeriod = (timestamp: string) => {
+    const day = localDay(timestamp);
+    return day >= effectiveRange.startDate && day <= effectiveRange.endDate;
+  };
   const reportTaskIds = new Set(
     data.ledger
       .filter((r) => {
-        const occurred = r.occurredAt.slice(0, 10);
-        if (
-          occurred < effectiveRange.startDate ||
-          occurred > effectiveRange.endDate
-        ) {
-          return false;
-        }
-        return report === "rework"
-          ? r.type === "task_returned"
-          : r.type === "task_redated";
+        if (!inPeriod(r.occurredAt)) return false;
+        if (report === "rework") return r.type === "task_returned" || r.type === "task_reopened";
+        if (report !== "slips") return false;
+        return r.type === "task_redated" && !!r.fromValue && !!r.toValue && r.toValue > r.fromValue;
       })
       .map((r) => r.subjectId),
   );
+  if (report === "throughput")
+    for (const e of acceptanceEvents(data.tasks, data.ledger)) if (inPeriod(e.occurredAt)) reportTaskIds.add(e.taskId);
   const reportTasks = data.tasks.filter(
     (t) =>
       matches(t.title, projectName(t.projectId), personName(t.assigneeId)) &&
       (!projectFilter || t.projectId === projectFilter) &&
-      (report === "throughput"
-        ? t.status === "accepted" &&
-          !!t.acceptedAt &&
-          t.acceptedAt.slice(0, 10) >= effectiveRange.startDate &&
-          t.acceptedAt.slice(0, 10) <= effectiveRange.endDate
-        : report === "unplanned"
-          ? t.origin === "unplanned" && isOpen(t)
-          : report === "blockers"
-            ? data.blockers.some(
-                (b) =>
-                  b.taskId === t.id &&
-                  !b.clearedAt &&
-                  (filter === "all" || b.category === filter),
-              )
-            : reportTaskIds.has(t.id)),
+      (report === "unplanned"
+        ? t.origin === "unplanned" && inPeriod(t.createdAt)
+        : report === "blockers"
+          ? data.blockers.some(
+              (b) =>
+                b.taskId === t.id &&
+                inPeriod(b.raisedAt) &&
+                (filter === "all" || b.category === filter),
+            )
+          : reportTaskIds.has(t.id)),
   );
+  const analyticsTasks = projectFilter
+    ? data.tasks.filter((t) => t.projectId === projectFilter)
+    : data.tasks;
+  const monthlyRows = monthlyDelivery(analyticsTasks, data.ledger, date, 6);
+  const blockerReport = blockerCategoryReport(data.blockers, analyticsTasks, data.projects, effectiveRange);
   const exportRows = (): unknown[][] => {
     if (view === "portfolio" || view === "governance")
       return [
@@ -837,6 +843,8 @@ export default function AdminDashboard({
           <AnalyticsPanel
             data={data}
             blockerAnalytics={data.signals.blockerAnalytics}
+            blockerReport={blockerReport}
+            monthlyRows={monthlyRows}
             reportTasks={reportTasks}
             report={report}
             filter={filter}

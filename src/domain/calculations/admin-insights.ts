@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 import type { Blocker } from "../../entities/blocker.entity";
 import type { LedgerRecord } from "../../entities/ledger-record.entity";
 import type { Project } from "../../entities/project.entity";
@@ -91,4 +92,115 @@ export function inactiveProjects(
     })
     .filter((row) => row.workingDaysInactive > SYSTEM_CONFIG.STALE_INACTIVITY_WORKING_DAYS)
     .sort((a, b) => b.workingDaysInactive - a.workingDaysInactive);
+}
+
+const localDay = (timestamp: string) => dayjs(timestamp).format("YYYY-MM-DD");
+const weightOf = (task: Task | undefined) => (task ? (SYSTEM_CONFIG.COMPLEXITY_WEIGHTS[task.complexity] ?? 0) : 0);
+
+export interface MonthlyDeliveryRow {
+  month: string; // YYYY-MM
+  label: string;
+  acceptedCount: number;
+  acceptedWeight: number;
+  submissions: number;
+  reworked: number;
+  reworkPercent: number | null;
+}
+
+/**
+ * FR-56 / FR-59: accepted work and the share returned or reopened, per month,
+ * for the `months` months up to `date`. Built from change records, so work
+ * that was accepted and later reopened still counts in the month it was accepted.
+ */
+export function monthlyDelivery(
+  tasks: Task[],
+  ledger: LedgerRecord[],
+  date: string,
+  months = 6,
+): MonthlyDeliveryRow[] {
+  const taskById = new Map(tasks.map((t) => [t.id, t]));
+  const rows: MonthlyDeliveryRow[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const start = dayjs(date).startOf("month").subtract(i, "month");
+    const month = start.format("YYYY-MM");
+    const events = ledger.filter((l) => taskById.has(l.subjectId) && localDay(l.occurredAt).startsWith(month));
+    const accepted = acceptanceEvents(tasks, ledger).filter(
+      (e) => taskById.has(e.taskId) && localDay(e.occurredAt).startsWith(month),
+    );
+    const submitted = new Set(events.filter((l) => l.type === "task_submitted").map((l) => l.subjectId));
+    const reworked = new Set(
+      events
+        .filter((l) => (l.type === "task_returned" || l.type === "task_reopened") && submitted.has(l.subjectId))
+        .map((l) => l.subjectId),
+    );
+    rows.push({
+      month,
+      label: start.format("MMM YYYY"),
+      acceptedCount: accepted.length,
+      acceptedWeight: accepted.reduce((sum, e) => sum + weightOf(taskById.get(e.taskId)), 0),
+      submissions: submitted.size,
+      reworked: reworked.size,
+      reworkPercent: submitted.size ? Math.round((reworked.size / submitted.size) * 100) : null,
+    });
+  }
+  return rows;
+}
+
+export interface BlockerCategoryReport {
+  category: Blocker["category"];
+  label: string;
+  raisedInPeriod: number;
+  openNow: number;
+  /** Names of the projects whose tasks had blockers of this category raised in the period. */
+  projectNames: string[];
+}
+
+/** FR-60: blockers recorded per category in a period, and which projects each category affects. */
+export function blockerCategoryReport(
+  blockers: Blocker[],
+  tasks: Task[],
+  projects: Project[],
+  range: { startDate: string; endDate: string },
+): BlockerCategoryReport[] {
+  const projectOf = (taskId: string) => tasks.find((t) => t.id === taskId)?.projectId;
+  return (Object.keys(SYSTEM_CONFIG.CATEGORY_LABELS) as Blocker["category"][]).map((category) => {
+    const ofCategory = blockers.filter((b) => b.category === category && projectOf(b.taskId));
+    const raised = ofCategory.filter((b) => {
+      const day = localDay(b.raisedAt);
+      return day >= range.startDate && day <= range.endDate;
+    });
+    const projectIds = new Set(raised.map((b) => projectOf(b.taskId)));
+    return {
+      category,
+      label: SYSTEM_CONFIG.CATEGORY_LABELS[category],
+      raisedInPeriod: raised.length,
+      openNow: ofCategory.filter((b) => !b.clearedAt).length,
+      projectNames: projects
+        .filter((p) => projectIds.has(p.id))
+        .map((p) => p.name)
+        .sort(),
+    };
+  });
+}
+
+export interface AcceptanceEvent {
+  taskId: string;
+  occurredAt: string;
+}
+
+/**
+ * Every acceptance from the change log. Accepted tasks with no acceptance
+ * record (older data) fall back to their acceptedAt, so nothing is lost.
+ */
+export function acceptanceEvents(tasks: Task[], ledger: LedgerRecord[]): AcceptanceEvent[] {
+  const events = ledger
+    .filter((l) => l.type === "task_accepted")
+    .map((l) => ({ taskId: l.subjectId, occurredAt: l.occurredAt }));
+  const recorded = new Set(events.map((e) => e.taskId));
+  for (const task of tasks) {
+    if (task.status === "accepted" && task.acceptedAt && !recorded.has(task.id)) {
+      events.push({ taskId: task.id, occurredAt: task.acceptedAt });
+    }
+  }
+  return events;
 }

@@ -69,3 +69,45 @@ test("inactive projects use the same rule as the amber risk rating (FR-55)", () 
     assert.equal(amberForInactivity, rows.some((r) => r.project.id === p.id), `rating and list agree for ${p.id}`);
   }
 });
+
+test("monthly delivery counts acceptances and rework by month, reopened work included (FR-56/59)", () => {
+  const { monthlyDelivery } = require("../src/domain/calculations/admin-insights.ts");
+  const tasks = [
+    task("a", { complexity: "high", status: "in_progress" }), // accepted in July, reopened in August
+    task("b", { complexity: "low", status: "accepted", acceptedAt: "2026-08-20T10:00:00Z" }), // no log entry (older data)
+  ];
+  const ledger = [
+    rec("1", "a", "dev", "2026-07-10T10:00:00Z", { type: "task_submitted" }),
+    rec("2", "a", "mgr", "2026-07-11T10:00:00Z", { type: "task_accepted" }),
+    rec("3", "a", "dev", "2026-08-03T10:00:00Z", { type: "task_submitted" }),
+    rec("4", "a", "mgr", "2026-08-04T10:00:00Z", { type: "task_reopened", reason: "bug" }),
+    // Another project's task (not in `tasks`) must not be counted.
+    rec("5", "elsewhere", "mgr", "2026-07-20T10:00:00Z", { type: "task_accepted" }),
+  ];
+  const rows = monthlyDelivery(tasks, ledger, DATE, 3);
+  assert.deepEqual(rows.map((r) => r.month), ["2026-07", "2026-08", "2026-09"]);
+  assert.deepEqual([rows[0].acceptedCount, rows[0].acceptedWeight], [1, 3], "July keeps the reopened task's acceptance");
+  assert.deepEqual([rows[1].acceptedCount, rows[1].submissions, rows[1].reworked, rows[1].reworkPercent], [1, 1, 1, 100]);
+  assert.equal(rows[2].reworkPercent, null, "no submissions yet in September");
+});
+
+test("blockers by category for a period, with the projects they affect (FR-60)", () => {
+  const { blockerCategoryReport } = require("../src/domain/calculations/admin-insights.ts");
+  const projects = [
+    { id: "p1", name: "Payments" },
+    { id: "p2", name: "Mobile" },
+  ];
+  const tasks = [task("t1", { projectId: "p1" }), task("t2", { projectId: "p2" })];
+  const b = (id, taskId, category, raisedAt, clearedAt = null) => ({ id, taskId, category, description: "x", ownerId: "o", raisedAt, clearedAt, clearedBy: clearedAt ? "o" : null });
+  const blockers = [
+    b("1", "t1", "external", "2026-08-10T10:00:00Z"),
+    b("2", "t2", "external", "2026-08-12T10:00:00Z", "2026-08-13T10:00:00Z"),
+    b("3", "t2", "decision", "2026-06-01T10:00:00Z"),
+  ];
+  const report = blockerCategoryReport(blockers, tasks, projects, { startDate: "2026-08-01", endDate: "2026-08-31" });
+  const external = report.find((r) => r.category === "external");
+  assert.deepEqual([external.raisedInPeriod, external.openNow, external.projectNames], [2, 1, ["Mobile", "Payments"]]);
+  const decision = report.find((r) => r.category === "decision");
+  assert.deepEqual([decision.raisedInPeriod, decision.openNow, decision.projectNames], [0, 1, []]);
+  assert.equal(report.length, 4, "every category is listed, even with no blockers");
+});

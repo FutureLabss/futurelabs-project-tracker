@@ -34,6 +34,11 @@ import {
 import { PersonLink } from "../atoms/PersonLink";
 import { EmptyState } from "../atoms/EmptyState";
 import { BlockerCategoryCard } from "../molecules/BlockerCategoryCard";
+import { MonthlyTrendCard } from "../molecules/MonthlyTrendCard";
+import type {
+  BlockerCategoryReport,
+  MonthlyDeliveryRow,
+} from "../../../../domain/calculations/admin-insights";
 import { TaskList } from "../AdminDetails";
 import type { Task } from "../../../../entities/task.entity";
 import type { AdminWorkspace } from "../../../../api/hooks/use-admin-workspace";
@@ -47,6 +52,8 @@ import type {
 interface AnalyticsPanelProps {
   data: AdminWorkspace;
   blockerAnalytics: BlockerCategoryCount[];
+  blockerReport: BlockerCategoryReport[];
+  monthlyRows: MonthlyDeliveryRow[];
   reportTasks: Task[];
   report: string;
   filter: string;
@@ -69,6 +76,8 @@ interface AnalyticsPanelProps {
 export function AnalyticsPanel({
   data,
   blockerAnalytics,
+  blockerReport,
+  monthlyRows,
   reportTasks,
   report,
   filter,
@@ -254,7 +263,7 @@ export function AnalyticsPanel({
             </Group>
 
             <Text size="xs" c="dimmed">
-              {periodAnalytics.current.totalReturns} returns / {periodAnalytics.current.totalSubmissions} submissions
+              {periodAnalytics.current.totalReturns} returned or reopened / {periodAnalytics.current.totalSubmissions} submissions
             </Text>
 
             <Group gap={4} wrap="nowrap">
@@ -283,7 +292,7 @@ export function AnalyticsPanel({
             <Group justify="space-between" align="flex-start" wrap="nowrap">
               <Stack gap={2}>
                 <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
-                  Unplanned Capacity
+                  Unplanned Work
                 </Text>
                 <Text fz={28} fw={800} style={{ lineHeight: 1 }}>
                   {periodAnalytics.current.unplannedCapacityPercent.toFixed(1)}%
@@ -295,7 +304,7 @@ export function AnalyticsPanel({
             </Group>
 
             <Text size="xs" c="dimmed">
-              {periodAnalytics.current.unplannedAcceptedWeight} unplanned of {totalDeliveredPoints} delivered pts
+              {periodAnalytics.current.unplannedAcceptedWeight} of {totalDeliveredPoints} pts created in the period were self-assigned
             </Text>
 
             <Group gap={4} wrap="nowrap">
@@ -339,7 +348,7 @@ export function AnalyticsPanel({
             </Group>
 
             <Text size="xs" c="dimmed">
-              Rescheduled tasks in period
+              Due dates moved later in period
             </Text>
 
             <Group gap={4} wrap="nowrap">
@@ -355,6 +364,8 @@ export function AnalyticsPanel({
           </Stack>
         </Card>
       </SimpleGrid>
+
+      <MonthlyTrendCard rows={monthlyRows} />
 
       {/* Report Navigation Tabs */}
       <Tabs
@@ -377,13 +388,13 @@ export function AnalyticsPanel({
             value="rework"
             leftSection={<IconArrowBackUp size={15} />}
           >
-            Returned Work
+            Returned or Reopened
           </Tabs.Tab>
           <Tabs.Tab
             value="unplanned"
             leftSection={<IconCompass size={15} />}
           >
-            Unplanned Open Work
+            Unplanned Work
           </Tabs.Tab>
           <Tabs.Tab
             value="slips"
@@ -409,13 +420,17 @@ export function AnalyticsPanel({
       {/* Report Sub-Views */}
       {report === "blockers" && (
         <SimpleGrid cols={{ base: 1, sm: 2, xl: 4 }} spacing="md">
-          {blockerAnalytics.map((b) => (
+          {blockerReport.map((b) => (
             <BlockerCategoryCard
               key={b.category}
               category={b.category}
               label={b.label}
-              activeCount={b.activeCount}
-              avgResolutionDays={b.avgResolutionDays}
+              activeCount={b.openNow}
+              raisedInPeriod={b.raisedInPeriod}
+              projectNames={b.projectNames}
+              avgResolutionDays={
+                blockerAnalytics.find((a) => a.category === b.category)?.avgResolutionDays ?? 0
+              }
               isSelected={filter === b.category}
               onToggle={(cat) =>
                 onFilterChange(filter === cat ? "all" : cat)
