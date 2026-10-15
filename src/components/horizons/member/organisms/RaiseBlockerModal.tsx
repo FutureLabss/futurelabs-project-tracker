@@ -4,6 +4,7 @@ import { ReusableModal } from "../../../modal/ReuseableModal";
 import { useRaiseBlocker } from "../../../../api/hooks/use-blockers";
 import { usePersons } from "../../../../api/hooks/use-availability";
 import { BlockerCategory } from "../../../../entities/blocker.entity";
+import { BlockingTaskSelect } from "../molecules/BlockingTaskSelect";
 
 interface RaiseBlockerModalProps {
   opened: boolean;
@@ -23,6 +24,7 @@ export function RaiseBlockerModal({
   const [category, setCategory] = useState<BlockerCategory | null>("person");
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [description, setDescription] = useState("");
+  const [blockingTaskId, setBlockingTaskId] = useState<string | null>(null);
 
   const { data: persons = [] } = usePersons();
 
@@ -42,6 +44,7 @@ export function RaiseBlockerModal({
         category,
         ownerId,
         description,
+        blockingTaskId: blockingTaskId ?? undefined,
         actorId,
       },
       {
@@ -49,6 +52,7 @@ export function RaiseBlockerModal({
           setCategory(null);
           setOwnerId(null);
           setDescription("");
+          setBlockingTaskId(null);
           onClose();
         },
       }
@@ -102,6 +106,8 @@ export function RaiseBlockerModal({
         searchable
       />
 
+      <BlockingTaskSelect taskId={taskId} value={blockingTaskId} onChange={setBlockingTaskId} />
+
       <Textarea
         label="Blocker Description"
         placeholder="Explain what is blocked and what is needed to resume progress..."
@@ -109,6 +115,7 @@ export function RaiseBlockerModal({
         value={description}
         onChange={(e) => setDescription(e.currentTarget.value)}
         minRows={4}
+        mt="md"
       />
     </ReusableModal>
   );
