@@ -22,7 +22,12 @@ import type { TaskComplexity } from "../../../entities/task.entity";
 
 import type { ManagerView } from "../../../types/dashboard";
 import { ManagerTemplate } from "./templates/ManagerTemplate";
-import { TeamOverviewHeader } from "./kilos/TeamOverviewHeader";
+import {
+  TeamOverviewHeader,
+  type TeamOverviewMetrics,
+} from "./kilos/TeamOverviewHeader";
+import { getWorkingDaysElapsed } from "../../../domain/calculations/working-days";
+import { SYSTEM_CONFIG } from "../../../domain/config/system-thresholds";
 import { AcceptanceGate, type DeliverableRow } from "./kilos/AcceptanceGate";
 import { AuditLedger, type LedgerDisplayRow } from "./kilos/AuditLedger";
 import {
@@ -225,11 +230,21 @@ export default function ManagersDashboard({
   const dueSoonRows = notStartedDueSoon(scope.tasks, date);
   const workloadRows = openWorkByPerson(scope.tasks, data.people);
   const forecastRows = projectForecasts(scope.projects, scope.tasks, scope.ledger, date, FORECAST_WEEKS);
-  const agingWipCount =
-    data.signals?.attentionItems?.filter((i) => i.signalType === "aging_wip")
-      .length ?? 0;
-  const capacityPercent =
-    data.signals?.orgMetrics?.unplannedCapacityPercent ?? 82;
+  // Team overview cards: real figures for the manager's own projects only.
+  const waitingDays = scope.tasks
+    .filter((t) => t.status === "submitted" && t.submittedAt)
+    .map((t) => getWorkingDaysElapsed(t.submittedAt!, date));
+  const overviewMetrics: TeamOverviewMetrics = {
+    reviewQueueCount: submittedTasks.length,
+    oldestWaitingDays: waitingDays.length ? Math.max(...waitingDays) : null,
+    activeBlockersCount: activeBlockers.length,
+    agingBlockersCount: blockerRows.filter(
+      (r) => r.daysOpen > SYSTEM_CONFIG.AGING_BLOCKER_WORKING_DAYS,
+    ).length,
+    openWeight: workloadRows.reduce((sum, r) => sum + r.openWeight, 0),
+    openPeopleCount: workloadRows.filter((r) => r.personId !== null).length,
+    agingWipCount: attentionItems.filter((i) => i.signalType === "aging_wip").length,
+  };
 
   // Handlers
   const normalizeComplexity = (value: string): TaskComplexity => {
@@ -293,14 +308,9 @@ export default function ManagersDashboard({
     <ManagerTemplate>
       {/* SECTION 1: TEAM OVERVIEW (IMAGE 1) */}
       <TeamOverviewHeader
-        reviewQueueCount={submittedTasks.length}
-        activeBlockersCount={activeBlockers.length}
-        capacityPercent={capacityPercent}
-        totalMembersCount={data.people.length}
-        agingWipCount={agingWipCount}
+        metrics={view === "overview" ? overviewMetrics : undefined}
         onAssignWork={() => setIsAssignOpen(true)}
         onReviewSubmissions={() => onViewChange("review_gate")}
-        onNavigateToRisk={() => onViewChange("risk_queue")}
       />
 
       {/* SECTION 2: ACCEPTANCE GATE (IMAGE 3) */}
