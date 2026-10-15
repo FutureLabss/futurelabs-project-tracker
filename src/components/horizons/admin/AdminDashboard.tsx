@@ -98,7 +98,8 @@ export default function AdminDashboard({
   const [filters, setFilters] = useState<Partial<Record<AdminView, string>>>(
     {},
   );
-  const filter = filters[view] ?? "all";
+  // FR-51: the portfolio lists active projects unless another filter is chosen.
+  const filter = filters[view] ?? (view === "portfolio" ? "active" : "all");
   const setFilter = (value: string) =>
     setFilters((current) => ({ ...current, [view]: value }));
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
@@ -158,16 +159,27 @@ export default function AdminDashboard({
     data.projects.find((p) => p.id === id)?.name ?? "Unknown project";
   const activeProjects = data.projects.filter((p) => p.state === "active");
   const metrics = data.signals.orgMetrics;
-  const projects = data.projects.filter(
-    (p) =>
-      matches(p.name, p.goal, personName(p.managerId)) &&
-      (filter === "all" ||
-        filter === p.state ||
-        (filter === "unmanaged" && !p.managerId && p.state === "active") ||
-        filter ===
-          data.signals.projectSummaries.find((s) => s.projectId === p.id)
-            ?.ragStatus),
-  );
+  const summaryOf = (projectId: string) =>
+    data.signals.projectSummaries.find((s) => s.projectId === projectId);
+  // FR-52: most at risk first (red, amber, green, then closed), then the
+  // project with more reasons, then the nearest target date.
+  const riskRank = (p: (typeof data.projects)[number]) =>
+    p.state === "closed" ? 3 : { red: 0, amber: 1, green: 2 }[summaryOf(p.id)?.ragStatus ?? "green"];
+  const projects = data.projects
+    .filter(
+      (p) =>
+        matches(p.name, p.goal, personName(p.managerId)) &&
+        (filter === "all" ||
+          filter === p.state ||
+          (filter === "unmanaged" && !p.managerId && p.state === "active") ||
+          (p.state === "active" && filter === summaryOf(p.id)?.ragStatus)),
+    )
+    .sort(
+      (a, b) =>
+        riskRank(a) - riskRank(b) ||
+        (riskRank(a) < 2 ? (summaryOf(b.id)?.ragReasons.length ?? 0) - (summaryOf(a.id)?.ragReasons.length ?? 0) : 0) ||
+        a.targetDate.localeCompare(b.targetDate),
+    );
   const tasks = data.tasks.filter(
     (t) =>
       matches(

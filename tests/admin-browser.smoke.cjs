@@ -284,6 +284,8 @@ const fs = require("node:fs");
     );
     await page.reload();
     await login();
+    // The portfolio lists active projects by default (FR-51); this one is closed.
+    await page.getByText(/^Closed \(\d+\)$/).click();
     await page
       .getByRole("button", { name: "Browser delivery project", exact: true })
       .waitFor();
