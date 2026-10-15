@@ -17,8 +17,9 @@ export interface TeamOverviewMetrics {
 interface TeamOverviewHeaderProps {
   /** Summary cards are shown on the Team overview only. */
   metrics?: TeamOverviewMetrics;
-  onAssignWork: () => void;
-  onReviewSubmissions: () => void;
+  /** Each button only renders when its handler is given for the current tab. */
+  onAssignWork?: () => void;
+  onReviewSubmissions?: () => void;
 }
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
@@ -39,20 +40,24 @@ export function TeamOverviewHeader({ metrics, onAssignWork, onReviewSubmissions 
           </Text>
         </Box>
         <Group>
-          <Button
-            leftSection={<IconChecklist size={16} />}
-            color="teal"
-            onClick={onReviewSubmissions}
-          >
-            Review submissions
-          </Button>
-          <Button
-            leftSection={<IconUserPlus size={16} />}
-            color="teal"
-            onClick={onAssignWork}
-          >
-            Assign work
-          </Button>
+          {onReviewSubmissions && (
+            <Button
+              leftSection={<IconChecklist size={16} />}
+              color="teal"
+              onClick={onReviewSubmissions}
+            >
+              Review submissions
+            </Button>
+          )}
+          {onAssignWork && (
+            <Button
+              leftSection={<IconUserPlus size={16} />}
+              color="teal"
+              onClick={onAssignWork}
+            >
+              Assign work
+            </Button>
+          )}
         </Group>
       </Group>
 

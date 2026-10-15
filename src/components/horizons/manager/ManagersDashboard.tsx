@@ -309,8 +309,14 @@ export default function ManagersDashboard({
       {/* SECTION 1: TEAM OVERVIEW (IMAGE 1) */}
       <TeamOverviewHeader
         metrics={view === "overview" ? overviewMetrics : undefined}
-        onAssignWork={() => setIsAssignOpen(true)}
-        onReviewSubmissions={() => onViewChange("review_gate")}
+        onAssignWork={
+          view === "overview" || view === "tasks" || view === "projects"
+            ? () => setIsAssignOpen(true)
+            : undefined
+        }
+        onReviewSubmissions={
+          view === "overview" ? () => onViewChange("review_gate") : undefined
+        }
       />
 
       {/* SECTION 2: ACCEPTANCE GATE (IMAGE 3) */}
