@@ -1,5 +1,5 @@
 import { Select } from '@mantine/core';
-import { useTaskById, useTasks } from '../../../../api/hooks/use-tasks';
+import { useProjectTaskTitles, useTaskById } from '../../../../api/hooks/use-tasks';
 
 interface BlockingTaskSelectProps {
   taskId: string;
@@ -9,25 +9,16 @@ interface BlockingTaskSelectProps {
 
 /**
  * FR-10: optionally record another task as the cause of a blocker.
- * Lists open tasks in the same project by title only.
+ * Lists open tasks in the same project by title only, so members still never
+ * see teammates' task details (FR-19).
  */
 export function BlockingTaskSelect({ taskId, value, onChange }: BlockingTaskSelectProps) {
   const { data: task } = useTaskById(taskId);
-  const { data: projectTasks = [] } = useTasks(
-    task ? { projectId: task.projectId } : undefined,
-  );
+  const { data: titles = [] } = useProjectTaskTitles(task?.projectId);
 
-  const options = task
-    ? projectTasks
-        .filter(
-          (t) =>
-            t.projectId === task.projectId &&
-            t.id !== taskId &&
-            t.status !== 'accepted' &&
-            t.status !== 'cancelled',
-        )
-        .map((t) => ({ value: t.id, label: t.title }))
-    : [];
+  const options = titles
+    .filter((t) => t.id !== taskId)
+    .map((t) => ({ value: t.id, label: t.title }));
 
   return (
     <Select

@@ -182,6 +182,11 @@ export class SupabaseTrackerApi implements ITrackerApi {
     if (error) throw new Error(error.message);
     return data ? mapTask(data) : null;
   }
+  async getProjectTaskTitles(projectId: string) {
+    const { data, error } = await this.client.rpc("tracker_project_task_titles", { project: projectId });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) => ({ id: row.id, title: row.title }));
+  }
   async createTask(dto: Parameters<ITrackerApi["createTask"]>[0]) {
     return mapTask(
       await this.mutate<TaskRow>("create_task", {

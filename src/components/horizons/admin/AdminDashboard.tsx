@@ -34,6 +34,7 @@ import {
   type AnalyticsPreset,
   type DateRange,
   calculatePeriodAnalytics,
+  calculatePeriodMetrics,
   computeDateRange,
   downloadCsv,
   isOpen,
@@ -165,7 +166,6 @@ export default function AdminDashboard({
   const projectName = (id: string) =>
     data.projects.find((p) => p.id === id)?.name ?? "Unknown project";
   const activeProjects = data.projects.filter((p) => p.state === "active");
-  const metrics = data.signals.orgMetrics;
   const summaryOf = (projectId: string) =>
     data.signals.projectSummaries.find((s) => s.projectId === projectId);
   // FR-52: most at risk first (red, amber, green, then closed), then the
@@ -233,6 +233,9 @@ export default function AdminDashboard({
   );
 
   const effectiveRange = computeDateRange(analyticsPreset, date, customRange);
+  // Same source as Analytics: acceptances from the change log, so reopened work still counts.
+  const last30 = calculatePeriodMetrics(data, computeDateRange("30d", date));
+  const acceptedLast30 = { count: last30.acceptedCount, weight: last30.acceptedWeight };
   const periodAnalytics = {
     ...calculatePeriodAnalytics(data, effectiveRange, projectFilter),
     currentRange: effectiveRange,
@@ -528,8 +531,8 @@ export default function AdminDashboard({
           />
           <MetricCard
             label="Accepted in 30 days"
-            value={metrics.acceptedThroughput30d}
-            detail={`${metrics.acceptedWeight30d} complexity points`}
+            value={acceptedLast30.count}
+            detail={`${acceptedLast30.weight} complexity points`}
           />
           <MetricCard
             label="Review queue"

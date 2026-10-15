@@ -27,7 +27,7 @@ import {
 } from '../../../Table/ReusableTable';
 
 import type { PersonalTask } from '../../../../types/memberpersonaltasks';
-import { useSubmitTask, useTasks, useUpdateTaskStatus } from '../../../../api/hooks/use-tasks';
+import { useTasks, useUpdateTaskStatus } from '../../../../api/hooks/use-tasks';
 import { useProjects } from '../../../../api/hooks/use-projects';
 import { useClearBlocker } from '../../../../api/hooks/use-blockers';
 import { RaiseBlockerModal } from './RaiseBlockerModal';
@@ -37,12 +37,16 @@ import { TaskDiagnosticDrawer } from '../../../detail-views/TaskDiagnosticDrawer
 
 interface personTaskTableProps {
   personId:string;
+  /** Dashboard (time machine) date for the task panel. */
+  date?: string;
   getFlags: (task: Task) => MemberTaskFlags;
   onProjectClick?: (projectId: string) => void;
+  /** Opens the submission dialog (deliverable link and notes) for a task. */
+  onSubmitTask: (task: { id: string; title: string }) => void;
 }
 
 
-export function PersonalTasksTable({personId, getFlags, onProjectClick}:personTaskTableProps) {
+export function PersonalTasksTable({personId, date, getFlags, onProjectClick, onSubmitTask}:personTaskTableProps) {
   const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null);
 
   const clickableCell = (taskId: string | number, children: React.ReactNode) => (
@@ -249,7 +253,6 @@ const handleStart = (taskId: string) => {
       status: 'in_progress',
       actorId: personId,
     });
-    console.log(`Start working button clicked for task: ${taskId}`);
 
 }
 
@@ -260,27 +263,19 @@ const handleResume = (taskId: string) => {
         blockerId: task.activeBlockerId,
         actorId: personId,
       });
-      console.log(`Blocker cleared and task resumed: ${taskId}`);
     } else {
       updateTaskStatus({
         taskId,
         status: 'in_progress',
         actorId: personId,
       });
-      console.log(`Resume button clicked for task: ${taskId}`);
     }
 }
 
-const{ mutate: submitTask } = useSubmitTask();
+// FR-14: submitting always goes through the dialog (deliverable link and notes).
 const handleSubmit = (taskId: string) => {
-  submitTask({
-    taskId,
-    actorId: personId,
-    notes:'task completed successfully',
-    deliverableUrl:''
-  });
-
-  console.log(`Submit button clicked for task: ${taskId}`);
+  const task = tasks.find((t) => t.id === taskId);
+  if (task) onSubmitTask({ id: task.id, title: task.title });
 }
   const {data: tasks = [], isLoading, error} = useTasks({
     assigneeId: personId,
@@ -422,6 +417,7 @@ const handleSubmit = (taskId: string) => {
         />
       )}
       <TaskDiagnosticDrawer
+        date={date}
         opened={!!drawerTaskId}
         onClose={() => setDrawerTaskId(null)}
         taskId={drawerTaskId}

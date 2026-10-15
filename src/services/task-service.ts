@@ -5,6 +5,7 @@ type Backend = Pick<
   | "getTasks"
   | "getTasksCount"
   | "getTaskById"
+  | "getProjectTaskTitles"
   | "createTask"
   | "assignTask"
   | "updateTaskStatus"
@@ -35,6 +36,12 @@ export class TaskService {
     ...args: Parameters<Backend["getTaskById"]>
   ): ReturnType<Backend["getTaskById"]> {
     return this.api.getTaskById(...args);
+  }
+
+  getProjectTaskTitles(
+    ...args: Parameters<Backend["getProjectTaskTitles"]>
+  ): ReturnType<Backend["getProjectTaskTitles"]> {
+    return this.api.getProjectTaskTitles(...args);
   }
 
   createTask(

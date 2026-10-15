@@ -145,8 +145,56 @@ test("manager workflows in the database: create/close project, complexity, reope
       0,
       "other managers cannot read it",
     );
-    const memberTask = await mutate("create_task", memberTaskInput);
+    const memberTask = await mutate("create_task", { ...memberTaskInput, origin: "unplanned" });
     assert.equal(memberTask.assignee_id, member);
+    // SR-04: the database decides the origin, whatever the client sends.
+    assert.equal(memberTask.origin, "planned", "a manager assigning someone else is planned work");
+    const ownTask = await mutate(
+      "create_task",
+      { ...memberTaskInput, title: "Member's own task", origin: "planned" },
+      member,
+    );
+    assert.equal(ownTask.origin, "unplanned", "self-assigned work is unplanned");
+    await assert.rejects(
+      mutate("create_task", { ...memberTaskInput, assignee_id: null, title: "No owner" }, member),
+      /not permitted/,
+      "members only create work for themselves",
+    );
+
+    // FR-12 / FR-13: the assignee reschedules their own work, with a reason.
+    await assert.rejects(
+      mutate("reschedule_task", { task_id: ownTask.id, due_date: "2026-10-05" }, member),
+      /reason is required/,
+    );
+    const moved = await mutate(
+      "reschedule_task",
+      { task_id: ownTask.id, due_date: "2026-10-05", reason: "Waiting on design" },
+      member,
+    );
+    assert.equal(moved.due_date, "2026-10-05");
+    assert.deepEqual(await ledger(ownTask.id, "task_redated"), [
+      { actor_id: member, from_value: "2026-10-01", to_value: "2026-10-05", reason: "Waiting on design" },
+    ]);
+    await assert.rejects(
+      mutate("reschedule_task", { task_id: task.id, due_date: "2026-10-09", reason: "x" }, member),
+      /project manager|another member/,
+      "members cannot move other people's dates",
+    );
+
+    // FR-19: members read only their own tasks; the project's manager reads them all.
+    const visible = async (id) =>
+      (await readAs(id, "select id from tasks where project_id=$1 order by id", [project.id])).map((r) => r.id).sort();
+    assert.deepEqual(await visible(member), [memberTask.id, ownTask.id].sort());
+    assert.deepEqual(await visible(manager), [task.id, memberTask.id, ownTask.id].sort());
+    assert.deepEqual(await visible(otherManager), []);
+    // FR-10: open task titles in the project stay pickable as a blocker's cause.
+    const titles = await readAs(member, "select title from public.tracker_project_task_titles($1)", [project.id]);
+    assert.deepEqual(titles.map((r) => r.title).sort(), ["Build the thing", "Member work", "Member's own task"].sort());
+    assert.equal(
+      (await readAs(otherManager, "select 1 from public.tracker_project_task_titles($1)", [project.id])).length,
+      0,
+      "no titles from projects you cannot access",
+    );
     await assert.rejects(manage("set_project_member", { ...access, included: false }), /Reassign open tasks/);
 
     // FR-26: complexity change is audited and limited to the project's manager.
@@ -193,6 +241,7 @@ test("manager workflows in the database: create/close project, complexity, reope
     await assert.rejects(manage("close_project", { project_id: project.id }), /open tasks/);
     await mutate("update_task_status", { task_id: task.id, status: "cancelled" });
     await mutate("update_task_status", { task_id: memberTask.id, status: "cancelled" });
+    await mutate("update_task_status", { task_id: ownTask.id, status: "cancelled" });
     await manage("set_project_member", { ...access, included: false });
     assert.equal((await ledger(project.id, "project_member_removed")).length, 1);
     await assert.rejects(manage("close_project", { project_id: project.id }, otherManager), /project's manager/);
@@ -261,4 +310,30 @@ test("manager workflows in the local demo adapter mirror the database rules", as
   const closed = await projectService.closeManagedProject(project.id, "p-david");
   assert.equal(closed.state, "closed");
   await assert.rejects(projectService.closeManagedProject(project.id, "p-david"), /active project/);
+});
+
+test("member rules in the local demo adapter: own tasks, origin, reschedule (FR-05/12, SR-04)", async () => {
+  const { MockLocalStorageApi } = require("../src/api/mock/local-storage-adapter.ts");
+  const { createTrackerServices } = require("../src/services/create-tracker-services.ts");
+  const { createTrackerTestValues } = require("./fixtures/tracker-storage.ts");
+  const values = createTrackerTestValues();
+  const { taskService } = createTrackerServices(
+    new MockLocalStorageApi({ getItem: (k) => values.get(k) ?? null, setItem: (k, v) => values.set(k, v) }),
+  );
+  const base = { projectId: "proj-iam", title: "Mine", description: "", complexity: "low", dueDate: "2026-09-20" };
+
+  const own = await taskService.createTask({ ...base, assigneeId: "p-alex", origin: "planned", actorId: "p-alex" });
+  assert.equal(own.origin, "unplanned", "self-assigned is unplanned whatever the client sends");
+  const assigned = await taskService.createTask({ ...base, assigneeId: "p-alex", origin: "unplanned", actorId: "p-david" });
+  assert.equal(assigned.origin, "planned", "assigned by the manager is planned");
+  await assert.rejects(
+    taskService.createTask({ ...base, assigneeId: "p-maya", origin: "unplanned", actorId: "p-alex" }),
+    /not permitted/,
+  );
+
+  const moved = await taskService.rescheduleTask(own.id, "2026-09-25", "Waiting on design", "p-alex");
+  assert.equal(moved.dueDate, "2026-09-25");
+  await assert.rejects(taskService.rescheduleTask(own.id, "2026-09-26", "x", "p-maya"), /project manager/);
+  const titles = await taskService.getProjectTaskTitles("proj-iam");
+  assert.ok(titles.some((t) => t.title === "Mine") && titles.every((t) => Object.keys(t).length === 2));
 });

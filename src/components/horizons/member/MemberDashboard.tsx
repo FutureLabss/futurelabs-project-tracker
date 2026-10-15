@@ -256,8 +256,12 @@ export default function MemberDashboard({
               ) : (
                 <PersonalTasksTable
                   personId={personId}
+                  date={date}
                   getFlags={getFlags}
                   onProjectClick={setActiveProjectId}
+                  onSubmitTask={(task) =>
+                    setMemberAction({ kind: 'submit', taskId: task.id, taskTitle: task.title })
+                  }
                 />
               )}
             </Stack>
@@ -316,6 +320,7 @@ export default function MemberDashboard({
         onClose={() => setMemberAction(null)}
       />
       <TaskDiagnosticDrawer
+        date={date}
         opened={!!drawerTaskId}
         onClose={() => setDrawerTaskId(null)}
         taskId={drawerTaskId}
