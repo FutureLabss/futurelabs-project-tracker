@@ -114,15 +114,25 @@ const fs = require("node:fs");
     await dialog("Browser delivery project")
       .getByRole("button", { name: "Browser verified task", exact: true })
       .click();
-    await dialog("Browser verified task")
-      .getByRole("button", { name: "Start work", exact: true })
-      .click();
-    await confirm("Start task");
+    // Starting, submitting and raising blockers are the assignee's own actions.
+    for (const name of ["Start work", "Submit deliverable", "Raise blocker"]) {
+      assert.equal(
+        await dialog("Browser verified task")
+          .getByRole("button", { name, exact: true })
+          .count(),
+        0,
+        `Admin must not see "${name}" on another person's task`,
+      );
+    }
     await dialog("Browser verified task")
       .getByRole("button", { name: "Assign owner", exact: true })
       .click();
     await choose(dialog("Assign task"), "Task owner", "Sarah Connor (admin)");
     await confirm("Assign task");
+    await dialog("Browser verified task")
+      .getByRole("button", { name: "Start work", exact: true })
+      .click();
+    await confirm("Start task");
     await dialog("Browser verified task")
       .getByRole("button", { name: "Raise blocker", exact: true })
       .click();

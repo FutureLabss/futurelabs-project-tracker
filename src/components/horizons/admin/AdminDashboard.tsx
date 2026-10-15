@@ -569,6 +569,7 @@ export default function AdminDashboard({
             onPerson={onPerson}
             onAction={setAction}
             onRecord={setRecord}
+            actorId={actorId}
           />
         )
       }
@@ -673,6 +674,7 @@ export default function AdminDashboard({
               projects={data.projects}
               people={data.people}
               onTaskClick={onTask}
+              canDoMemberActions={(task) => task.assigneeId === actorId}
               onTaskStatusChange={async (taskId, targetStatus) => {
                 await adminActionMutation.mutateAsync(() =>
                   taskService.updateTaskStatus(taskId, targetStatus, actorId),

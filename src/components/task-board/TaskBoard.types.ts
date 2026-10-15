@@ -55,6 +55,11 @@ export interface TaskBoardProps {
   onCreateTask?: (initialStatus?: TaskStatus) => void;
   canDragTask?: (task: Task) => boolean;
   canDropTask?: (task: Task, targetStatus: TaskStatus) => boolean;
+  /**
+   * Whether the viewer may do the assignee's part on a task (start, submit,
+   * raise a blocker). Omit to allow everywhere; admins pass "own tasks only".
+   */
+  canDoMemberActions?: (task: Task) => boolean;
   readOnly?: boolean;
   emptyPlaceholder?: ReactNode;
   headerRightContent?: ReactNode;

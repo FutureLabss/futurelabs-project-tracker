@@ -32,6 +32,7 @@ interface TaskBoardColumnProps {
   people?: TaskBoardPerson[];
   isDraggableColumn?: boolean;
   canDragTask?: (task: Task) => boolean;
+  canDoMemberActions?: (task: Task) => boolean;
   readOnly?: boolean;
   onTaskClick?: (taskId: string) => void;
   onTaskStatusChange?: (
@@ -62,6 +63,7 @@ export function TaskBoardColumn({
   people,
   isDraggableColumn = true,
   canDragTask,
+  canDoMemberActions,
   readOnly = false,
   onTaskClick,
   onTaskStatusChange,
@@ -269,6 +271,7 @@ export function TaskBoardColumn({
             project={projectMap.get(task.projectId)}
             assignee={task.assigneeId ? peopleMap.get(task.assigneeId) : undefined}
             isDraggable={!readOnly && (!canDragTask || canDragTask(task))}
+            memberActionsAllowed={!canDoMemberActions || canDoMemberActions(task)}
             onTaskClick={onTaskClick}
             onStatusChange={(targetStatus) =>
               onTaskStatusChange?.(task.id, targetStatus, task)

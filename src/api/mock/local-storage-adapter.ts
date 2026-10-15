@@ -430,6 +430,12 @@ export class MockLocalStorageApi implements ITrackerApi {
     return tasks[index];
   }
 
+  /** Mirrors the database: only the assignee starts, submits or blocks their own work. */
+  private requireAssignee(task: Task, actorId: string) {
+    if (task.assigneeId !== actorId)
+      throw new Error("Only the task's assignee can start it, submit it or raise a blocker on it.");
+  }
+
   async updateTaskStatus(
     taskId: string,
     status: TaskStatus,
@@ -439,6 +445,7 @@ export class MockLocalStorageApi implements ITrackerApi {
     const tasks = this.getCollection<Task>(STORAGE_KEYS.TASKS);
     const index = tasks.findIndex((t) => t.id === taskId);
     if (index === -1) throw new Error(`Task ${taskId} not found`);
+    if (status === "not_started" || status === "in_progress") this.requireAssignee(tasks[index], actorId);
 
     const oldStatus = tasks[index].status;
     tasks[index].status = status;
@@ -528,6 +535,7 @@ export class MockLocalStorageApi implements ITrackerApi {
     const tasks = this.getCollection<Task>(STORAGE_KEYS.TASKS);
     const index = tasks.findIndex((t) => t.id === taskId);
     if (index === -1) throw new Error(`Task ${taskId} not found`);
+    this.requireAssignee(tasks[index], actorId);
 
     const oldStatus = tasks[index].status;
     tasks[index].status = "submitted";
@@ -749,6 +757,9 @@ export class MockLocalStorageApi implements ITrackerApi {
 
   async raiseBlocker(dto: RaiseBlockerDto): Promise<Blocker> {
     await this.delay();
+    const blockedTask = this.getCollection<Task>(STORAGE_KEYS.TASKS).find((t) => t.id === dto.taskId);
+    if (!blockedTask) throw new Error(`Task ${dto.taskId} not found`);
+    this.requireAssignee(blockedTask, dto.actorId);
     const blockers = this.getCollection<Blocker>(STORAGE_KEYS.BLOCKERS);
     const newBlocker: Blocker = {
       id: `blocker-${crypto.randomUUID()}`,

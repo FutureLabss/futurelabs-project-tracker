@@ -229,6 +229,10 @@ test("manager workflows in the local demo adapter mirror the database rules", as
   await assert.rejects(taskService.changeTaskComplexity("task-1", "high", "p-david"), /already has this complexity/);
 
   await assert.rejects(taskService.reopenTask("task-1", "p-david", "Bug"), /Only accepted work/);
+  // Only the assignee (p-alex) starts, submits or blocks their own work.
+  await assert.rejects(taskService.submitTask("task-1", "p-sarah", "Admin"), /Only the task's assignee/);
+  await assert.rejects(taskService.submitTask("task-1", "p-david", "Manager"), /Only the task's assignee/);
+  await assert.rejects(taskService.updateTaskStatus("task-1", "in_progress", "p-sarah"), /Only the task's assignee/);
   await taskService.submitTask("task-1", "p-alex", "Done");
   await taskService.acceptTask("task-1", "p-david");
   await assert.rejects(taskService.reopenTask("task-1", "p-david", "  "), /reason is required/);
