@@ -7,9 +7,11 @@ import {
 } from "../../../api/hooks/use-manager-workspace";
 import { useAssignTask, useCreateTask } from "../../../api/hooks/use-tasks";
 import {
+  invalidateManagerQueries,
   useManagerAcceptTask,
   useManagerReturnTask,
 } from "../../../api/hooks/use-manager-actions";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   notStartedDueSoon,
   openBlockersByAge,
@@ -52,6 +54,7 @@ import { ManagedTasksTable } from "./kilos/ManagedTasksTable";
 import { WorkloadPanel } from "./kilos/WorkloadPanel";
 import { DueSoonPanel } from "./kilos/DueSoonPanel";
 import { OpenBlockersPanel } from "./kilos/OpenBlockersPanel";
+import { ManagerMyWork } from "./kilos/ManagerMyWork";
 
 const FORECAST_WEEKS = 4;
 
@@ -72,6 +75,7 @@ export default function ManagersDashboard({
   const [inspectedTaskId, setInspectedTaskId] = useState<string | null>(null);
   const query = useManagerWorkspace(date);
   const executeAction = useManagerAction();
+  const queryClient = useQueryClient();
   const createTaskMutation = useCreateTask();
   const assignTaskMutation = useAssignTask();
   const acceptTaskMutation = useManagerAcceptTask();
@@ -111,7 +115,7 @@ export default function ManagersDashboard({
         ownerId: values.resolverId,
         description: values.description,
       });
-      await taskService.updateTaskStatus(taskId, "blocked", actorId);
+      // raiseBlocker already moves the task to blocked in both backends.
     });
   };
 
@@ -359,6 +363,21 @@ export default function ManagersDashboard({
         />
       )}
 
+      {view === "my_work" && (
+        <ManagerMyWork
+          tasks={data.tasks}
+          projects={data.projects}
+          people={data.people}
+          actorId={actorId}
+          onTaskClick={setInspectedTaskId}
+          onStatusChange={(taskId, status) =>
+            executeAction.mutateAsync(() => taskService.updateTaskStatus(taskId, status, actorId)).then(() => undefined)
+          }
+          onCreateTask={() => setIsAssignOpen(true)}
+          onActionSaved={() => void invalidateManagerQueries(queryClient)}
+        />
+      )}
+
       {view === "workload" && <WorkloadPanel rows={workloadRows} />}
 
       {/* SECTION 1.2: AUDIT LEDGER (IMAGE 2) */}
@@ -401,6 +420,8 @@ export default function ManagersDashboard({
         onRaiseBlocker={handleRaiseBlocker}
         onReschedule={handleReschedule}
         loading={executeAction.isPending}
+        actorId={actorId}
+        date={date}
         renderManagerControls={(task) => (
           <ManagerTaskControls
             task={task}

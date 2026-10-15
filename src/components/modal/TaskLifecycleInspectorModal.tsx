@@ -41,6 +41,10 @@ interface TaskLifecycleInspectorModalProps {
   onRaiseBlocker: (taskId: string, values: RaiseBlockerFormValues) => Promise<void>;
   onReschedule: (taskId: string, values: RescheduleTaskFormValues) => Promise<void>;
   loading?: boolean;
+  /** The signed-in person: member actions (start, submit, raise blocker) only apply to their own tasks. */
+  actorId: string;
+  /** The dashboard date (time machine), used for the overdue badge. */
+  date: string;
   /** Manager-only controls (reassign, complexity, cancel, reopen) for the given task. */
   renderManagerControls?: (task: ManagerWorkspace["tasks"][number]) => ReactNode;
 }
@@ -55,6 +59,8 @@ export function TaskLifecycleInspectorModal({
   onRaiseBlocker,
   onReschedule,
   loading = false,
+  actorId,
+  date,
   renderManagerControls,
 }: TaskLifecycleInspectorModalProps) {
   const [raiseBlockerOpen, setRaiseBlockerOpen] = useState(false);
@@ -70,9 +76,12 @@ export function TaskLifecycleInspectorModal({
   const taskLedgerEvents = data.ledger.filter((l) => l.subjectId === taskId);
   const scheduleSlips = taskLedgerEvents.filter((l) => l.type === "task_redated");
 
-  const isNotStarted = task.status === "not_started";
-  const isInProgress = task.status === "in_progress";
-  const isOverdue = dayjs().isAfter(dayjs(task.dueDate), "day");
+  // A manager is a member for tasks assigned to them, and only for those.
+  const isAssignee = task.assigneeId === actorId;
+  const isNotStarted = isAssignee && task.status === "not_started";
+  const isInProgress = isAssignee && task.status === "in_progress";
+  const isClosed = task.status === "accepted" || task.status === "cancelled";
+  const isOverdue = !isClosed && dayjs(date).isAfter(dayjs(task.dueDate), "day");
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -247,15 +256,17 @@ export function TaskLifecycleInspectorModal({
                 )}
 
                 {/* Reschedule Button (Image 1 & Image 2) */}
-                <Button
-                  variant="outline"
-                  color="orange"
-                  size="sm"
-                  leftSection={<IconCalendarEvent size={16} />}
-                  onClick={() => setRescheduleOpen(true)}
-                >
-                  Reschedule Due Date...
-                </Button>
+                {!isClosed && (
+                  <Button
+                    variant="outline"
+                    color="orange"
+                    size="sm"
+                    leftSection={<IconCalendarEvent size={16} />}
+                    onClick={() => setRescheduleOpen(true)}
+                  >
+                    Reschedule Due Date...
+                  </Button>
+                )}
               </Group>
             </Box>
 

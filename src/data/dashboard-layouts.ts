@@ -55,6 +55,7 @@ export const roleDashboards: Record<UserRole, DashboardLayoutConfig> = {
         managerView: "overview",
         active: true,
       },
+      { label: "My Work", icon: IconUser, managerView: "my_work" },
       {
         label: "Review gate",
         icon: IconClipboardCheck,

@@ -14,6 +14,7 @@ export type AdminView =
 export type MemberView = "my-work" | "team" | "completed";
 export type ManagerView =
   | "overview"
+  | "my_work"
   | "review_gate"
   | "projects"
   | "tasks"
