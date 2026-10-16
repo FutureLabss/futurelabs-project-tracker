@@ -21,6 +21,8 @@ export type LedgerChangeType =
   | "task_accepted"
   | "task_returned"
   | "task_cancelled"
+  | "task_reopened"
+  | "complexity_changed"
   | "leave_recorded"
   | "person_created"
   | "profile_updated"

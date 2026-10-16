@@ -114,31 +114,28 @@ const fs = require("node:fs");
     await dialog("Browser delivery project")
       .getByRole("button", { name: "Browser verified task", exact: true })
       .click();
+    // Starting, submitting and raising blockers are the assignee's own actions.
+    for (const name of ["Start work", "Submit deliverable", "Raise blocker"]) {
+      assert.equal(
+        await dialog("Browser verified task")
+          .getByRole("button", { name, exact: true })
+          .count(),
+        0,
+        `Admin must not see "${name}" on another person's task`,
+      );
+    }
+    // Administrators are never task owners: they oversee, the manager does the work.
     await dialog("Browser verified task")
-      .getByRole("button", { name: "Start work", exact: true })
+      .getByRole("button", { name: "Reassign owner", exact: true })
       .click();
-    await confirm("Start task");
-    await dialog("Browser verified task")
-      .getByRole("button", { name: "Assign owner", exact: true })
-      .click();
-    await choose(dialog("Assign task"), "Task owner", "Sarah Connor (admin)");
-    await confirm("Assign task");
-    await dialog("Browser verified task")
-      .getByRole("button", { name: "Raise blocker", exact: true })
-      .click();
-    await dialog("Raise blocker")
-      .getByLabel("What is blocking delivery?")
-      .fill("Waiting for provider");
-    await choose(
-      dialog("Raise blocker"),
-      "Responsible person",
-      "Alex Chen (member)",
+    await dialog("Reassign task").getByLabel("Task owner").click();
+    assert.equal(
+      await page.getByRole("option", { name: "Sarah Connor (admin)", exact: true }).count(),
+      0,
+      "Admins must not be offered as task owners",
     );
-    await confirm("Raise blocker");
-    await dialog("Browser verified task")
-      .getByRole("button", { name: "Resolve blocker", exact: true })
-      .click();
-    await confirm("Resolve blocker");
+    await page.getByRole("option", { name: "David Kim (manager)", exact: true }).click();
+    await confirm("Reassign task");
     await dialog("Browser verified task")
       .getByRole("button", { name: "Reschedule", exact: true })
       .click();
@@ -149,19 +146,60 @@ const fs = require("node:fs");
       .getByLabel("Reason for rescheduling")
       .fill("Provider delay");
     await confirm("Reschedule task");
-    const submit = async () => {
-      await dialog("Browser verified task")
-        .getByRole("button", { name: "Submit deliverable", exact: true })
-        .click();
-      await dialog("Submit deliverable")
-        .getByLabel("Deliverable URL")
-        .fill("https://example.test/delivery");
-      await dialog("Submit deliverable")
-        .getByLabel("Submission notes")
-        .fill("Ready for review");
-      await confirm("Submit deliverable");
+
+    // Switch between the admin and the manager who owns the task.
+    const signInAs = async (role) => {
+      await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: "Sign out", exact: true }).click();
+      if (role === "admin") return login();
+      await page.getByRole("button", { name: "Fill", exact: true }).nth(1).click();
+      await page.getByRole("button", { name: "Sign in", exact: true }).click();
+      await page.getByRole("button", { name: "My Work", exact: true }).click();
+      await page.getByLabel("Options for Browser verified task").waitFor();
     };
-    await submit();
+    const managerMenu = async (item) => {
+      await page.getByLabel("Options for Browser verified task").click();
+      await page.getByRole("menuitem", { name: item, exact: true }).click();
+    };
+    const openTaskAsAdmin = async () => {
+      await page
+        .getByRole("button", { name: "Browser delivery project", exact: true })
+        .first()
+        .click();
+      await dialog("Browser delivery project")
+        .getByRole("button", { name: "Browser verified task", exact: true })
+        .click();
+    };
+    const submitAsManager = async () => {
+      await managerMenu("Submit for Review");
+      const form = dialog("Submit Deliverable for Review");
+      await form.getByLabel("Deliverable Link").fill("https://example.test/delivery");
+      await form.getByLabel("Submission Notes").fill("Ready for review");
+      await form.getByRole("button", { name: "Submit for Review", exact: true }).click();
+      await form.waitFor({ state: "hidden" });
+    };
+
+    await signInAs("manager");
+    await managerMenu("Start Work");
+    await managerMenu("Raise Blocker");
+    await choose(dialog("Raise Blocker"), "Who can clear it?", "Alex Chen (member)");
+    await dialog("Raise Blocker")
+      .getByLabel("Blocker Reason & Impact")
+      .fill("Waiting for provider");
+    await confirm("Raise Blocker");
+
+    await signInAs("admin");
+    await openTaskAsAdmin();
+    await dialog("Browser verified task")
+      .getByRole("button", { name: "Resolve blocker", exact: true })
+      .click();
+    await confirm("Resolve blocker");
+
+    await signInAs("manager");
+    await submitAsManager();
+
+    await signInAs("admin");
+    await openTaskAsAdmin();
     await dialog("Browser verified task")
       .getByRole("button", { name: "Return for rework", exact: true })
       .click();
@@ -169,7 +207,12 @@ const fs = require("node:fs");
       .getByLabel("Required changes")
       .fill("Add documentation");
     await confirm("Return for rework");
-    await submit();
+
+    await signInAs("manager");
+    await submitAsManager();
+
+    await signInAs("admin");
+    await openTaskAsAdmin();
     await dialog("Browser verified task")
       .getByRole("button", { name: "Accept", exact: true })
       .click();
@@ -274,6 +317,8 @@ const fs = require("node:fs");
     );
     await page.reload();
     await login();
+    // The portfolio lists active projects by default (FR-51); this one is closed.
+    await page.getByText(/^Closed \(\d+\)$/).click();
     await page
       .getByRole("button", { name: "Browser delivery project", exact: true })
       .waitFor();

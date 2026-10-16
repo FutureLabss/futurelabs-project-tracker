@@ -8,6 +8,8 @@ export type SignalType =
   | "silent_overrun"
   | "aging_wip"
   | "aging_blocker"
+  | "blocked"
+  | "returned_for_rework"
   | "stale_inactivity"
   | "overdue"
   | "imminent_unstarted"
@@ -40,6 +42,7 @@ export interface MemberSignalSummary {
   acceptedCountThisMonth: number;
   acceptedWeightThisMonth: number;
   overdueCount: number;
+  staleTaskIds: string[]; // Active tasks with no change for STALE_INACTIVITY_WORKING_DAYS (leave-adjusted)
 }
 
 export interface ProjectHealthSummary {

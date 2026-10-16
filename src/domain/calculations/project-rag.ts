@@ -8,9 +8,19 @@ import { SYSTEM_CONFIG } from "../config/system-thresholds";
 
 export interface ProjectRagEvaluation {
   status: RagStatus;
+  /** Every reason found, red ones first (FR-53). */
   reasons: string[];
 }
 
+const latest = (timestamps: string[]): string | null =>
+  timestamps.reduce<string | null>((max, t) => (!max || t > max ? t : max), null);
+
+/**
+ * SR-17 / SR-18: the project risk rating, derived only from project data.
+ * RED: target date passed with open work, or a task blocked / in progress too
+ * long with no action from the project's manager. AMBER: overdue work, no
+ * project activity for longer than the inactivity threshold, or repeated slips.
+ */
 export function evaluateProjectRag(
   project: Project,
   tasks: Task[],
@@ -18,117 +28,102 @@ export function evaluateProjectRag(
   ledger: LedgerRecord[],
   simulatedDate: string,
 ): ProjectRagEvaluation {
+  if (project.state === "closed") {
+    return { status: "green", reasons: ["Project is closed and no longer rated."] };
+  }
+
   const projectTasks = tasks.filter((t) => t.projectId === project.id);
   const openTasks = projectTasks.filter(
     (t) => t.status !== "accepted" && t.status !== "cancelled",
   );
+  const projectTaskIds = new Set(projectTasks.map((t) => t.id));
+  const projectBlockers = blockers.filter((b) => projectTaskIds.has(b.taskId));
+  const projectBlockerIds = new Set(projectBlockers.map((b) => b.id));
+
+  // Records about a task include records about its blockers.
+  const recordsForTask = (taskId: string) => {
+    const blockerIds = new Set(projectBlockers.filter((b) => b.taskId === taskId).map((b) => b.id));
+    return ledger.filter((l) => l.subjectId === taskId || blockerIds.has(l.subjectId));
+  };
+  const managerActedSince = (taskId: string, since: string) =>
+    !!project.managerId &&
+    recordsForTask(taskId).some((l) => l.actorId === project.managerId && l.occurredAt > since);
 
   const redReasons: string[] = [];
   const amberReasons: string[] = [];
 
-  // 1. Critical Target Date Missed
-  const targetPassed = dayjs(project.targetDate).isBefore(
-    dayjs(simulatedDate),
-    "day",
-  );
-  if (targetPassed && openTasks.length > 0) {
+  // RED 1: target date passed with open work.
+  if (dayjs(project.targetDate).isBefore(dayjs(simulatedDate), "day") && openTasks.length > 0) {
     redReasons.push(
-      `Project target date (${project.targetDate}) has passed with ${openTasks.length} open task(s) remaining.`,
+      `Target date (${project.targetDate}) has passed with ${openTasks.length} open task(s).`,
     );
   }
 
-  // 2. Critical Stalled Work (Blocked or Aging WIP > 3 working days with zero manager action)
+  // RED 2: blocked or aging work the project's manager has not acted on.
   for (const task of openTasks) {
     if (task.status === "blocked") {
-      const activeBlocker = blockers.find(
-        (b) => b.id === task.activeBlockerId && !b.clearedAt,
-      );
-      if (activeBlocker) {
-        const daysBlocked = getWorkingDaysElapsed(
-          activeBlocker.raisedAt,
-          simulatedDate,
+      const blocker = projectBlockers.find((b) => b.id === task.activeBlockerId && !b.clearedAt);
+      if (!blocker) continue;
+      const daysBlocked = getWorkingDaysElapsed(blocker.raisedAt, simulatedDate);
+      if (daysBlocked > SYSTEM_CONFIG.AGING_BLOCKER_WORKING_DAYS && !managerActedSince(task.id, blocker.raisedAt)) {
+        redReasons.push(
+          `"${task.title}" blocked for ${daysBlocked} working days with no action from the project manager.`,
         );
-        if (daysBlocked > 3) {
-          // Check if manager intervened since blocker raised
-          const managerAction = ledger.find(
-            (l) =>
-              l.subjectId === task.id &&
-              l.actorId === project.managerId &&
-              dayjs(l.occurredAt).isAfter(dayjs(activeBlocker.raisedAt)),
-          );
-          if (!managerAction) {
-            redReasons.push(
-              `Task "${task.title}" blocked for ${daysBlocked} working days without manager intervention.`,
-            );
-          }
-        }
+      }
+    } else if (task.status === "in_progress") {
+      const since =
+        latest(recordsForTask(task.id).filter((l) => l.toValue === "in_progress").map((l) => l.occurredAt)) ??
+        task.createdAt;
+      const daysInProgress = getWorkingDaysElapsed(since, simulatedDate);
+      const expected = SYSTEM_CONFIG.AGING_WIP_WORKING_DAYS[task.complexity];
+      if (daysInProgress > expected && !managerActedSince(task.id, since)) {
+        redReasons.push(
+          `"${task.title}" in progress for ${daysInProgress} working days (expected ${expected} for ${task.complexity}) with no action from the project manager.`,
+        );
       }
     }
   }
 
-  // 3. Amber Checks
-  // A. Overdue active tasks
-  const overdueTasks = openTasks.filter((t) =>
-    dayjs(t.dueDate).isBefore(dayjs(simulatedDate), "day"),
-  );
-  if (overdueTasks.length > 0) {
-    amberReasons.push(`${overdueTasks.length} task(s) currently overdue.`);
+  // AMBER 1: overdue work.
+  const overdue = openTasks.filter((t) => dayjs(t.dueDate).isBefore(dayjs(simulatedDate), "day"));
+  if (overdue.length > 0) {
+    amberReasons.push(`${overdue.length} task(s) overdue.`);
   }
 
-  // B. Project Slip Count >= 2
-  const projectTaskIds = new Set(projectTasks.map((t) => t.id));
-  const slipCount = ledger.filter((l) => {
-    if (l.type !== "task_redated") return false;
-    if (!projectTaskIds.has(l.subjectId)) return false;
-    if (!l.fromValue || !l.toValue) return false;
-    return dayjs(l.toValue).isAfter(dayjs(l.fromValue), "day");
-  }).length;
-
+  // AMBER 2: due dates moved later repeatedly (moving earlier is not a slip, SR-14).
+  const slipCount = ledger.filter(
+    (l) =>
+      l.type === "task_redated" &&
+      projectTaskIds.has(l.subjectId) &&
+      !!l.fromValue &&
+      !!l.toValue &&
+      dayjs(l.toValue).isAfter(dayjs(l.fromValue), "day"),
+  ).length;
   if (slipCount >= SYSTEM_CONFIG.SLIP_ALERT_COUNT_THRESHOLD) {
+    amberReasons.push(`Due dates moved later ${slipCount} times across the project.`);
+  }
+
+  // AMBER 3: no recorded activity on the project, its tasks or their blockers.
+  const lastActivity =
+    latest(
+      ledger
+        .filter(
+          (l) =>
+            l.subjectId === project.id || projectTaskIds.has(l.subjectId) || projectBlockerIds.has(l.subjectId),
+        )
+        .map((l) => l.occurredAt),
+    ) ?? project.createdAt;
+  const daysInactive = getWorkingDaysElapsed(lastActivity, simulatedDate);
+  if (daysInactive > SYSTEM_CONFIG.STALE_INACTIVITY_WORKING_DAYS) {
     amberReasons.push(
-      `Task deadlines slipped ${slipCount} times across the project.`,
+      `No activity for ${daysInactive} working days (limit ${SYSTEM_CONFIG.STALE_INACTIVITY_WORKING_DAYS}).`,
     );
   }
 
-  // C. Inactive Project (No ledger change in > 5 working days)
-  const projectLedger = ledger.filter(
-    (l) => l.subjectId === project.id || projectTaskIds.has(l.subjectId),
-  );
-  if (projectLedger.length > 0) {
-    const latestEvent = projectLedger.reduce((latest, current) =>
-      dayjs(current.occurredAt).isAfter(dayjs(latest.occurredAt))
-        ? current
-        : latest,
-    );
-    const daysInactive = getWorkingDaysElapsed(
-      latestEvent.occurredAt,
-      simulatedDate,
-    );
-    if (daysInactive > SYSTEM_CONFIG.STALE_INACTIVITY_WORKING_DAYS) {
-      amberReasons.push(
-        `Zero ledger activity recorded in ${daysInactive} working days (threshold: 5 days).`,
-      );
-    }
-  } else {
-    const daysSinceCreated = getWorkingDaysElapsed(
-      project.createdAt,
-      simulatedDate,
-    );
-    if (daysSinceCreated > SYSTEM_CONFIG.STALE_INACTIVITY_WORKING_DAYS) {
-      amberReasons.push(
-        `No activity since project creation (${daysSinceCreated} working days ago).`,
-      );
-    }
-  }
-
-  if (redReasons.length > 0) {
-    return { status: "red", reasons: redReasons };
-  }
-  if (amberReasons.length > 0) {
-    return { status: "amber", reasons: amberReasons };
-  }
+  if (redReasons.length > 0) return { status: "red", reasons: [...redReasons, ...amberReasons] };
+  if (amberReasons.length > 0) return { status: "amber", reasons: amberReasons };
   return {
     status: "green",
-    reasons: ["Project is progressing on schedule with healthy velocity."],
+    reasons: ["No overdue work, stalled tasks, long inactivity or repeated slips."],
   };
 }
