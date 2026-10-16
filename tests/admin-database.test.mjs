@@ -210,6 +210,19 @@ test("admin lifecycle, project membership, audit, and session authorization", as
       mutate("reschedule_task", { task_id: task.id, due_date: "2020-01-01", reason: "Too late" }),
       /cannot be in the past/,
     );
+    // Rescheduling counts as a slip, so unassigned work gets an owner first.
+    const unowned = await mutate("create_task", {
+      project_id: project.id,
+      title: "Nobody yet",
+      complexity: "low",
+      origin: "planned",
+      due_date: "2099-09-22",
+    });
+    await assert.rejects(
+      mutate("reschedule_task", { task_id: unowned.id, due_date: "2099-09-30", reason: "Plan change" }),
+      /Assign an owner/,
+    );
+    await mutate("update_task_status", { task_id: unowned.id, status: "cancelled" });
     await mutate("assign_task", { task_id: task.id, assignee_id: manager });
     await assert.rejects(
       govern("set_project_member", { ...access, included: false }),

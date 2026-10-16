@@ -523,15 +523,18 @@ export function AdminDetails({
                 >
                   {task.assigneeId ? "Reassign owner" : "Assign owner"}
                 </Button>
-                <Button
-                  size="xs"
-                  variant="light"
-                  onClick={() =>
-                    onAction({ kind: "reschedule", taskId: task.id })
-                  }
-                >
-                  Reschedule
-                </Button>
+                {/* A reschedule counts as a slip, so unassigned work gets an owner first. */}
+                {task.assigneeId && (
+                  <Button
+                    size="xs"
+                    variant="light"
+                    onClick={() =>
+                      onAction({ kind: "reschedule", taskId: task.id })
+                    }
+                  >
+                    Reschedule
+                  </Button>
+                )}
                 {task.status === "not_started" && task.assigneeId === actorId && (
                   <Button
                     size="xs"
