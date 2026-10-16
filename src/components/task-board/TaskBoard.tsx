@@ -31,8 +31,6 @@ export function TaskBoard({
   onCreateTask,
   canDragTask,
   canDropTask,
-  canDoMemberActions,
-  today,
   readOnly = false,
   emptyPlaceholder,
   headerRightContent,
@@ -128,12 +126,6 @@ export function TaskBoard({
     if (!task) return;
     if (task.status === targetStatus) return; // Same column, no status change needed
 
-    // Without member rights only review moves (accept / return) and cancelling are allowed.
-    if (canDoMemberActions && !canDoMemberActions(task)) {
-      const reviewMove =
-        task.status === "submitted" && (targetStatus === "accepted" || targetStatus === "in_progress");
-      if (!reviewMove && targetStatus !== "cancelled") return;
-    }
     if (canDropTask && !canDropTask(task, targetStatus)) {
       return;
     }
@@ -276,8 +268,6 @@ export function TaskBoard({
               people={people}
               isDraggableColumn={!readOnly}
               canDragTask={canDragTask}
-              canDoMemberActions={canDoMemberActions}
-              today={today}
               readOnly={readOnly}
               onTaskClick={onTaskClick}
               onTaskStatusChange={onTaskStatusChange}

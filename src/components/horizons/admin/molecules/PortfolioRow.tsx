@@ -5,7 +5,6 @@ import {
   Button,
   Group,
   Progress,
-  Stack,
   Table,
   Text,
   Tooltip,
@@ -130,32 +129,7 @@ export function PortfolioRow({
 
       {/* RAG Health */}
       <Table.Td style={{ minWidth: 110 }}>
-        {/* FR-53: what caused the rating, without opening the project */}
-        <Tooltip
-          multiline
-          w={320}
-          withArrow
-          disabled={isClosed || !summary?.ragReasons.length}
-          label={
-            <Stack gap={2}>
-              {summary?.ragReasons.map((reason) => (
-                <Text key={reason} size="xs">
-                  • {reason}
-                </Text>
-              ))}
-            </Stack>
-          }
-        >
-          <Stack gap={2} style={{ cursor: "help" }}>
-            <RagBadge status={summary?.ragStatus} closed={isClosed} />
-            {!isClosed && summary?.ragStatus !== "green" && summary?.ragReasons[0] && (
-              <Text size="xs" c="dimmed" lineClamp={2} maw={220}>
-                {summary.ragReasons[0]}
-                {summary.ragReasons.length > 1 ? ` (+${summary.ragReasons.length - 1} more)` : ""}
-              </Text>
-            )}
-          </Stack>
-        </Tooltip>
+        <RagBadge status={summary?.ragStatus} closed={isClosed} />
       </Table.Td>
 
       {/* Tasks & Risks Breakdown */}

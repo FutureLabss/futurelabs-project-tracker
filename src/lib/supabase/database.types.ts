@@ -118,14 +118,6 @@ export type Database = {
         Args: { operation: string; payload: Json };
         Returns: Json;
       };
-      tracker_project_task_titles: {
-        Args: { project: string };
-        Returns: { id: string; title: string }[];
-      };
-      tracker_manager_mutate: {
-        Args: { operation: string; payload: Json };
-        Returns: Json;
-      };
       tracker_logout: { Args: Record<string, never>; Returns: undefined };
       tracker_mutate: {
         Args: { operation: string; payload: Json };

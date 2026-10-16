@@ -42,16 +42,8 @@ import {
 import type { AdminWorkspace } from "../../../api/hooks/use-admin-workspace";
 import { useAdminAction } from "../../../api/hooks/use-admin-workspace";
 import {
-  useAcceptTask,
-  useAssignTask,
-  useCreateTask,
-  useRescheduleTask,
-  useReturnTask,
-  useSubmitTask,
-  useUpdateTaskStatus,
-} from "../../../api/hooks/use-tasks";
-import {
   projectService,
+  taskService,
   blockerService,
   peopleService,
 } from "../../../services";
@@ -175,15 +167,7 @@ export function AdminActionDialog({
   onClose: () => void;
 }) {
   const mutation = useAdminAction();
-  const createTaskMutation = useCreateTask();
-  const assignTaskMutation = useAssignTask();
-  const rescheduleTaskMutation = useRescheduleTask();
-  const submitTaskMutation = useSubmitTask();
-  const acceptTaskMutation = useAcceptTask();
-  const returnTaskMutation = useReturnTask();
-  const updateTaskStatusMutation = useUpdateTaskStatus();
   const [validation, setValidation] = useState("");
-  const [formValues, setFormValues] = useState<Record<string, string>>({});
   const task = data.tasks.find((t) => t.id === action.taskId);
   const targetPerson = data.people.find((p) => p.id === action.personId);
   const [projectId, setProjectId] = useState(
@@ -198,24 +182,11 @@ export function AdminActionDialog({
     task?.deliverableUrl && /^https?:\/\//i.test(task.deliverableUrl)
       ? task.deliverableUrl
       : undefined;
-
-  const updateField = (name: string, value: string) => {
-    setFormValues((current) => ({ ...current, [name]: value }));
-  };
-
-  const readField = (name: string) => String(formValues[name] ?? "").trim();
-  // The default applies only until the field is edited, so clearing a field sticks.
-  const fieldValue = (name: string, fallback: string) =>
-    name in formValues ? formValues[name] : fallback;
-
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setValidation("");
-    // Uncontrolled fields (people forms) only exist in the DOM form; controlled
-    // fields also carry a name, so the form data covers both.
     const form = new FormData(event.currentTarget);
-    const value = (name: string) =>
-      String(form.get(name) ?? "").trim() || readField(name);
+    const value = (name: string) => String(form.get(name) ?? "").trim();
     const person = value("person") || null;
     if (["project", "task"].includes(action.kind) && !value("name")) {
       setValidation("A name is required.");
@@ -292,7 +263,7 @@ export function AdminActionDialog({
         case "close":
           return projectService.closeProject(projectId, actorId);
         case "task":
-          return createTaskMutation.mutateAsync({
+          return taskService.createTask({
             projectId,
             title: value("name"),
             description: value("description"),
@@ -303,48 +274,29 @@ export function AdminActionDialog({
             actorId,
           });
         case "assign":
-          return assignTaskMutation.mutateAsync({
-            taskId: task!.id,
-            assigneeId: person,
-            actorId,
-          });
+          return taskService.assignTask(task!.id, person, actorId);
         case "reschedule":
-          return rescheduleTaskMutation.mutateAsync({
-            taskId: task!.id,
-            newDueDate: value("due"),
-            reason: value("reason"),
+          return taskService.rescheduleTask(
+            task!.id,
+            value("due"),
+            value("reason"),
             actorId,
-          });
+          );
         case "submit":
-          return submitTaskMutation.mutateAsync({
-            taskId: task!.id,
+          return taskService.submitTask(
+            task!.id,
             actorId,
-            notes: value("description"),
-            deliverableUrl: value("url") || undefined,
-          });
+            value("description"),
+            value("url") || undefined,
+          );
         case "accept":
-          return acceptTaskMutation.mutateAsync({
-            taskId: task!.id,
-            managerId: actorId,
-          });
+          return taskService.acceptTask(task!.id, actorId);
         case "return":
-          return returnTaskMutation.mutateAsync({
-            taskId: task!.id,
-            managerId: actorId,
-            reason: value("reason"),
-          });
+          return taskService.returnTask(task!.id, actorId, value("reason"));
         case "start":
-          return updateTaskStatusMutation.mutateAsync({
-            taskId: task!.id,
-            status: "in_progress",
-            actorId,
-          });
+          return taskService.updateTaskStatus(task!.id, "in_progress", actorId);
         case "cancel":
-          return updateTaskStatusMutation.mutateAsync({
-            taskId: task!.id,
-            status: "cancelled",
-            actorId,
-          });
+          return taskService.updateTaskStatus(task!.id, "cancelled", actorId);
         case "blocker":
           return blockerService.raiseBlocker({
             taskId: task!.id,
@@ -433,8 +385,7 @@ export function AdminActionDialog({
       name="person"
       label={label}
       data={options(rows)}
-      value={fieldValue("person", defaultValue ?? "") || null}
-      onChange={(value) => updateField("person", value ?? "")}
+      defaultValue={defaultValue}
       placeholder={placeholder}
       nothingFoundMessage="No eligible users found"
       searchable
@@ -542,10 +493,6 @@ export function AdminActionDialog({
                 leftSection={<IconFolder size={16} />}
                 required
                 maxLength={200}
-                value={readField("name")}
-                onChange={(event) =>
-                  updateField("name", event.currentTarget.value)
-                }
               />
               <Textarea
                 name="description"
@@ -554,20 +501,13 @@ export function AdminActionDialog({
                 minRows={3}
                 autosize
                 required
-                value={readField("description")}
-                onChange={(event) =>
-                  updateField("description", event.currentTarget.value)
-                }
               />
               <Group grow gap="md">
                 <TextInput
                   name="start"
                   type="date"
                   label="Start date"
-                  value={fieldValue("start", date)}
-                  onChange={(event) =>
-                    updateField("start", event.currentTarget.value)
-                  }
+                  defaultValue={date}
                   leftSection={<IconCalendar size={16} />}
                   required
                 />
@@ -575,10 +515,7 @@ export function AdminActionDialog({
                   name="end"
                   type="date"
                   label="Target date"
-                  value={fieldValue("end", date)}
-                  onChange={(event) =>
-                    updateField("end", event.currentTarget.value)
-                  }
+                  defaultValue={date}
                   leftSection={<IconCalendarEvent size={16} />}
                   required
                 />
@@ -592,16 +529,12 @@ export function AdminActionDialog({
           {action.kind === "task" && (
             <>
               <Select
-                name="project"
                 label="Project"
                 data={data.projects
                   .filter((p) => p.state === "active")
                   .map((p) => ({ value: p.id, label: p.name }))}
                 value={projectId || null}
-                onChange={(v) => {
-                  setProjectId(v ?? "");
-                  updateField("project", v ?? "");
-                }}
+                onChange={(v) => setProjectId(v ?? "")}
                 searchable
                 required
                 leftSection={<IconFolder size={16} />}
@@ -611,19 +544,11 @@ export function AdminActionDialog({
                 label="Task title"
                 required
                 maxLength={200}
-                value={readField("name")}
-                onChange={(event) =>
-                  updateField("name", event.currentTarget.value)
-                }
                 leftSection={<IconChecklist size={16} />}
               />
               <Textarea
                 name="description"
                 label="Description and acceptance criteria"
-                value={readField("description")}
-                onChange={(event) =>
-                  updateField("description", event.currentTarget.value)
-                }
                 minRows={3}
                 autosize
               />
@@ -645,10 +570,7 @@ export function AdminActionDialog({
                   name="complexity"
                   label="Complexity"
                   data={["low", "mid", "high"]}
-                  value={fieldValue("complexity", "mid")}
-                  onChange={(value) =>
-                    updateField("complexity", value ?? "mid")
-                  }
+                  defaultValue="mid"
                   allowDeselect={false}
                   required
                 />
@@ -656,10 +578,7 @@ export function AdminActionDialog({
                   name="origin"
                   label="Origin"
                   data={["planned", "unplanned"]}
-                  value={fieldValue("origin", "planned")}
-                  onChange={(value) =>
-                    updateField("origin", value ?? "planned")
-                  }
+                  defaultValue="planned"
                   allowDeselect={false}
                   required
                 />
@@ -668,10 +587,7 @@ export function AdminActionDialog({
                 name="due"
                 label="Due date"
                 type="date"
-                value={fieldValue("due", date)}
-                onChange={(event) =>
-                  updateField("due", event.currentTarget.value)
-                }
+                defaultValue={date}
                 leftSection={<IconCalendar size={16} />}
                 required
               />
@@ -717,20 +633,13 @@ export function AdminActionDialog({
                 name="due"
                 type="date"
                 label="New due date"
-                value={fieldValue("due", task?.dueDate ?? "")}
-                onChange={(event) =>
-                  updateField("due", event.currentTarget.value)
-                }
+                defaultValue={task?.dueDate}
                 leftSection={<IconCalendarTime size={16} />}
                 required
               />
               <Textarea
                 name="reason"
                 label="Reason for rescheduling"
-                value={readField("reason")}
-                onChange={(event) =>
-                  updateField("reason", event.currentTarget.value)
-                }
                 minRows={2}
                 autosize
                 required
@@ -744,18 +653,12 @@ export function AdminActionDialog({
                 type="url"
                 label="Deliverable URL"
                 pattern="https?://.*"
-                value={fieldValue("url", task?.deliverableUrl ?? "")}
-                onChange={(event) =>
-                  updateField("url", event.currentTarget.value)
-                }
+                defaultValue={task?.deliverableUrl ?? ""}
               />
               <Textarea
                 name="description"
                 label="Submission notes"
-                value={fieldValue("description", task?.submissionNotes ?? "")}
-                onChange={(event) =>
-                  updateField("description", event.currentTarget.value)
-                }
+                defaultValue={task?.submissionNotes ?? ""}
               />
               <Text size="sm">This sends the task to the review queue.</Text>
             </>
@@ -779,15 +682,7 @@ export function AdminActionDialog({
             </>
           )}
           {action.kind === "return" && (
-            <Textarea
-              name="reason"
-              label="Required changes"
-              value={readField("reason")}
-              onChange={(event) =>
-                updateField("reason", event.currentTarget.value)
-              }
-              required
-            />
+            <Textarea name="reason" label="Required changes" required />
           )}
           {action.kind === "accept" && (
             <Text>
@@ -809,20 +704,13 @@ export function AdminActionDialog({
                     label: "Unclear requirement",
                   },
                 ]}
-                value={fieldValue("category", "external")}
-                onChange={(value) =>
-                  updateField("category", value ?? "external")
-                }
+                defaultValue="external"
                 allowDeselect={false}
                 required
               />
               <Textarea
                 name="reason"
                 label="What is blocking delivery?"
-                value={readField("reason")}
-                onChange={(event) =>
-                  updateField("reason", event.currentTarget.value)
-                }
                 required
               />
               {personField(eligible, "Responsible person", undefined, true)}
@@ -832,8 +720,6 @@ export function AdminActionDialog({
                 data={data.tasks
                   .filter((t) => t.id !== task?.id && isTaskOpen(t.status))
                   .map((t) => ({ value: t.id, label: t.title }))}
-                value={fieldValue("dependency", "") || null}
-                onChange={(value) => updateField("dependency", value ?? "")}
                 searchable
                 clearable
               />
@@ -847,10 +733,7 @@ export function AdminActionDialog({
                   name="start"
                   type="date"
                   label="First day"
-                  value={fieldValue("start", date)}
-                  onChange={(event) =>
-                    updateField("start", event.currentTarget.value)
-                  }
+                  defaultValue={date}
                   leftSection={<IconCalendar size={16} />}
                   required
                 />
@@ -858,24 +741,12 @@ export function AdminActionDialog({
                   name="end"
                   type="date"
                   label="Last day"
-                  value={fieldValue("end", date)}
-                  onChange={(event) =>
-                    updateField("end", event.currentTarget.value)
-                  }
+                  defaultValue={date}
                   leftSection={<IconCalendarEvent size={16} />}
                   required
                 />
               </Group>
-              <Textarea
-                name="description"
-                label="Note"
-                minRows={2}
-                autosize
-                value={readField("description")}
-                onChange={(event) =>
-                  updateField("description", event.currentTarget.value)
-                }
-              />
+              <Textarea name="description" label="Note" minRows={2} autosize />
             </>
           )}
           {action.kind === "cancel" && (

@@ -16,8 +16,6 @@ export const SYSTEM_CONFIG = {
   } as Record<TaskComplexity, number>,
 
   STALE_INACTIVITY_WORKING_DAYS: 5,
-  // FR-54: blocked or aging work nobody but its assignee has touched for this long.
-  UNATTENDED_WORKING_DAYS: 3,
   AGING_BLOCKER_WORKING_DAYS: 3,
   IMMINENT_WARNING_WORKING_DAYS: 3,
   SLIP_ALERT_COUNT_THRESHOLD: 2,

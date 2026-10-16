@@ -162,23 +162,12 @@ test("admin lifecycle, project membership, audit, and session authorization", as
       govern("set_project_member", { ...access, included: false }),
       /Reassign/,
     );
-    const blockerInput = {
+    const blocker = await mutate("raise_blocker", {
       task_id: task.id,
       category: "external",
       description: "Waiting",
       owner_id: member,
-    };
-    // Only the assignee declares a blocker, starts or submits their own work.
-    await assert.rejects(mutate("raise_blocker", blockerInput), /Only the task's assignee/);
-    await assert.rejects(
-      mutate("update_task_status", { task_id: task.id, status: "in_progress" }),
-      /Only the task's assignee/,
-    );
-    await assert.rejects(
-      mutate("submit_task", { task_id: task.id, notes: "Not mine" }, manager),
-      /Only the task's assignee/,
-    );
-    const blocker = await mutate("raise_blocker", blockerInput, member);
+    });
     await mutate("assign_task", { task_id: task.id, assignee_id: admin });
     await assert.rejects(
       govern("set_project_member", { ...access, included: false }),

@@ -25,22 +25,15 @@ import {
   IconLayoutSidebarLeftExpand,
   IconSearch,
   IconSettings,
-} from "@tabler/icons-react";
-import dayjs from "dayjs";
-import { useMemo, useState } from "react";
-import {
-  AdminView,
-  DashboardLayoutConfig,
-  DashboardPanel as DashboardPanelConfig,
-  DashboardTone,
-  ManagerView,
-  MemberView,
-} from "../types/dashboard";
+} from '@tabler/icons-react';
+import dayjs from 'dayjs';
+import { useMemo, useState } from 'react';
+import {  AdminView, DashboardLayoutConfig, DashboardPanel as DashboardPanelConfig, DashboardTone,  MemberView, } from '../types/dashboard';
 
-import MemberDashboard from "./horizons/member/MemberDashboard";
-import AdminDashboard from "./horizons/admin/AdminDashboard";
+import MemberDashboard from './horizons/member/MemberDashboard';
+import AdminDashboard from './horizons/admin/AdminDashboard';
+import ManagerDashboard from './horizons/manager/ManagerDashboard';
 import { useMediaQuery } from "@mantine/hooks";
-import ManagersDashboard from "./horizons/manager/ManagersDashboard";
 
 interface RoleDashboardLayoutProps {
   config: DashboardLayoutConfig;
@@ -84,13 +77,16 @@ export function RoleDashboardLayout({
   const [activeDate, setActiveDate] = useState(initialDate);
   const [adminView, setAdminView] = useState<AdminView>("portfolio");
   const [memberView, setMemberView] = useState<MemberView>("my-work");
-  const [managerView, setManagerView] = useState<ManagerView>("overview");
   const ToggleIcon = navigationHidden
     ? IconLayoutSidebarLeftExpand
     : IconLayoutSidebarLeftCollapse;
   const panels = [config.focusPanel, config.secondaryPanel].filter(
     (panel) => panel.title || panel.description || panel.items.length > 0,
+
   );
+
+
+
 
   return (
     <AppShell
@@ -215,7 +211,7 @@ export function RoleDashboardLayout({
                     ? item.memberView === memberView
                     : config.role === "admin"
                       ? item.adminView === adminView
-                      : item.managerView === managerView;
+                      : item.active;
                 const navItem = (
                   <UnstyledButton
                     aria-label={item.label}
@@ -223,7 +219,6 @@ export function RoleDashboardLayout({
                     onClick={() => {
                       if (item.memberView) setMemberView(item.memberView);
                       if (item.adminView) setAdminView(item.adminView);
-                      if (item.managerView) setManagerView(item.managerView);
                       setMobileNavigationOpened(false);
                     }}
                     className={
@@ -260,45 +255,43 @@ export function RoleDashboardLayout({
       </AppShell.Navbar>
 
       <AppShell.Main className="app-main">
-        {config.role === "member" ? (
-          <MemberDashboard
+        {config.role === 'member' ? (
+            <MemberDashboard
             personId={personId}
             personName={personName}
             memberView={memberView}
-            date={activeDate}
-          />
-        ) : config.role === "admin" ? (
-          <AdminDashboard
-            actorId={personId}
-            date={activeDate}
-            view={adminView}
-            onViewChange={setAdminView}
-          />
-        ) : config.role === "manager" ? (
-          <ManagersDashboard
-            actorId={personId}
-            date={activeDate}
-            view={managerView}
-            onViewChange={setManagerView}
-          />
+            />
+
+        ) : config.role === 'admin' ? (
+            <AdminDashboard
+              actorId={personId}
+              date={activeDate}
+              view={adminView}
+              onViewChange={setAdminView}
+            />
+
+        ) : config.role === 'manager' ? (
+            <ManagerDashboard
+              managerId={personId}
+              managerName={personName}
+              activeDate={activeDate}
+            />
         ) : (
-          <Stack gap="xl" className="dashboard-shell">
-            <Group justify="space-between" align="flex-start" gap="lg">
-              <Box maw={760}>
-                <Badge className={roleToneClassNames[config.role]}>
-                  {config.roleLabel}
-                </Badge>
-                {config.title && (
-                  <Title order={1} mt="sm">
-                    {config.title}
-                  </Title>
-                )}
-                {config.subtitle && (
-                  <Text c="dimmed" mt={6}>
-                    {config.subtitle}
-                  </Text>
-                )}
-              </Box>
+        <Stack gap="xl" className="dashboard-shell">
+          <Group justify="space-between" align="flex-start" gap="lg">
+            <Box maw={760}>
+              <Badge className={roleToneClassNames[config.role]}>{config.roleLabel}</Badge>
+              {config.title && (
+                <Title order={1} mt="sm">
+                  {config.title}
+                </Title>
+              )}
+              {config.subtitle && (
+                <Text c="dimmed" mt={6}>
+                  {config.subtitle}
+                </Text>
+              )}
+            </Box>
 
               {config.primaryActions.length > 0 && (
                 <Group gap="xs">

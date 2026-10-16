@@ -14,9 +14,7 @@ import {
   useRaiseBlocker,
   useClearBlocker,
 } from "../../../../api/hooks/use-blockers";
-import { usePersons } from "../../../../api/hooks/use-availability";
 import type { BlockerCategory } from "../../../../entities/blocker.entity";
-import { BlockingTaskSelect } from "../molecules/BlockingTaskSelect";
 
 export type MemberTaskAction =
   | { kind: "submit"; taskId: string; taskTitle?: string }
@@ -43,23 +41,9 @@ export function MemberTaskActionModal({
   const [blockerCategory, setBlockerCategory] =
     useState<BlockerCategory>("unclear_requirement");
   const [blockerReason, setBlockerReason] = useState("");
-  const [blockerOwnerId, setBlockerOwnerId] = useState<string | null>(null);
-  const [blockingTaskId, setBlockingTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { data: persons = [] } = usePersons();
 
   if (!action) return null;
-
-  const resetAndClose = () => {
-    setNotes("");
-    setDeliverableUrl("");
-    setBlockerCategory("unclear_requirement");
-    setBlockerReason("");
-    setBlockerOwnerId(null);
-    setBlockingTaskId(null);
-    setError(null);
-    onClose();
-  };
 
   const isSubmitting =
     submitTaskMutation.isPending ||
@@ -77,20 +61,15 @@ export function MemberTaskActionModal({
           deliverableUrl: deliverableUrl || undefined,
         });
       } else if (action.kind === "blocker") {
-        if (!blockerOwnerId) {
-          setError("Please choose who can clear this blocker.");
-          return;
-        }
         if (!blockerReason.trim()) {
           setError("Please provide a reason for the blocker.");
           return;
         }
         await raiseBlockerMutation.mutateAsync({
           taskId: action.taskId,
-          ownerId: blockerOwnerId,
+          ownerId: actorId,
           category: blockerCategory,
           description: blockerReason,
-          blockingTaskId: blockingTaskId ?? undefined,
           actorId,
         });
       } else if (action.kind === "clear") {
@@ -99,7 +78,7 @@ export function MemberTaskActionModal({
           actorId,
         });
       }
-      resetAndClose();
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action failed");
     }
@@ -115,7 +94,7 @@ export function MemberTaskActionModal({
   return (
     <Modal
       opened={!!action}
-      onClose={resetAndClose}
+      onClose={onClose}
       title={getTitle()}
       centered
       size="md"
@@ -161,21 +140,6 @@ export function MemberTaskActionModal({
               ]}
               required
             />
-            <Select
-              label="Who can clear it?"
-              description="The person with authority to remove this blocker"
-              placeholder="Select a person"
-              data={persons.map((p) => ({ value: p.id, label: `${p.name} (${p.role})` }))}
-              value={blockerOwnerId}
-              onChange={setBlockerOwnerId}
-              searchable
-              required
-            />
-            <BlockingTaskSelect
-              taskId={action.taskId}
-              value={blockingTaskId}
-              onChange={setBlockingTaskId}
-            />
             <Textarea
               label="Blocker Reason & Impact"
               placeholder="What is preventing forward progress on this task?"
@@ -200,7 +164,7 @@ export function MemberTaskActionModal({
         )}
 
         <Group justify="flex-end" mt="md">
-          <Button variant="default" onClick={resetAndClose} disabled={isSubmitting}>
+          <Button variant="default" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button

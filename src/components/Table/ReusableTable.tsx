@@ -1,5 +1,9 @@
-import { ScrollArea, Table, Text } from "@mantine/core";
-import type { ReactNode } from "react";
+import {
+  ScrollArea,
+  Table,
+  Text,
+} from '@mantine/core';
+import type { ReactNode } from 'react';
 
 export type TableColumn<T> = {
   key: string;
@@ -14,10 +18,12 @@ type ReusableTableProps<T extends { id: string | number }> = {
   emptyMessage?: string;
 };
 
-export function ReusableTable<T extends { id: string | number }>({
+export function ReusableTable<
+  T extends { id: string | number }
+>({
   columns,
   data,
-  emptyMessage = "No records found",
+  emptyMessage = 'No records found',
 }: ReusableTableProps<T>) {
   return (
     <ScrollArea type="auto">
@@ -39,8 +45,8 @@ export function ReusableTable<T extends { id: string | number }>({
                   width: column.width,
                   fontSize: 12,
                   fontWeight: 700,
-                  color: "#111827",
-                  whiteSpace: "nowrap",
+                  color: '#111827',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {column.label}
@@ -53,7 +59,12 @@ export function ReusableTable<T extends { id: string | number }>({
           {data.length === 0 ? (
             <Table.Tr>
               <Table.Td colSpan={columns.length}>
-                <Text ta="center" c="dimmed" py="xl" size="sm">
+                <Text
+                  ta="center"
+                  c="dimmed"
+                  py="xl"
+                  size="sm"
+                >
                   {emptyMessage}
                 </Text>
               </Table.Td>
@@ -65,12 +76,16 @@ export function ReusableTable<T extends { id: string | number }>({
                   <Table.Td
                     key={column.key}
                     style={{
-                      verticalAlign: "middle",
+                      verticalAlign: 'middle',
                     }}
                   >
                     {column.render
                       ? column.render(row)
-                      : String(row[column.key as keyof T] ?? "")}
+                      : String(
+                          row[
+                            column.key as keyof T
+                          ] ?? '',
+                        )}
                   </Table.Td>
                 ))}
               </Table.Tr>

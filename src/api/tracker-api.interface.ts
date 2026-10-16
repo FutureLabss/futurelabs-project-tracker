@@ -1,6 +1,6 @@
 import { Person } from "../entities/person.entity";
 import { Project } from "../entities/project.entity";
-import { Task, TaskComplexity, TaskStatus } from "../entities/task.entity";
+import { Task, TaskStatus } from "../entities/task.entity";
 import { Blocker } from "../entities/blocker.entity";
 import { Availability } from "../entities/availability.entity";
 import { LedgerRecord, LedgerSubjectType, LedgerChangeType } from "../entities/ledger-record.entity";
@@ -61,8 +61,6 @@ export interface ITrackerApi {
   getTasks(filter?: TaskFilter): Promise<Task[]>;
   getTasksCount(filter?: TaskFilter): Promise<number>;
   getTaskById(id: string): Promise<Task | null>;
-  /** Titles of open tasks in a project the caller can access (FR-10 blocker cause picker). */
-  getProjectTaskTitles(projectId: string): Promise<{ id: string; title: string }[]>;
   createTask(dto: CreateTaskDto): Promise<Task>;
   assignTask(
     taskId: string,
@@ -88,23 +86,6 @@ export interface ITrackerApi {
   ): Promise<Task>;
   acceptTask(taskId: string, managerId: string): Promise<Task>;
   returnTask(taskId: string, managerId: string, reason: string): Promise<Task>;
-
-  // Manager workflows: only the project's own manager (never an administrator)
-  createManagedProject(dto: Omit<CreateProjectDto, "managerId">): Promise<Project>;
-  closeManagedProject(projectId: string, actorId: string): Promise<Project>;
-  setManagedProjectMember(
-    projectId: string,
-    personId: string,
-    included: boolean,
-    actorId: string,
-  ): Promise<void>;
-  changeTaskComplexity(
-    taskId: string,
-    complexity: TaskComplexity,
-    actorId: string,
-    reason?: string,
-  ): Promise<Task>;
-  reopenTask(taskId: string, actorId: string, reason: string): Promise<Task>;
 
   // Blockers
   getBlockers(taskId?: string): Promise<Blocker[]>;

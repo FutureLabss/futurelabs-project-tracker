@@ -16,10 +16,8 @@ import {
 
 import { BlockedBadge } from '../atoms/BlockedBadge';
 import { ComplexityBadge } from '../atoms/ComplexityBadge';
+import { OverdueBadge } from '../atoms/OverdueBadge';
 import { StatusBadge } from '../atoms/StatusBadge';
-import { TaskFlagBadges } from '../atoms/TaskFlagBadges';
-import type { MemberTaskFlags } from '../../../../api/hooks/use-member-task-flags';
-import type { Task } from '../../../../entities/task.entity';
 
 import {
   ReusableTable,
@@ -27,7 +25,7 @@ import {
 } from '../../../Table/ReusableTable';
 
 import type { PersonalTask } from '../../../../types/memberpersonaltasks';
-import { useTasks, useUpdateTaskStatus } from '../../../../api/hooks/use-tasks';
+import { useSubmitTask, useTasks, useUpdateTaskStatus } from '../../../../api/hooks/use-tasks';
 import { useProjects } from '../../../../api/hooks/use-projects';
 import { useClearBlocker } from '../../../../api/hooks/use-blockers';
 import { RaiseBlockerModal } from './RaiseBlockerModal';
@@ -37,16 +35,11 @@ import { TaskDiagnosticDrawer } from '../../../detail-views/TaskDiagnosticDrawer
 
 interface personTaskTableProps {
   personId:string;
-  /** Dashboard (time machine) date for the task panel. */
-  date?: string;
-  getFlags: (task: Task) => MemberTaskFlags;
   onProjectClick?: (projectId: string) => void;
-  /** Opens the submission dialog (deliverable link and notes) for a task. */
-  onSubmitTask: (task: { id: string; title: string }) => void;
 }
 
 
-export function PersonalTasksTable({personId, date, getFlags, onProjectClick, onSubmitTask}:personTaskTableProps) {
+export function PersonalTasksTable({personId, onProjectClick}:personTaskTableProps) {
   const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null);
 
   const clickableCell = (taskId: string | number, children: React.ReactNode) => (
@@ -136,7 +129,9 @@ const personalTaskColumns: TableColumn<PersonalTask>[] = [
           {task.dueDate}
         </Text>
 
-        {task.flags && <TaskFlagBadges flags={task.flags} />}
+        {task.overdue && (
+          <OverdueBadge />
+        )}
       </Stack>
     )),
   },
@@ -253,6 +248,7 @@ const handleStart = (taskId: string) => {
       status: 'in_progress',
       actorId: personId,
     });
+    console.log(`Start working button clicked for task: ${taskId}`);
 
 }
 
@@ -263,19 +259,27 @@ const handleResume = (taskId: string) => {
         blockerId: task.activeBlockerId,
         actorId: personId,
       });
+      console.log(`Blocker cleared and task resumed: ${taskId}`);
     } else {
       updateTaskStatus({
         taskId,
         status: 'in_progress',
         actorId: personId,
       });
+      console.log(`Resume button clicked for task: ${taskId}`);
     }
 }
 
-// FR-14: submitting always goes through the dialog (deliverable link and notes).
+const{ mutate: submitTask } = useSubmitTask();
 const handleSubmit = (taskId: string) => {
-  const task = tasks.find((t) => t.id === taskId);
-  if (task) onSubmitTask({ id: task.id, title: task.title });
+  submitTask({
+    taskId,
+    actorId: personId,
+    notes:'task completed successfully',
+    deliverableUrl:''
+  });
+
+  console.log(`Submit button clicked for task: ${taskId}`);
 }
   const {data: tasks = [], isLoading, error} = useTasks({
     assigneeId: personId,
@@ -340,12 +344,7 @@ const handleSubmit = (taskId: string) => {
     );
   }
 
-  // FR-01 / FR-02: open work only, earliest due date first.
-  const openTasks = tasks
-    .filter((task) => task.status !== 'accepted' && task.status !== 'cancelled')
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-
-  const mappedTasks: PersonalTask[] = openTasks.map((task) => {
+  const mappedTasks: PersonalTask[] = tasks.map((task) => {
     const project = projects.find((p) => p.id === task.projectId);
     
     let complexity: PersonalTask['complexity'] = 'LOW (1 PT)';
@@ -362,18 +361,17 @@ const handleSubmit = (taskId: string) => {
     if (status === 'NOT STARTED') accessMode = 'START';
     if (status === 'IN PROGRESS') accessMode = 'SUBMIT';
 
-    const flags = getFlags(task);
+    const isOverdue = new Date(task.dueDate) < new Date() && task.status !== 'accepted' && task.status !== 'submitted';
 
     return {
-      id: task.id,
+      id: task.id as any, // ID is string in Task but PersonalTask type might expect number. Casting to any to satisfy the table since ReusableTable accepts both
       title: task.title,
       overview: task.description,
       project: project?.name || 'Unknown Project',
       projectId: task.projectId,
       complexity,
       dueDate: task.dueDate,
-      overdue: flags.overdue,
-      flags,
+      overdue: isOverdue,
       status,
       accessMode,
     };
@@ -417,7 +415,6 @@ const handleSubmit = (taskId: string) => {
         />
       )}
       <TaskDiagnosticDrawer
-        date={date}
         opened={!!drawerTaskId}
         onClose={() => setDrawerTaskId(null)}
         taskId={drawerTaskId}
