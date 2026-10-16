@@ -38,6 +38,7 @@ import {
   type MemberTaskAction,
 } from './organisms/MemberTaskActionModal';
 import { MyWorkAttention } from './organisms/MyWorkAttention';
+import { LinkedWorkPanel } from './organisms/LinkedWorkPanel';
 import { PersonalTasksTable } from './organisms/PersonalTasksTable';
 import { RescheduleTaskModal } from './organisms/RescheduleTaskModal';
 import { SubmittedWorkTable } from './organisms/SubmittedWorkTable';
@@ -183,6 +184,8 @@ export default function MemberDashboard({
             getFlags={getFlags}
             onTaskClick={setDrawerTaskId}
           />
+
+          <LinkedWorkPanel personId={personId} date={date} onTaskClick={setDrawerTaskId} />
 
           <Paper withBorder radius="md" p="md">
             <Stack gap="md">

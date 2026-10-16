@@ -175,6 +175,7 @@ export function MemberTaskActionModal({
               taskId={action.taskId}
               value={blockingTaskId}
               onChange={setBlockingTaskId}
+              onOwnerSuggested={(ownerId) => ownerId && setBlockerOwnerId(ownerId)}
             />
             <Textarea
               label="Blocker Reason & Impact"

@@ -106,7 +106,12 @@ export function RaiseBlockerModal({
         searchable
       />
 
-      <BlockingTaskSelect taskId={taskId} value={blockingTaskId} onChange={setBlockingTaskId} />
+      <BlockingTaskSelect
+        taskId={taskId}
+        value={blockingTaskId}
+        onChange={setBlockingTaskId}
+        onOwnerSuggested={(suggested) => suggested && setOwnerId(suggested)}
+      />
 
       <Textarea
         label="Blocker Description"
