@@ -81,18 +81,6 @@ export class SupabaseTrackerApi implements ITrackerApi {
     return data as T;
   }
 
-  // Actor identity comes from the JWT; the database checks the caller manages the project.
-  private async managerMutate<T>(operation: string, payload: Json): Promise<T> {
-    const { data, error } = await this.client.rpc("tracker_manager_mutate", {
-      operation,
-      payload,
-    });
-    if (error) throw new Error(error.message);
-    if (!data || typeof data !== "object" || Array.isArray(data))
-      throw new Error("The manager mutation returned no record.");
-    return data as T;
-  }
-
   async getProjects() {
     return (
       await this.all((from, to) =>
@@ -182,11 +170,6 @@ export class SupabaseTrackerApi implements ITrackerApi {
     if (error) throw new Error(error.message);
     return data ? mapTask(data) : null;
   }
-  async getProjectTaskTitles(projectId: string) {
-    const { data, error } = await this.client.rpc("tracker_project_task_titles", { project: projectId });
-    if (error) throw new Error(error.message);
-    return (data ?? []).map((row) => ({ id: row.id, title: row.title }));
-  }
   async createTask(dto: Parameters<ITrackerApi["createTask"]>[0]) {
     return mapTask(
       await this.mutate<TaskRow>("create_task", {
@@ -260,56 +243,6 @@ export class SupabaseTrackerApi implements ITrackerApi {
   async returnTask(taskId: string, _managerId: string, reason: string) {
     return mapTask(
       await this.mutate<TaskRow>("return_task", { task_id: taskId, reason }),
-    );
-  }
-  async createManagedProject(
-    dto: Parameters<ITrackerApi["createManagedProject"]>[0],
-  ) {
-    return mapProject(
-      await this.managerMutate<ProjectRow>("create_project", {
-        name: dto.name,
-        goal: dto.goal,
-        start_date: dto.startDate,
-        target_date: dto.targetDate,
-      }),
-    );
-  }
-  async closeManagedProject(projectId: string, _actorId: string) {
-    return mapProject(
-      await this.managerMutate<ProjectRow>("close_project", {
-        project_id: projectId,
-      }),
-    );
-  }
-  async setManagedProjectMember(
-    projectId: string,
-    personId: string,
-    included: boolean,
-    _actorId: string,
-  ) {
-    await this.managerMutate("set_project_member", {
-      project_id: projectId,
-      person_id: personId,
-      included,
-    });
-  }
-  async changeTaskComplexity(
-    taskId: string,
-    complexity: Parameters<ITrackerApi["changeTaskComplexity"]>[1],
-    _actorId: string,
-    reason?: string,
-  ) {
-    return mapTask(
-      await this.managerMutate<TaskRow>("change_complexity", {
-        task_id: taskId,
-        complexity,
-        reason: reason ?? null,
-      }),
-    );
-  }
-  async reopenTask(taskId: string, _actorId: string, reason: string) {
-    return mapTask(
-      await this.managerMutate<TaskRow>("reopen_task", { task_id: taskId, reason }),
     );
   }
   async getBlockers(taskId?: string) {

@@ -13,8 +13,7 @@ interface AdminPageHeaderProps {
   isFetching: boolean;
   onRefresh: () => void;
   onExport: () => void;
-  /** Shown only on the tabs that pass it (the Portfolio). */
-  onNewProject?: () => void;
+  onNewProject: () => void;
   onResetDemo?: () => void;
   canResetDemo?: boolean;
 }
@@ -84,15 +83,13 @@ export function AdminPageHeader({
         >
           Export CSV
         </Button>
-        {onNewProject && (
-          <Button
-            color="teal"
-            leftSection={<IconPlus size={16} />}
-            onClick={onNewProject}
-          >
-            New project
-          </Button>
-        )}
+        <Button
+          color="teal"
+          leftSection={<IconPlus size={16} />}
+          onClick={onNewProject}
+        >
+          New project
+        </Button>
       </Group>
     </Group>
   );

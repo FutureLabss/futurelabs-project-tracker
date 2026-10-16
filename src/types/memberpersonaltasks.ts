@@ -1,5 +1,3 @@
-import type { MemberTaskFlags } from "../api/hooks/use-member-task-flags";
-
 export type PersonalTask = {
   id: string;
   title: string;
@@ -12,7 +10,6 @@ export type PersonalTask = {
     | 'HIGH (3 PTS)';
   dueDate: string;
   overdue?: boolean;
-  flags?: MemberTaskFlags;
   status:
     | 'NOT STARTED'
     | 'IN PROGRESS'

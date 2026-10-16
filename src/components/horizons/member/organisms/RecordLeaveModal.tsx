@@ -84,7 +84,7 @@ export function RecordLeaveModal({
           <Controller
             name="fromDate"
             control={control}
-            rules={{ required: "From date is required", deps: ["toDate"] }}
+            rules={{ required: "From date is required" }}
             render={({ field, fieldState }) => (
               <DateInput
                 label="From Date"
@@ -101,13 +101,7 @@ export function RecordLeaveModal({
           <Controller
             name="toDate"
             control={control}
-            rules={{
-              required: "To date is required",
-              // FR-17: the end of a leave period cannot be before its start.
-              validate: (to, values) =>
-                !to || !values.fromDate || !dayjs(to).isBefore(dayjs(values.fromDate), "day") ||
-                "The end date cannot be before the start date",
-            }}
+            rules={{ required: "To date is required" }}
             render={({ field, fieldState }) => (
               <DateInput
                 label="To Date"

@@ -299,7 +299,6 @@ export function AdminDetails({
   onPerson,
   onAction,
   onRecord,
-  actorId,
 }: {
   selection: { type: "project" | "task" | "person"; id: string };
   data: AdminWorkspace;
@@ -309,8 +308,6 @@ export function AdminDetails({
   onPerson: (id: string) => void;
   onAction: (action: AdminAction) => void;
   onRecord: (record: LedgerRecord) => void;
-  /** The signed-in admin: they only start, submit or block tasks assigned to them. */
-  actorId: string;
 }) {
   const project = data.projects.find((p) => p.id === selection.id);
   const task = data.tasks.find((t) => t.id === selection.id);
@@ -521,7 +518,7 @@ export function AdminDetails({
                   size="xs"
                   onClick={() => onAction({ kind: "assign", taskId: task.id })}
                 >
-                  {task.assigneeId ? "Reassign owner" : "Assign owner"}
+                  Assign owner
                 </Button>
                 <Button
                   size="xs"
@@ -532,7 +529,7 @@ export function AdminDetails({
                 >
                   Reschedule
                 </Button>
-                {task.status === "not_started" && task.assigneeId === actorId && (
+                {task.status === "not_started" && (
                   <Button
                     size="xs"
                     onClick={() => onAction({ kind: "start", taskId: task.id })}
@@ -540,7 +537,7 @@ export function AdminDetails({
                     Start work
                   </Button>
                 )}
-                {["not_started", "in_progress"].includes(task.status) && task.assigneeId === actorId && (
+                {["not_started", "in_progress"].includes(task.status) && (
                   <>
                     <Button
                       size="xs"

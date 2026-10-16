@@ -1,4 +1,5 @@
 import {
+  ActionIcon,
   Badge,
   Box,
   Group,
@@ -13,29 +14,33 @@ import {
 } from '@mantine/core';
 import {
   IconArrowLeft,
+  IconCheck,
   IconFolder,
+  IconAlertTriangle,
+  IconClock,
 } from '@tabler/icons-react';
 import { useProjects } from '../../../api/hooks/use-projects';
 import { useTasks } from '../../../api/hooks/use-tasks';
+import { useSignals } from '../../../api/hooks/use-signals';
 import { useLedger } from '../../../api/hooks/use-ledger';
 import { usePersons } from '../../../api/hooks/use-availability';
 import { ReusableTable, TableColumn } from '../../Table/ReusableTable';
 import { readable } from '../admin/admin-utils';
+import { RagBadge } from '../admin/atoms/RagBadge';
 import { TaskComplexity } from '../../../entities/task.entity';
 
 interface ProjectDetailsViewProps {
   projectId: string;
-  personId: string;
   onBack: () => void;
 }
 
-/**
- * A member's view of one project: its details plus only the member's own
- * tasks and their history (FR-19 — members never see teammates' work).
- */
-export function ProjectDetailsView({ projectId, personId, onBack }: ProjectDetailsViewProps) {
+export function ProjectDetailsView({ projectId, onBack }: ProjectDetailsViewProps) {
   const { data: projects = [] } = useProjects();
-  const { data: projectTasks = [] } = useTasks({ projectId });
+  const { data: tasks = [] } = useTasks({ projectId });
+
+  // Use today's date for signals
+  const today = new Date().toISOString().split('T')[0];
+  const { data: signals } = useSignals(today);
   const { data: ledger = [] } = useLedger();
   const { data: persons = [] } = usePersons();
 
@@ -45,9 +50,7 @@ export function ProjectDetailsView({ projectId, personId, onBack }: ProjectDetai
     return <Text>Project not found.</Text>;
   }
 
-  const tasks = projectTasks
-    .filter((t) => t.assigneeId === personId)
-    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  const projectSummary = signals?.projectSummaries.find(s => s.projectId === projectId);
 
   const getComplexityPoints = (complexity: TaskComplexity) => {
     if (complexity === 'high') return 3;
@@ -72,21 +75,30 @@ export function ProjectDetailsView({ projectId, personId, onBack }: ProjectDetai
     'cancelled': tasks.filter(t => t.status === 'cancelled').length,
   };
 
+  const unassignedTasks = tasks.filter(t => !t.assigneeId && t.status !== 'accepted' && t.status !== 'cancelled');
+
   const personName = (id: string | null) => {
     if (!id) return "Unassigned";
     return persons.find(p => p.id === id)?.name || "Unknown";
   };
 
-  const relatedLedger = ledger
-    .filter((r) => tasks.some((t) => t.id === r.subjectId))
-    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+  const relatedLedger = ledger.filter(r =>
+    r.subjectId === projectId ||
+    tasks.some(t => t.id === r.subjectId)
+  );
 
   const taskColumns: TableColumn<any>[] = [
     {
       key: 'title',
       label: 'Task Title',
-      width: '50%',
+      width: '30%',
       render: (t) => <Text size="sm" fw={500}>{t.title}</Text>
+    },
+    {
+      key: 'assignee',
+      label: 'Assignee',
+      width: '20%',
+      render: (t) => <Text size="sm" c="teal.7">{personName(t.assigneeId)}</Text>
     },
     {
       key: 'complexity',
@@ -179,6 +191,7 @@ export function ProjectDetailsView({ projectId, personId, onBack }: ProjectDetai
                 <Text c="dimmed" size="sm" mt={4}>{project.goal}</Text>
               </Box>
             </Group>
+            {projectSummary && <RagBadge status={projectSummary.ragStatus} closed={project.state === 'closed'} />}
           </Group>
 
           <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} mt="xl">
@@ -204,11 +217,35 @@ export function ProjectDetailsView({ projectId, personId, onBack }: ProjectDetai
         </Paper>
       </Stack>
 
+      {/* DIAGNOSTICS */}
+      {projectSummary?.ragReasons && projectSummary.ragReasons.length > 0 && (
+        <Paper withBorder p="lg" radius="md">
+          <Group justify="space-between" mb="md">
+            <Group gap="sm">
+              <IconAlertTriangle size={24} color="var(--mantine-color-orange-6)" />
+              <Title order={4}>Deterministic Mathematical RAG Diagnostics</Title>
+            </Group>
+            <RagBadge status={projectSummary.ragStatus} closed={project.state === 'closed'} />
+          </Group>
+          <Text size="sm" c="dimmed" mb="lg">
+            Calculated dynamically from target date variance, overdue deliverable count, open blockers, and slip logs.
+          </Text>
+          <Stack gap="xs">
+            {projectSummary.ragReasons.map((reason, idx) => (
+              <Group key={idx} gap="xs">
+                <IconClock size={16} color="var(--mantine-color-gray-5)" />
+                <Text size="sm">{reason}</Text>
+              </Group>
+            ))}
+          </Stack>
+        </Paper>
+      )}
+
       {/* METRICS ROW */}
       <SimpleGrid cols={{ base: 1, md: 2 }}>
         <Paper withBorder p="lg" radius="md">
           <Group justify="space-between" mb="lg">
-            <Title order={5}>My Completion in This Project</Title>
+            <Title order={5}>Complexity-Weighted Completion</Title>
             <Badge color="teal" variant="light">{completedComplexity} / {totalComplexity} PTS ({completionPercent}%)</Badge>
           </Group>
           <Group justify="center" mb="lg">
@@ -228,7 +265,7 @@ export function ProjectDetailsView({ projectId, personId, onBack }: ProjectDetai
 
         <Paper withBorder p="lg" radius="md">
           <Group justify="space-between" mb="lg">
-            <Title order={5}>My Task Status ({tasks.length})</Title>
+            <Title order={5}>Deliverable Status Distribution ({tasks.length})</Title>
           </Group>
           <SimpleGrid cols={2} spacing="md">
             {Object.entries(statusDistribution).map(([status, count]) => {
@@ -251,11 +288,34 @@ export function ProjectDetailsView({ projectId, personId, onBack }: ProjectDetai
         </Paper>
       </SimpleGrid>
 
+      {/* UNASSIGNED TASKS TRAY */}
+      <Paper withBorder p="lg" radius="md">
+        <Group justify="space-between" mb="md">
+          <Group gap="sm">
+            <IconAlertTriangle size={20} color={unassignedTasks.length > 0 ? "var(--mantine-color-orange-6)" : "var(--mantine-color-gray-4)"} />
+            <Title order={5}>Unassigned Tasks Intake Tray ({unassignedTasks.length})</Title>
+          </Group>
+          <Text size="xs" c="dimmed">Work items needing owner designation</Text>
+        </Group>
+
+        {unassignedTasks.length === 0 ? (
+          <Paper withBorder p="xl" radius="md" style={{ textAlign: 'center' }}>
+            <ActionIcon size="xl" color="teal" variant="light" radius="xl" mb="sm" mx="auto">
+              <IconCheck size={24} />
+            </ActionIcon>
+            <Title order={5}>All Tasks Assigned</Title>
+            <Text size="sm" c="dimmed">Every active deliverable in this initiative has a designated owner.</Text>
+          </Paper>
+        ) : (
+          <ReusableTable columns={taskColumns} data={unassignedTasks} />
+        )}
+      </Paper>
+
       {/* ALL TASKS */}
       <Paper withBorder p="lg" radius="md">
         <Group justify="space-between" mb="md">
-          <Title order={5}>My Tasks in This Project ({tasks.length})</Title>
-          <Text size="xs" c="dimmed">Only tasks assigned to you</Text>
+          <Title order={5}>Project Deliverables & Work Items ({tasks.length})</Title>
+          <Text size="xs" c="dimmed">Click any task to inspect details in side drawer</Text>
         </Group>
         <ReusableTable columns={taskColumns} data={tasks} />
       </Paper>
@@ -263,8 +323,8 @@ export function ProjectDetailsView({ projectId, personId, onBack }: ProjectDetai
       {/* LEDGER */}
       <Paper withBorder p="lg" radius="md">
         <Group justify="space-between" mb="md">
-          <Title order={5}>My Task History ({relatedLedger.length})</Title>
-          <Text size="xs" c="dimmed">Changes to your tasks in this project, newest first</Text>
+          <Title order={5}>Project Change Ledger Feed ({relatedLedger.length})</Title>
+          <Text size="xs" c="dimmed">Filtered strictly to this initiative • Click any row for raw audit inspection</Text>
         </Group>
         <ReusableTable columns={ledgerColumns} data={relatedLedger} />
       </Paper>

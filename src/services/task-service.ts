@@ -5,7 +5,6 @@ type Backend = Pick<
   | "getTasks"
   | "getTasksCount"
   | "getTaskById"
-  | "getProjectTaskTitles"
   | "createTask"
   | "assignTask"
   | "updateTaskStatus"
@@ -13,8 +12,6 @@ type Backend = Pick<
   | "submitTask"
   | "acceptTask"
   | "returnTask"
-  | "changeTaskComplexity"
-  | "reopenTask"
 >;
 
 export class TaskService {
@@ -36,12 +33,6 @@ export class TaskService {
     ...args: Parameters<Backend["getTaskById"]>
   ): ReturnType<Backend["getTaskById"]> {
     return this.api.getTaskById(...args);
-  }
-
-  getProjectTaskTitles(
-    ...args: Parameters<Backend["getProjectTaskTitles"]>
-  ): ReturnType<Backend["getProjectTaskTitles"]> {
-    return this.api.getProjectTaskTitles(...args);
   }
 
   createTask(
@@ -84,17 +75,5 @@ export class TaskService {
     ...args: Parameters<Backend["returnTask"]>
   ): ReturnType<Backend["returnTask"]> {
     return this.api.returnTask(...args);
-  }
-
-  changeTaskComplexity(
-    ...args: Parameters<Backend["changeTaskComplexity"]>
-  ): ReturnType<Backend["changeTaskComplexity"]> {
-    return this.api.changeTaskComplexity(...args);
-  }
-
-  reopenTask(
-    ...args: Parameters<Backend["reopenTask"]>
-  ): ReturnType<Backend["reopenTask"]> {
-    return this.api.reopenTask(...args);
   }
 }

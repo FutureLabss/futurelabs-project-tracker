@@ -162,29 +162,13 @@ test("admin lifecycle, project membership, audit, and session authorization", as
       govern("set_project_member", { ...access, included: false }),
       /Reassign/,
     );
-    const blockerInput = {
+    const blocker = await mutate("raise_blocker", {
       task_id: task.id,
       category: "external",
       description: "Waiting",
       owner_id: member,
-    };
-    // Only the assignee declares a blocker, starts or submits their own work.
-    await assert.rejects(mutate("raise_blocker", blockerInput), /Only the task's assignee/);
-    await assert.rejects(
-      mutate("update_task_status", { task_id: task.id, status: "in_progress" }),
-      /Only the task's assignee/,
-    );
-    await assert.rejects(
-      mutate("submit_task", { task_id: task.id, notes: "Not mine" }, manager),
-      /Only the task's assignee/,
-    );
-    const blocker = await mutate("raise_blocker", blockerInput, member);
-    // Administrators are never task owners; the project manager takes it over.
-    await assert.rejects(
-      mutate("assign_task", { task_id: task.id, assignee_id: admin }),
-      /Administrators cannot be assigned tasks/,
-    );
-    await mutate("assign_task", { task_id: task.id, assignee_id: manager });
+    });
+    await mutate("assign_task", { task_id: task.id, assignee_id: admin });
     await assert.rejects(
       govern("set_project_member", { ...access, included: false }),
       /blockers/,
@@ -195,15 +179,11 @@ test("admin lifecycle, project membership, audit, and session authorization", as
       due_date: "2026-09-25",
       reason: "Provider delay",
     });
-    await mutate(
-      "submit_task",
-      {
-        task_id: task.id,
-        notes: "Review ready",
-        deliverable_url: "https://example.test/delivery",
-      },
-      manager,
-    );
+    await mutate("submit_task", {
+      task_id: task.id,
+      notes: "Review ready",
+      deliverable_url: "https://example.test/delivery",
+    });
     await assert.rejects(
       mutate("return_task", { task_id: task.id, reason: " " }),
       /reason/,
@@ -212,7 +192,7 @@ test("admin lifecycle, project membership, audit, and session authorization", as
       task_id: task.id,
       reason: "Add documentation",
     });
-    await mutate("submit_task", { task_id: task.id, notes: "Updated docs" }, manager);
+    await mutate("submit_task", { task_id: task.id, notes: "Updated docs" });
     await mutate("accept_task", { task_id: task.id });
     await govern("set_project_member", { ...access, included: false });
     assert.equal(
@@ -226,7 +206,7 @@ test("admin lifecycle, project membership, audit, and session authorization", as
       mutate("create_task", {
         project_id: project.id,
         title: "Too late",
-        assignee_id: manager,
+        assignee_id: admin,
         complexity: "low",
         origin: "planned",
         due_date: "2026-09-25",

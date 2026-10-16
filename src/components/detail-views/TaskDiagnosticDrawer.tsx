@@ -22,7 +22,6 @@ import {
   IconClock,
   IconRefresh,
 } from '@tabler/icons-react';
-import dayjs from 'dayjs';
 import { useTasks } from '../../api/hooks/use-tasks';
 import { useProjects } from '../../api/hooks/use-projects';
 import { usePersons } from '../../api/hooks/use-availability';
@@ -36,8 +35,6 @@ interface TaskDiagnosticDrawerProps {
   onClose: () => void;
   taskId: string | null;
   isReadOnly?: boolean;
-  /** Dashboard (time machine) date, YYYY-MM-DD; defaults to the local date. */
-  date?: string;
   onOpenRaiseBlocker?: (task: any) => void;
   onOpenReschedule?: (task: any) => void;
   onOpenClearBlocker?: (task: any) => void;
@@ -50,7 +47,6 @@ export function TaskDiagnosticDrawer({
   onClose,
   taskId,
   isReadOnly = false,
-  date,
   onOpenRaiseBlocker,
   onOpenReschedule,
   onOpenClearBlocker,
@@ -70,9 +66,7 @@ export function TaskDiagnosticDrawer({
   const project = projects.find((p: any) => p.id === task.projectId);
   const assignee = persons.find((p: any) => p.id === task.assigneeId);
 
-  // SR-08: overdue once the due date has passed, unless accepted or cancelled.
-  const today = date ?? dayjs().format('YYYY-MM-DD');
-  const isOverdue = task.dueDate < today && task.status !== 'accepted' && task.status !== 'cancelled';
+  const isOverdue = new Date(task.dueDate) < new Date() && task.status !== 'accepted' && task.status !== 'submitted';
 
   // Audit Logs
   const scheduleSlips = ledger.filter((l: any) => l.type === 'task_redated').sort((a: any, b: any) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
@@ -286,15 +280,16 @@ export function TaskDiagnosticDrawer({
                 </Button>
               )}
 
-              {/* FR-12: the assignee may move the due date of any open task */}
-              <Button
-                variant="outline"
-                color="orange"
-                leftSection={<IconCalendarEvent size={16} />}
-                onClick={() => onOpenReschedule && onOpenReschedule(task as any)}
-              >
-                Reschedule Due Date...
-              </Button>
+              {task.status !== 'not_started' && (
+                <Button
+                  variant="outline"
+                  color="orange"
+                  leftSection={<IconCalendarEvent size={16} />}
+                  onClick={() => onOpenReschedule && onOpenReschedule(task as any)}
+                >
+                  Reschedule Due Date...
+                </Button>
+              )}
             </Group>
           </Card>
         )}

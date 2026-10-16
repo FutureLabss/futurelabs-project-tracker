@@ -1,5 +1,5 @@
 export type AcceptedDeliverable = {
-  id: string;
+  id: number;
   deliverable: string;
   project: string;
   projectId?: string;

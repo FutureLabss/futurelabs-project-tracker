@@ -36,7 +36,6 @@ export function calculateOperationalSignals(
   );
 
   const attentionItems: AttentionItem[] = [];
-  const staleTaskIdSet = new Set<string>();
 
   // Helper map for quick lookups
   const personMap = new Map<string, Person>(persons.map((p) => [p.id, p]));
@@ -57,52 +56,12 @@ export function calculateOperationalSignals(
 
     // B. Check Last Activity & Staleness (adjusted for leave)
     const taskLedger = ledger.filter((l) => l.subjectId === task.id);
-    const latestTaskEvent = taskLedger.reduce<LedgerRecord | null>(
-      (latest, event) =>
-        !latest || dayjs(event.occurredAt).isAfter(dayjs(latest.occurredAt))
-          ? event
-          : latest,
-      null,
-    );
-    const latestReviewEvent = taskLedger
-      .filter((event) =>
-        [
-          "task_returned",
-          "task_submitted",
-          "task_accepted",
-          "task_cancelled",
-        ].includes(event.type),
-      )
-      .reduce<LedgerRecord | null>(
-        (latest, event) =>
-          !latest || dayjs(event.occurredAt).isAfter(dayjs(latest.occurredAt))
-            ? event
-            : latest,
-        null,
-      );
-    const lastActivityTimestamp = latestTaskEvent?.occurredAt ?? task.createdAt;
-
-    if (
-      task.status === "in_progress" &&
-      latestReviewEvent?.type === "task_returned"
-    ) {
-      const reviewer = personMap.get(latestReviewEvent.actorId);
-      attentionItems.push({
-        id: `returned-for-rework-${task.id}`,
-        taskId: task.id,
-        projectId: task.projectId,
-        taskTitle: task.title,
-        projectName,
-        assigneeId: task.assigneeId,
-        assigneeName,
-        signalType: "returned_for_rework",
-        severity: "warning",
-        headline: `Returned for Work: ${task.title}`,
-        details: `${reviewer?.name ?? "Manager"} returned this deliverable for rework: ${latestReviewEvent.reason ?? "Review requested"}`,
-        dueDate: task.dueDate,
-        complexity: task.complexity,
-      });
-    }
+    const lastActivityTimestamp =
+      taskLedger.length > 0
+        ? taskLedger.reduce((latest, l) =>
+            dayjs(l.occurredAt).isAfter(dayjs(latest.occurredAt)) ? l : latest,
+          ).occurredAt
+        : task.createdAt;
 
     const rawInactiveWorkingDays = getWorkingDaysElapsed(
       lastActivityTimestamp,
@@ -125,7 +84,6 @@ export function calculateOperationalSignals(
     const isStale =
       adjustedInactiveWorkingDays >=
       SYSTEM_CONFIG.STALE_INACTIVITY_WORKING_DAYS;
-    if (isStale) staleTaskIdSet.add(task.id);
 
     // C. Check Silent Overrun (Overdue + Stale) -> PINNED TOP PRIORITY CRITICAL
     if (isOverdue && isStale) {
@@ -170,14 +128,16 @@ export function calculateOperationalSignals(
 
     // E. Check Aging WIP (In Progress beyond complexity threshold)
     if (task.status === "in_progress") {
-      // Latest move into progress by time, whatever order the backend returned
-      // the ledger in; returns, reopens and cleared blockers also re-enter it.
-      const inProgStart = ledger
-        .filter((l) => l.subjectId === task.id && l.toValue === "in_progress")
-        .reduce(
-          (latest, l) => (l.occurredAt > latest ? l.occurredAt : latest),
-          task.createdAt,
-        );
+      const inProgEvents = ledger.filter(
+        (l) =>
+          l.subjectId === task.id &&
+          l.type === "status_changed" &&
+          l.toValue === "in_progress",
+      );
+      const inProgStart =
+        inProgEvents.length > 0
+          ? inProgEvents[inProgEvents.length - 1].occurredAt
+          : task.createdAt;
 
       const inProgressDays = getWorkingDaysElapsed(inProgStart, simulatedDate);
       const maxAllowedDays =
@@ -338,9 +298,6 @@ export function calculateOperationalSignals(
       acceptedCountThisMonth: acceptedThisMonth.length,
       acceptedWeightThisMonth,
       overdueCount,
-      staleTaskIds: memberActiveTasks
-        .filter((t) => staleTaskIdSet.has(t.id))
-        .map((t) => t.id),
     };
   }
 

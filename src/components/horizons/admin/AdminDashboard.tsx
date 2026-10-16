@@ -34,19 +34,11 @@ import {
   type AnalyticsPreset,
   type DateRange,
   calculatePeriodAnalytics,
-  calculatePeriodMetrics,
   computeDateRange,
   downloadCsv,
   isOpen,
-  localDay,
   readable,
 } from "./admin-utils";
-import dayjs from "dayjs";
-import {
-  acceptanceEvents,
-  blockerCategoryReport,
-  monthlyDelivery,
-} from "../../../domain/calculations/admin-insights";
 import { MetricCard } from "./atoms/MetricCard";
 import { EmptyState } from "./atoms/EmptyState";
 import { RiskSignalCard } from "./molecules/RiskSignalCard";
@@ -56,8 +48,6 @@ import { GovernancePanel } from "./organisms/GovernancePanel";
 import { PeopleGrid } from "./organisms/PeopleGrid";
 import { AnalyticsPanel } from "./organisms/AnalyticsPanel";
 import { AdminTemplate } from "./templates/AdminTemplate";
-import { RiskWatchlists } from "./organisms/RiskWatchlists";
-import { inactiveProjects, unattendedTasks } from "../../../domain/calculations/admin-insights";
 
 const headings: Record<AdminView, [string, string]> = {
   portfolio: [
@@ -108,8 +98,7 @@ export default function AdminDashboard({
   const [filters, setFilters] = useState<Partial<Record<AdminView, string>>>(
     {},
   );
-  // FR-51: the portfolio lists active projects unless another filter is chosen.
-  const filter = filters[view] ?? (view === "portfolio" ? "active" : "all");
+  const filter = filters[view] ?? "all";
   const setFilter = (value: string) =>
     setFilters((current) => ({ ...current, [view]: value }));
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
@@ -126,8 +115,10 @@ export default function AdminDashboard({
   const adminActionMutation = useAdminAction();
 
   const [analyticsPreset, setAnalyticsPreset] = useState<AnalyticsPreset>("30d");
+  const defaultMonthAgo = new Date(`${date}T00:00:00`);
+  defaultMonthAgo.setDate(defaultMonthAgo.getDate() - 30);
   const [customRange, setCustomRange] = useState<DateRange>({
-    startDate: dayjs(date).subtract(30, "day").format("YYYY-MM-DD"),
+    startDate: defaultMonthAgo.toISOString().slice(0, 10),
     endDate: date,
   });
 
@@ -166,27 +157,17 @@ export default function AdminDashboard({
   const projectName = (id: string) =>
     data.projects.find((p) => p.id === id)?.name ?? "Unknown project";
   const activeProjects = data.projects.filter((p) => p.state === "active");
-  const summaryOf = (projectId: string) =>
-    data.signals.projectSummaries.find((s) => s.projectId === projectId);
-  // FR-52: most at risk first (red, amber, green, then closed), then the
-  // project with more reasons, then the nearest target date.
-  const riskRank = (p: (typeof data.projects)[number]) =>
-    p.state === "closed" ? 3 : { red: 0, amber: 1, green: 2 }[summaryOf(p.id)?.ragStatus ?? "green"];
-  const projects = data.projects
-    .filter(
-      (p) =>
-        matches(p.name, p.goal, personName(p.managerId)) &&
-        (filter === "all" ||
-          filter === p.state ||
-          (filter === "unmanaged" && !p.managerId && p.state === "active") ||
-          (p.state === "active" && filter === summaryOf(p.id)?.ragStatus)),
-    )
-    .sort(
-      (a, b) =>
-        riskRank(a) - riskRank(b) ||
-        (riskRank(a) < 2 ? (summaryOf(b.id)?.ragReasons.length ?? 0) - (summaryOf(a.id)?.ragReasons.length ?? 0) : 0) ||
-        a.targetDate.localeCompare(b.targetDate),
-    );
+  const metrics = data.signals.orgMetrics;
+  const projects = data.projects.filter(
+    (p) =>
+      matches(p.name, p.goal, personName(p.managerId)) &&
+      (filter === "all" ||
+        filter === p.state ||
+        (filter === "unmanaged" && !p.managerId && p.state === "active") ||
+        filter ===
+          data.signals.projectSummaries.find((s) => s.projectId === p.id)
+            ?.ragStatus),
+  );
   const tasks = data.tasks.filter(
     (t) =>
       matches(
@@ -206,17 +187,6 @@ export default function AdminDashboard({
       (filter === "all" || filter === r.signalType) &&
       (!projectFilter || r.projectId === projectFilter),
   );
-  // FR-54 / FR-55 watchlists, following the Risks view's project filter and search.
-  const unattended = unattendedTasks(data.tasks, data.blockers, data.ledger, date).filter(
-    (r) =>
-      (!projectFilter || r.task.projectId === projectFilter) &&
-      matches(r.task.title, projectName(r.task.projectId), personName(r.task.assigneeId)),
-  );
-  const inactive = inactiveProjects(data.projects, data.tasks, data.blockers, data.ledger, date).filter(
-    (r) =>
-      (!projectFilter || r.project.id === projectFilter) &&
-      matches(r.project.name, personName(r.project.managerId)),
-  );
   const people = data.people.filter((p) =>
     matches(p.name, p.email, p.title, p.role),
   );
@@ -233,51 +203,47 @@ export default function AdminDashboard({
   );
 
   const effectiveRange = computeDateRange(analyticsPreset, date, customRange);
-  // Same source as Analytics: acceptances from the change log, so reopened work still counts.
-  const last30 = calculatePeriodMetrics(data, computeDateRange("30d", date));
-  const acceptedLast30 = { count: last30.acceptedCount, weight: last30.acceptedWeight };
   const periodAnalytics = {
     ...calculatePeriodAnalytics(data, effectiveRange, projectFilter),
     currentRange: effectiveRange,
   };
 
-  // Task lists behind each analytics report, using the same rules as the figures.
-  const inPeriod = (timestamp: string) => {
-    const day = localDay(timestamp);
-    return day >= effectiveRange.startDate && day <= effectiveRange.endDate;
-  };
   const reportTaskIds = new Set(
     data.ledger
       .filter((r) => {
-        if (!inPeriod(r.occurredAt)) return false;
-        if (report === "rework") return r.type === "task_returned" || r.type === "task_reopened";
-        if (report !== "slips") return false;
-        return r.type === "task_redated" && !!r.fromValue && !!r.toValue && r.toValue > r.fromValue;
+        const occurred = r.occurredAt.slice(0, 10);
+        if (
+          occurred < effectiveRange.startDate ||
+          occurred > effectiveRange.endDate
+        ) {
+          return false;
+        }
+        return report === "rework"
+          ? r.type === "task_returned"
+          : r.type === "task_redated";
       })
       .map((r) => r.subjectId),
   );
-  if (report === "throughput")
-    for (const e of acceptanceEvents(data.tasks, data.ledger)) if (inPeriod(e.occurredAt)) reportTaskIds.add(e.taskId);
   const reportTasks = data.tasks.filter(
     (t) =>
       matches(t.title, projectName(t.projectId), personName(t.assigneeId)) &&
       (!projectFilter || t.projectId === projectFilter) &&
-      (report === "unplanned"
-        ? t.origin === "unplanned" && inPeriod(t.createdAt)
-        : report === "blockers"
-          ? data.blockers.some(
-              (b) =>
-                b.taskId === t.id &&
-                inPeriod(b.raisedAt) &&
-                (filter === "all" || b.category === filter),
-            )
-          : reportTaskIds.has(t.id)),
+      (report === "throughput"
+        ? t.status === "accepted" &&
+          !!t.acceptedAt &&
+          t.acceptedAt.slice(0, 10) >= effectiveRange.startDate &&
+          t.acceptedAt.slice(0, 10) <= effectiveRange.endDate
+        : report === "unplanned"
+          ? t.origin === "unplanned" && isOpen(t)
+          : report === "blockers"
+            ? data.blockers.some(
+                (b) =>
+                  b.taskId === t.id &&
+                  !b.clearedAt &&
+                  (filter === "all" || b.category === filter),
+              )
+            : reportTaskIds.has(t.id)),
   );
-  const analyticsTasks = projectFilter
-    ? data.tasks.filter((t) => t.projectId === projectFilter)
-    : data.tasks;
-  const monthlyRows = monthlyDelivery(analyticsTasks, data.ledger, date, 6);
-  const blockerReport = blockerCategoryReport(data.blockers, analyticsTasks, data.projects, effectiveRange);
   const exportRows = (): unknown[][] => {
     if (view === "portfolio" || view === "governance")
       return [
@@ -327,7 +293,7 @@ export default function AdminDashboard({
       ];
     if (view === "people")
       return [
-        ["Name", "Email", "Role", "Status", "Open tasks", "Open work (complexity points)"],
+        ["Name", "Email", "Role", "Status", "Open tasks", "Complexity points"],
         ...people.map((p) => [
           p.name,
           p.email,
@@ -412,8 +378,8 @@ export default function AdminDashboard({
             "Lead",
             "Accepted in Period",
             "Delivered Points",
-            "Returned or Reopened",
-            "Due Dates Moved Later",
+            "Returns (Rework)",
+            "Date Slips",
             "Open Tasks",
           ],
           ...periodAnalytics.projectBreakdown.map((p) => [
@@ -424,6 +390,25 @@ export default function AdminDashboard({
             p.returnsCount,
             p.dateChangesCount,
             p.openTasksCount,
+          ]),
+          [],
+          [
+            "Team Member",
+            "Role",
+            "Status",
+            "Accepted in Period",
+            "Delivered Points",
+            "Returns",
+            "Active Tasks",
+          ],
+          ...periodAnalytics.personBreakdown.map((p) => [
+            p.name,
+            p.role,
+            p.status,
+            p.acceptedCount,
+            p.acceptedWeight,
+            p.returnsCount,
+            p.activeTasksCount,
           ]),
         ];
       }
@@ -513,40 +498,46 @@ export default function AdminDashboard({
       isFetching={query.isFetching}
       onRefresh={() => void query.refetch()}
       onExport={exportReport}
-      // Portfolio is the admin home: only it carries New project, Reset demo and the summary cards.
-      onNewProject={view === "portfolio" ? () => setAction({ kind: "project" }) : undefined}
-      onResetDemo={view === "portfolio" ? () => setResetModalOpen(true) : undefined}
+      onNewProject={() => setAction({ kind: "project" })}
+      onResetDemo={() => setResetModalOpen(true)}
       canResetDemo={canResetDemo}
       queryError={query.isError ? query.error.message : undefined}
       exportError={exportError}
       exportNotice={exportNotice}
       onClearExportNotice={() => setExportNotice("")}
       metricsGrid={
-        view === "portfolio" && (
         <SimpleGrid cols={{ base: 1, xs: 2, xl: 4 }}>
           <MetricCard
             label="Active projects"
             value={activeProjects.length}
             detail={`${activeProjects.filter((p) => !p.managerId).length} without a lead`}
+            onClick={() => changeView("portfolio")}
           />
           <MetricCard
             label="Accepted in 30 days"
-            value={acceptedLast30.count}
-            detail={`${acceptedLast30.weight} complexity points`}
+            value={metrics.acceptedThroughput30d}
+            detail={`${metrics.acceptedWeight30d} complexity points`}
+            onClick={() => {
+              changeView("analytics");
+              setReport("throughput");
+            }}
           />
           <MetricCard
             label="Review queue"
             value={data.tasks.filter((t) => t.status === "submitted").length}
             detail="Submitted deliverables awaiting acceptance"
+            onClick={() => {
+              changeView("tasks", "submitted");
+            }}
           />
           <MetricCard
             label="Critical risks"
             value={data.signals.attentionItems.filter((r) => r.severity === "critical")
               .length}
             detail="Signals requiring investigation"
+            onClick={() => changeView("risks")}
           />
         </SimpleGrid>
-        )
       }
       controls={
         <TextInput
@@ -578,7 +569,6 @@ export default function AdminDashboard({
             onPerson={onPerson}
             onAction={setAction}
             onRecord={setRecord}
-            actorId={actorId}
           />
         )
       }
@@ -683,8 +673,6 @@ export default function AdminDashboard({
               projects={data.projects}
               people={data.people}
               onTaskClick={onTask}
-              canDoMemberActions={(task) => task.assigneeId === actorId}
-              today={date}
               onTaskStatusChange={async (taskId, targetStatus) => {
                 await adminActionMutation.mutateAsync(() =>
                   taskService.updateTaskStatus(taskId, targetStatus, actorId),
@@ -763,10 +751,11 @@ export default function AdminDashboard({
                   data={[
                     "all",
                     "silent_overrun",
-                    "overdue",
                     "aging_wip",
                     "aging_blocker",
-                    "returned_for_rework",
+                    "stale_inactivity",
+                    "overdue",
+                    "imminent_unstarted",
                     "unowned_task",
                     "unmanaged_project",
                   ].map((value) => ({ value, label: readable(value) }))}
@@ -791,15 +780,6 @@ export default function AdminDashboard({
             </Group>
           </Card>
 
-          <RiskWatchlists
-            unattended={unattended}
-            inactive={inactive}
-            projectName={projectName}
-            personName={personName}
-            onTask={onTask}
-            onProject={onProject}
-          />
-
           {!risks.length && (
             <Card withBorder p="xl" radius="md">
               <EmptyState message="No matching risks for this reporting date." />
@@ -822,8 +802,6 @@ export default function AdminDashboard({
           <AnalyticsPanel
             data={data}
             blockerAnalytics={data.signals.blockerAnalytics}
-            blockerReport={blockerReport}
-            monthlyRows={monthlyRows}
             reportTasks={reportTasks}
             report={report}
             filter={filter}

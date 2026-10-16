@@ -22,9 +22,6 @@ interface BlockerCategoryCardProps {
   category: string;
   label: string;
   activeCount: number;
-  /** FR-60: blockers of this category raised in the chosen period, and the projects they hit. */
-  raisedInPeriod: number;
-  projectNames: string[];
   avgResolutionDays: number;
   isSelected: boolean;
   onToggle: (category: string) => void;
@@ -52,8 +49,6 @@ export function BlockerCategoryCard({
   category,
   label,
   activeCount,
-  raisedInPeriod,
-  projectNames,
   avgResolutionDays,
   isSelected,
   onToggle,
@@ -104,18 +99,9 @@ export function BlockerCategoryCard({
             color={hasActive ? "red" : "gray"}
             size="sm"
           >
-            {activeCount} open now
+            {activeCount} active
           </Badge>
         </Group>
-
-        <Box>
-          <Text size="sm">
-            <Text span fw={700}>{raisedInPeriod}</Text> raised in this period
-          </Text>
-          <Text size="xs" c="dimmed" lineClamp={3}>
-            {projectNames.length ? `Projects: ${projectNames.join(", ")}` : "No projects affected in this period"}
-          </Text>
-        </Box>
 
         <Button
           size="xs"

@@ -9,9 +9,6 @@ type Backend = Pick<
   | "getProjectMembers"
   | "setProjectMember"
   | "closeProject"
-  | "createManagedProject"
-  | "closeManagedProject"
-  | "setManagedProjectMember"
 >;
 
 export class ProjectService {
@@ -24,15 +21,6 @@ export class ProjectService {
   }
   closeProject(...args: Parameters<Backend["closeProject"]>) {
     return this.api.closeProject(...args);
-  }
-  createManagedProject(...args: Parameters<Backend["createManagedProject"]>) {
-    return this.api.createManagedProject(...args);
-  }
-  closeManagedProject(...args: Parameters<Backend["closeManagedProject"]>) {
-    return this.api.closeManagedProject(...args);
-  }
-  setManagedProjectMember(...args: Parameters<Backend["setManagedProjectMember"]>) {
-    return this.api.setManagedProjectMember(...args);
   }
 
   getProjects(
