@@ -136,7 +136,7 @@ export function PersonCard({
               </Text>
             </Group>
             <Text size="10px" c="dimmed">
-              Points
+              Open pts
             </Text>
           </Card>
 

@@ -1,4 +1,7 @@
+import dayjs from "dayjs";
 import type { AdminWorkspace } from "../../../api/hooks/use-admin-workspace";
+import { unplannedShare } from "../../../domain/calculations/manager-insights";
+import { acceptanceEvents } from "../../../domain/calculations/admin-insights";
 
 export const isOpen = (task: { status: string }) =>
   !["accepted", "cancelled"].includes(task.status);
@@ -13,12 +16,12 @@ export function eligiblePeople(data: AdminWorkspace, projectId: string) {
       .map((member) => member.personId),
   );
 
+  // Administrators are never task owners: only the project's manager and members.
   return data.people.filter(
     (p) =>
       p.status !== "inactive" &&
-      (p.role === "admin" ||
-        p.id === project.managerId ||
-        projectMemberIds.has(p.id)),
+      p.role !== "admin" &&
+      (p.id === project.managerId || projectMemberIds.has(p.id)),
   );
 }
 // Quote every cell, escape CSV quotes, and neutralize spreadsheet formula input.
@@ -149,82 +152,59 @@ export interface ProjectBreakdownItem {
   openTasksCount: number;
 }
 
-export interface PersonBreakdownItem {
-  personId: string;
-  name: string;
-  role: string;
-  status: string;
-  acceptedCount: number;
-  acceptedWeight: number;
-  returnsCount: number;
-  activeTasksCount: number;
-}
+// Per-person delivery comparisons were removed: NFR-02 forbids ranking or comparing people.
+
+/** A timestamp's calendar day in local time (not UTC), for period filters. */
+export const localDay = (timestamp: string) => dayjs(timestamp).format("YYYY-MM-DD");
 
 export function calculatePeriodMetrics(
   data: AdminWorkspace,
   dateRange: DateRange,
   projectId?: string | null,
 ): PeriodMetrics {
+  const inRange = (timestamp: string) => {
+    const day = localDay(timestamp);
+    return day >= dateRange.startDate && day <= dateRange.endDate;
+  };
   const matchingTasks = data.tasks.filter((t) =>
     projectId ? t.projectId === projectId : true,
   );
-  const taskIds = new Set(matchingTasks.map((t) => t.id));
-
-  const acceptedTasks = matchingTasks.filter(
-    (t) =>
-      t.status === "accepted" &&
-      !!t.acceptedAt &&
-      t.acceptedAt.slice(0, 10) >= dateRange.startDate &&
-      t.acceptedAt.slice(0, 10) <= dateRange.endDate,
+  const taskById = new Map(matchingTasks.map((t) => [t.id, t]));
+  const blockerIds = new Set(
+    data.blockers.filter((b) => taskById.has(b.taskId)).map((b) => b.id),
+  );
+  const relevantLedger = data.ledger.filter(
+    (r) =>
+      inRange(r.occurredAt) &&
+      (projectId
+        ? r.subjectId === projectId || taskById.has(r.subjectId) || blockerIds.has(r.subjectId)
+        : true),
   );
 
-  const acceptedCount = acceptedTasks.length;
-  const acceptedWeight = acceptedTasks.reduce(
-    (sum, t) => sum + getComplexityWeight(t.complexity),
+  // FR-56: acceptances come from the change log, so later reopening does not erase them.
+  const acceptances = acceptanceEvents(matchingTasks, data.ledger).filter(
+    (e) => taskById.has(e.taskId) && inRange(e.occurredAt),
+  );
+  const acceptedCount = acceptances.length;
+  const acceptedWeight = acceptances.reduce(
+    (sum, e) => sum + getComplexityWeight(taskById.get(e.taskId)!.complexity),
     0,
   );
 
-  const unplannedAccepted = acceptedTasks.filter((t) => t.origin === "unplanned");
-  const unplannedAcceptedWeight = unplannedAccepted.reduce(
-    (sum, t) => sum + getComplexityWeight(t.complexity),
-    0,
-  );
-  const plannedAccepted = acceptedTasks.filter((t) => t.origin === "planned");
-  const plannedAcceptedWeight = plannedAccepted.reduce(
-    (sum, t) => sum + getComplexityWeight(t.complexity),
-    0,
-  );
-  const totalDeliveredWeight = unplannedAcceptedWeight + plannedAcceptedWeight;
-  const unplannedCapacityPercent =
-    totalDeliveredWeight > 0
-      ? (unplannedAcceptedWeight / totalDeliveredWeight) * 100
-      : 0;
+  // FR-57: of the work created in the period, how much was unplanned (same as the manager view).
+  const unplanned = unplannedShare(matchingTasks, dateRange.startDate, dateRange.endDate);
 
-  const relevantLedger = data.ledger.filter((r) => {
-    const occurredDate = r.occurredAt.slice(0, 10);
-    if (occurredDate < dateRange.startDate || occurredDate > dateRange.endDate) {
-      return false;
-    }
-    if (projectId) {
-      return (
-        r.subjectId === projectId ||
-        (r.subjectType === "task" && taskIds.has(r.subjectId))
-      );
-    }
-    return true;
-  });
-
-  const totalSubmissions = relevantLedger.filter(
-    (l) => l.type === "task_submitted",
-  ).length;
+  // FR-59: returned or reopened after submission.
+  const totalSubmissions = relevantLedger.filter((l) => l.type === "task_submitted").length;
   const totalReturns = relevantLedger.filter(
-    (l) => l.type === "task_returned",
+    (l) => l.type === "task_returned" || l.type === "task_reopened",
   ).length;
   const reworkRatePercent =
     totalSubmissions > 0 ? (totalReturns / totalSubmissions) * 100 : 0;
 
+  // FR-58: due dates moved later only.
   const dateChanges = relevantLedger.filter(
-    (l) => l.type === "task_redated",
+    (l) => l.type === "task_redated" && !!l.fromValue && !!l.toValue && l.toValue > l.fromValue,
   ).length;
 
   return {
@@ -234,10 +214,10 @@ export function calculatePeriodMetrics(
     totalReturns,
     reworkRatePercent,
     dateChanges,
-    unplannedAcceptedCount: unplannedAccepted.length,
-    unplannedAcceptedWeight,
-    plannedAcceptedWeight,
-    unplannedCapacityPercent,
+    unplannedAcceptedCount: unplanned.count.part,
+    unplannedAcceptedWeight: unplanned.part,
+    plannedAcceptedWeight: unplanned.total - unplanned.part,
+    unplannedCapacityPercent: unplanned.percent ?? 0,
   };
 }
 
@@ -278,52 +258,11 @@ export function calculatePeriodAnalytics(
     };
   });
 
-  const personBreakdown: PersonBreakdownItem[] = data.people.map((person) => {
-    const personAcceptedTasks = data.tasks.filter(
-      (t) =>
-        t.assigneeId === person.id &&
-        t.status === "accepted" &&
-        !!t.acceptedAt &&
-        t.acceptedAt.slice(0, 10) >= dateRange.startDate &&
-        t.acceptedAt.slice(0, 10) <= dateRange.endDate,
-    );
-    const personTaskIds = new Set(
-      data.tasks.filter((t) => t.assigneeId === person.id).map((t) => t.id),
-    );
-    const personReturns = data.ledger.filter((r) => {
-      const occurredDate = r.occurredAt.slice(0, 10);
-      return (
-        occurredDate >= dateRange.startDate &&
-        occurredDate <= dateRange.endDate &&
-        r.type === "task_returned" &&
-        personTaskIds.has(r.subjectId)
-      );
-    }).length;
-    const activeTasksCount = data.tasks.filter(
-      (t) => t.assigneeId === person.id && isOpen(t),
-    ).length;
-
-    return {
-      personId: person.id,
-      name: person.name,
-      role: person.role,
-      status: person.status ?? "active",
-      acceptedCount: personAcceptedTasks.length,
-      acceptedWeight: personAcceptedTasks.reduce(
-        (sum, t) => sum + getComplexityWeight(t.complexity),
-        0,
-      ),
-      returnsCount: personReturns,
-      activeTasksCount,
-    };
-  });
-
   return {
     current,
     previous,
     previousRange,
     trends,
     projectBreakdown,
-    personBreakdown,
   };
 }

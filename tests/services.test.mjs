@@ -6,17 +6,21 @@ import ts from "typescript";
 
 // Compile project TypeScript in memory; no additional test dependency or emitted files.
 const require = createRequire(import.meta.url);
-require.extensions[".ts"] = (module, filename) => {
+const compileTs = (module, filename) => {
   const { outputText } = ts.transpileModule(readFileSync(filename, "utf8"), {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
       target: ts.ScriptTarget.ES2022,
       esModuleInterop: true,
+      jsx: ts.JsxEmit.ReactJSX,
     },
     fileName: filename,
   });
   module._compile(outputText, filename);
 };
+
+require.extensions[".ts"] = compileTs;
+require.extensions[".tsx"] = compileTs;
 const {
   MockLocalStorageApi,
 } = require("../src/api/mock/local-storage-adapter.ts");
@@ -50,6 +54,25 @@ test("services accept an injected backend and propagate its failures", async () 
   await assert.rejects(
     service.getTasks({ assigneeId: "p-alex" }),
     (error) => error === failure,
+  );
+});
+
+test("manager review queue includes submitted work only", () => {
+  const {
+    getManagerReviewQueue,
+  } = require("../src/components/horizons/manager/manager-utils.ts");
+
+  const tasks = [
+    { id: "task-1", status: "not_started" },
+    { id: "task-2", status: "in_progress" },
+    { id: "task-3", status: "submitted" },
+    { id: "task-4", status: "accepted" },
+    { id: "task-5", status: "cancelled" },
+  ];
+
+  assert.deepEqual(
+    getManagerReviewQueue(tasks).map((task) => task.id),
+    ["task-3"],
   );
 });
 
@@ -123,7 +146,7 @@ test("raising and clearing a blocker updates its task", async () => {
 });
 
 test("submitting and accepting work preserves delivery metadata", async () => {
-  const { taskService } = setup();
+  const { taskService, reportingService } = setup();
   await taskService.submitTask(
     "task-1",
     "p-alex",
@@ -135,6 +158,53 @@ test("submitting and accepting work preserves delivery metadata", async () => {
   assert.equal(task.acceptedBy, "p-david");
   assert.ok(task.acceptedAt);
   assert.equal(task.deliverableUrl, "https://example.com/delivery");
+  assert.ok(
+    (await reportingService.getLedger({ subjectId: "task-1" })).some(
+      (event) => event.type === "task_accepted",
+    ),
+  );
+});
+
+test("returned work appears in Operational Radar until its next task event", async () => {
+  const {
+    taskService,
+    projectService,
+    peopleService,
+    blockerService,
+    reportingService,
+  } = setup();
+  await taskService.submitTask("task-1", "p-alex", "Ready for review");
+  await taskService.returnTask("task-1", "p-david", "Add input validation");
+
+  const getSignals = async () => {
+    const [projects, tasks, people, blockers, availability, ledger] =
+      await Promise.all([
+        projectService.getProjects(),
+        taskService.getTasks(),
+        peopleService.getPersons(),
+        blockerService.getBlockers(),
+        peopleService.getAvailability(),
+        reportingService.getLedger(),
+      ]);
+    return reportingService.summarize(
+      { people, projects, tasks, blockers, availability, ledger },
+      "2026-09-10",
+    );
+  };
+
+  const returnedSignal = (await getSignals()).attentionItems.find(
+    (item) => item.signalType === "returned_for_rework",
+  );
+  assert.equal(returnedSignal?.taskId, "task-1");
+  assert.match(returnedSignal?.details ?? "", /Add input validation/);
+
+  await taskService.submitTask("task-1", "p-alex", "Updated for review");
+  assert.equal(
+    (await getSignals()).attentionItems.some(
+      (item) => item.signalType === "returned_for_rework",
+    ),
+    false,
+  );
 });
 
 test("local reset clears operational data without touching other applications storage", async () => {
