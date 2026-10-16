@@ -125,10 +125,10 @@ const fs = require("node:fs");
       );
     }
     await dialog("Browser verified task")
-      .getByRole("button", { name: "Assign owner", exact: true })
+      .getByRole("button", { name: "Reassign owner", exact: true })
       .click();
-    await choose(dialog("Assign task"), "Task owner", "Sarah Connor (admin)");
-    await confirm("Assign task");
+    await choose(dialog("Reassign task"), "Task owner", "Sarah Connor (admin)");
+    await confirm("Reassign task");
     await dialog("Browser verified task")
       .getByRole("button", { name: "Start work", exact: true })
       .click();

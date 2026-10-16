@@ -421,6 +421,12 @@ export function AdminActionDialog({
   const isWarning = ["blocker", "return", "reschedule"].includes(action.kind);
   const actionColor = isDestructive ? "red" : isWarning ? "orange" : "teal";
   const ActionIcon = actionIcons[action.kind] || IconFolderPlus;
+  // A task that already has an owner is reassigned, not assigned.
+  const isReassign = action.kind === "assign" && !!task?.assigneeId;
+  const title = isReassign ? "Reassign task" : titles[action.kind];
+  const description = isReassign
+    ? "Move this task to a different owner, or leave it unassigned."
+    : descriptions[action.kind];
 
   const personField = (
     rows: typeof people,
@@ -452,7 +458,7 @@ export function AdminActionDialog({
       closeOnClickOutside={!mutation.isPending}
       closeOnEscape={!mutation.isPending}
       withCloseButton={!mutation.isPending}
-      title={titles[action.kind]}
+      title={title}
       centered
       size="lg"
       radius="md"
@@ -477,7 +483,7 @@ export function AdminActionDialog({
                 <ActionIcon size={18} />
               </ThemeIcon>
               <Text size="xs" c="dimmed">
-                {descriptions[action.kind]}
+                {description}
               </Text>
             </Group>
           </Card>
@@ -1067,7 +1073,7 @@ export function AdminActionDialog({
                   : "teal"
               }
             >
-              {titles[action.kind]}
+              {title}
             </Button>
           </Group>
         </Stack>

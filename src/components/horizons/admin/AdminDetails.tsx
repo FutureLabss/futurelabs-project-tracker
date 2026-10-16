@@ -521,7 +521,7 @@ export function AdminDetails({
                   size="xs"
                   onClick={() => onAction({ kind: "assign", taskId: task.id })}
                 >
-                  Assign owner
+                  {task.assigneeId ? "Reassign owner" : "Assign owner"}
                 </Button>
                 <Button
                   size="xs"
