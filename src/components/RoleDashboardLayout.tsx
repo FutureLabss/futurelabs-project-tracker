@@ -10,24 +10,20 @@ import {
   SimpleGrid,
   Stack,
   Text,
-  TextInput,
   Title,
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
 import {
   IconBell,
-  IconCalendarEvent,
-  IconChevronLeft,
   IconChevronRight,
-  IconChevronsRight,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
   IconSearch,
   IconSettings,
 } from "@tabler/icons-react";
-import dayjs from "dayjs";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { todayIso } from "../domain/calculations/due-dates";
 import {
   AdminView,
   DashboardLayoutConfig,
@@ -46,7 +42,6 @@ interface RoleDashboardLayoutProps {
   config: DashboardLayoutConfig;
   personId: string;
   personName?: string;
-  initialDate?: string;
   onLogout: () => void;
 }
 
@@ -73,7 +68,6 @@ export function RoleDashboardLayout({
   onLogout,
   personId,
   personName,
-  initialDate = "2026-09-01",
 }: RoleDashboardLayoutProps) {
   const [isNavigationCollapsed, setIsNavigationCollapsed] = useState(false);
   const [mobileNavigationOpened, setMobileNavigationOpened] = useState(false);
@@ -81,7 +75,12 @@ export function RoleDashboardLayout({
   const navigationHidden = isMobile
     ? !mobileNavigationOpened
     : isNavigationCollapsed;
-  const [activeDate, setActiveDate] = useState(initialDate);
+  // Every view works on today's real date; it rolls over if the app stays open past midnight.
+  const [activeDate, setActiveDate] = useState(todayIso);
+  useEffect(() => {
+    const timer = window.setInterval(() => setActiveDate(todayIso()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [adminView, setAdminView] = useState<AdminView>("portfolio");
   const [memberView, setMemberView] = useState<MemberView>("my-work");
   const [managerView, setManagerView] = useState<ManagerView>("overview");
@@ -94,7 +93,7 @@ export function RoleDashboardLayout({
 
   return (
     <AppShell
-      header={{ height: { base: 152, sm: 112, xl: 64 } }}
+      header={{ height: 64 }}
       navbar={{
         width: isNavigationCollapsed
           ? collapsedNavbarWidth
@@ -141,11 +140,6 @@ export function RoleDashboardLayout({
               </Text>
             </Box>
           </Group>
-
-          <TimeMachineBar
-            activeDate={activeDate}
-            setActiveDate={setActiveDate}
-          />
 
           <Group gap="xs" wrap="nowrap">
             {config.role !== "admin" && (
@@ -356,73 +350,6 @@ export function RoleDashboardLayout({
         )}
       </AppShell.Main>
     </AppShell>
-  );
-}
-
-function TimeMachineBar({
-  activeDate,
-  setActiveDate,
-}: {
-  activeDate: string;
-  setActiveDate: React.Dispatch<React.SetStateAction<string>>;
-}) {
-  const readableDate = useMemo(
-    () => dayjs(activeDate).format("ddd, MMM D, YYYY"),
-    [activeDate],
-  );
-
-
-  const shiftDate = (days: number) => {
-    setActiveDate((currentDate) =>
-      dayjs(currentDate).add(days, "day").format("YYYY-MM-DD"),
-    );
-  };
-
-  return (
-    <Group className="time-machine-bar" gap="xs" wrap="nowrap">
-      <Group gap={8} wrap="nowrap" className="time-machine-label">
-        <IconCalendarEvent size={22} />
-        <Text span fw={800} c="dimmed" size="sm">
-          TIME MACHINE:
-        </Text>
-        <Text span fw={800} c="teal.7" size="sm">
-          {readableDate}
-        </Text>
-      </Group>
-
-      <Tooltip label="Move back one day">
-        <ActionIcon
-          aria-label="Move time machine back one day"
-          onClick={() => shiftDate(-1)}
-          size="sm"
-        >
-          <IconChevronLeft size={17} />
-        </ActionIcon>
-      </Tooltip>
-
-      <Button
-        className="time-machine-step"
-        onClick={() => shiftDate(1)}
-        rightSection={<IconChevronRight size={15} />}
-      >
-        +1 Day
-      </Button>
-      <Button
-        className="time-machine-step"
-        onClick={() => shiftDate(7)}
-        rightSection={<IconChevronsRight size={15} />}
-      >
-        +1 Week
-      </Button>
-
-      <TextInput
-        aria-label="Time machine date"
-        className="time-machine-input"
-        type="date"
-        value={activeDate}
-        onChange={(event) => setActiveDate(event.currentTarget.value)}
-      />
-    </Group>
   );
 }
 

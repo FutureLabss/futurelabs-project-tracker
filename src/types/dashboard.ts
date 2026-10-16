@@ -4,6 +4,7 @@ export type UserRole = "member" | "manager" | "admin";
 
 export type AdminView =
   | "portfolio"
+  | "my_work"
   | "analytics"
   | "governance"
   | "risks"

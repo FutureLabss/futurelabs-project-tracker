@@ -1,4 +1,3 @@
-import dayjs from "dayjs";
 import { useState } from "react";
 import { Alert, Button, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
@@ -79,7 +78,6 @@ export function SupabaseApp() {
         config={roleDashboards[profile.data.role]}
         personId={profile.data.id}
         personName={profile.data.name}
-        initialDate={dayjs().format("YYYY-MM-DD")}
         onLogout={() => void logout()}
       />
     </>

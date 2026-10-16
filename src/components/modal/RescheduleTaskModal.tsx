@@ -1,6 +1,7 @@
 import { Modal, Stack, Text, TextInput, Textarea, Button, Group, Alert } from "@mantine/core";
 import { IconInfoCircle } from "@tabler/icons-react";
 import { useForm, Controller } from "react-hook-form";
+import { isPastDueDate, PAST_DUE_DATE_MESSAGE, todayIso } from "../../domain/calculations/due-dates";
 
 export interface RescheduleTaskFormValues {
   newDueDate: string;
@@ -78,11 +79,15 @@ export function RescheduleTaskModal({
           <Controller
             name="newDueDate"
             control={control}
-            rules={{ required: "New due date is required" }}
+            rules={{
+              required: "New due date is required",
+              validate: (value) => !isPastDueDate(value) || PAST_DUE_DATE_MESSAGE,
+            }}
             render={({ field }) => (
               <TextInput
                 label="New Due Date *"
                 type="date"
+                min={todayIso()}
                 error={errors.newDueDate?.message}
                 required
                 {...field}

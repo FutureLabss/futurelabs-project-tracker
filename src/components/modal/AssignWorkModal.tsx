@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Group, SegmentedControl, Select, Stack, Text, TextInput, Textarea } from "@mantine/core";
 import { ReusableModal } from "./ReuseableModal";
+import { isPastDueDate, PAST_DUE_DATE_MESSAGE } from "../../domain/calculations/due-dates";
 import type { Person } from "../../entities/person.entity";
 import type { Project } from "../../entities/project.entity";
 import type { ProjectMember } from "../../entities/project-member.entity";
@@ -74,6 +75,10 @@ export function AssignWorkModal({
     setError(null);
     if (!form.title.trim() || !form.projectId || !form.dueDate) {
       setError("A title, a project and a due date are required.");
+      return;
+    }
+    if (isPastDueDate(form.dueDate, date)) {
+      setError(PAST_DUE_DATE_MESSAGE);
       return;
     }
     try {
@@ -159,6 +164,7 @@ export function AssignWorkModal({
             type="date"
             label="Due date"
             required
+            min={date}
             value={form.dueDate}
             onChange={(e) => setForm({ ...form, dueDate: e.currentTarget.value })}
           />

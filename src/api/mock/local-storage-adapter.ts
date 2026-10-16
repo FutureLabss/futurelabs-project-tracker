@@ -20,6 +20,7 @@ import {
 } from "../../dtos/manage-person.dto";
 import { getInitialSeedDataset } from "../../domain/seed/initial-dataset";
 import { calculateOperationalSignals } from "../../domain/calculations/derived-signals";
+import { isPastDueDate, PAST_DUE_DATE_MESSAGE } from "../../domain/calculations/due-dates";
 
 export class MockLocalStorageApi implements ITrackerApi {
   async getProjectMembers(): Promise<
@@ -389,7 +390,7 @@ export class MockLocalStorageApi implements ITrackerApi {
     // FR-05: members only create work for themselves.
     if (!this.canManageProject(dto.projectId, dto.actorId) && dto.assigneeId !== dto.actorId)
       throw new Error("Task creation is not permitted.");
-    this.requireNonAdminOwner(dto.assigneeId);
+    if (isPastDueDate(dto.dueDate)) throw new Error(PAST_DUE_DATE_MESSAGE);
     const tasks = this.getCollection<Task>(STORAGE_KEYS.TASKS);
     const newTask: Task = {
       id: `task-${crypto.randomUUID()}`,
@@ -424,20 +425,12 @@ export class MockLocalStorageApi implements ITrackerApi {
     return newTask;
   }
 
-  /** Administrators oversee work and are never a task's owner. */
-  private requireNonAdminOwner(assigneeId: string | null) {
-    if (!assigneeId) return;
-    const person = this.getCollection<Person>(STORAGE_KEYS.PERSONS).find((p) => p.id === assigneeId);
-    if (person?.role === "admin") throw new Error("Administrators cannot be assigned tasks.");
-  }
-
   async assignTask(
     taskId: string,
     assigneeId: string | null,
     actorId: string,
   ): Promise<Task> {
     await this.delay();
-    this.requireNonAdminOwner(assigneeId);
     const tasks = this.getCollection<Task>(STORAGE_KEYS.TASKS);
     const index = tasks.findIndex((t) => t.id === taskId);
     if (index === -1) throw new Error(`Task ${taskId} not found`);
@@ -532,6 +525,7 @@ export class MockLocalStorageApi implements ITrackerApi {
         "A recorded reason is strictly mandatory when rescheduling task due dates.",
       );
     }
+    if (isPastDueDate(newDueDate)) throw new Error(PAST_DUE_DATE_MESSAGE);
 
     const tasks = this.getCollection<Task>(STORAGE_KEYS.TASKS);
     const index = tasks.findIndex((t) => t.id === taskId);

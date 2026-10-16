@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
+import type { TaskStatus } from "../../../entities/task.entity";
 import {
   Alert,
   Badge,
@@ -63,6 +64,10 @@ const headings: Record<AdminView, [string, string]> = {
   portfolio: [
     "Portfolio operations",
     "Project health, delivery ownership, and outcomes across your organization.",
+  ],
+  my_work: [
+    "My work",
+    "Tasks assigned to you. Start, submit, raise blockers and reschedule them like any team member.",
   ],
   analytics: [
     "Delivery analytics",
@@ -200,6 +205,15 @@ export default function AdminDashboard({
         filter === t.status ||
         (filter === "unassigned" && !t.assigneeId && isOpen(t))),
   );
+  // The admin's own open work, earliest due date first.
+  const myTasks = data.tasks
+    .filter(
+      (t) =>
+        t.assigneeId === actorId &&
+        isOpen(t) &&
+        matches(t.title, t.description, projectName(t.projectId)),
+    )
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   const risks = data.signals.attentionItems.filter(
     (r) =>
       matches(r.headline, r.details, r.projectName, r.assigneeName) &&
@@ -466,7 +480,7 @@ export default function AdminDashboard({
         "Submitted",
         "Accepted",
       ],
-      ...tasks.map((t) => [
+      ...(view === "my_work" ? myTasks : tasks).map((t) => [
         t.title,
         projectName(t.projectId),
         personName(t.assigneeId),
@@ -493,6 +507,19 @@ export default function AdminDashboard({
       );
     }
   }
+  // Board buttons open the matching action dialog; start, submit and raise
+  // blocker only appear on the admin's own tasks (canDoMemberActions).
+  const onBoardAction = (
+    req: Parameters<NonNullable<ComponentProps<typeof TaskBoard>["onTaskActionRequired"]>>[0],
+  ) => {
+    if (req.kind === "clear") setAction({ kind: "clear", blockerId: req.blockerId });
+    else setAction({ kind: req.kind, taskId: req.taskId });
+  };
+  const onBoardStatusChange = async (taskId: string, targetStatus: TaskStatus) => {
+    await adminActionMutation.mutateAsync(() =>
+      taskService.updateTaskStatus(taskId, targetStatus, actorId),
+    );
+  };
   const projectSelect = (
     <Select
       label="Project"
@@ -617,6 +644,30 @@ export default function AdminDashboard({
           />
         </Stack>
       )}
+      {view === "my_work" && (
+        <Stack gap="md">
+          <Group justify="flex-end">
+            <Button
+              onClick={() => setAction({ kind: "task", personId: actorId })}
+              disabled={!activeProjects.length}
+            >
+              Create task for me
+            </Button>
+          </Group>
+          <TaskBoard
+            tasks={myTasks}
+            projects={data.projects}
+            people={data.people}
+            onTaskClick={onTask}
+            canDoMemberActions={(task) => task.assigneeId === actorId}
+            today={date}
+            onTaskStatusChange={onBoardStatusChange}
+            onTaskActionRequired={onBoardAction}
+            onCreateTask={() => setAction({ kind: "task", personId: actorId })}
+            storageKey="futurelabs_admin_my_work_cols_v1"
+          />
+        </Stack>
+      )}
       {view === "tasks" && (
         <>
           <Group align="flex-end" justify="space-between" wrap="wrap" gap="sm">
@@ -685,28 +736,8 @@ export default function AdminDashboard({
               onTaskClick={onTask}
               canDoMemberActions={(task) => task.assigneeId === actorId}
               today={date}
-              onTaskStatusChange={async (taskId, targetStatus) => {
-                await adminActionMutation.mutateAsync(() =>
-                  taskService.updateTaskStatus(taskId, targetStatus, actorId),
-                );
-              }}
-              onTaskActionRequired={(req) => {
-                if (req.kind === "blocker") {
-                  setAction({ kind: "blocker", taskId: req.taskId });
-                } else if (req.kind === "clear") {
-                  setAction({ kind: "clear", blockerId: req.blockerId });
-                } else if (req.kind === "submit") {
-                  setAction({ kind: "submit", taskId: req.taskId });
-                } else if (req.kind === "accept") {
-                  setAction({ kind: "accept", taskId: req.taskId });
-                } else if (req.kind === "return") {
-                  setAction({ kind: "return", taskId: req.taskId });
-                } else if (req.kind === "cancel") {
-                  setAction({ kind: "cancel", taskId: req.taskId });
-                } else if (req.kind === "start") {
-                  setAction({ kind: "start", taskId: req.taskId });
-                }
-              }}
+              onTaskStatusChange={onBoardStatusChange}
+              onTaskActionRequired={onBoardAction}
               onCreateTask={() =>
                 setAction({
                   kind: "task",

@@ -24,7 +24,7 @@ const {
   calculatePeriodAnalytics,
 } = require("../src/components/horizons/admin/admin-utils.ts");
 
-test("task owners are the active manager and members of the project, never admins", () => {
+test("task owners are active admins plus the project's manager and members", () => {
   const data = {
     projects: [{ id: "project-1", managerId: "manager" }],
     members: [
@@ -43,7 +43,7 @@ test("task owners are the active manager and members of the project, never admin
 
   assert.deepEqual(
     eligiblePeople(data, "project-1").map((person) => person.id),
-    ["manager", "member"],
+    ["admin", "manager", "member"],
   );
   assert.deepEqual(eligiblePeople(data, "missing-project"), []);
 });

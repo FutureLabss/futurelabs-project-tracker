@@ -160,99 +160,9 @@ body {
   }
 }
 
-.time-machine-bar {
-  flex: 1 1 620px;
-  max-width: 700px;
-  min-width: 420px;
-  min-height: 42px;
-  padding: 6px 10px;
-  border: 1px solid #dde6e2;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 2px 8px rgba(24, 33, 31, 0.12);
-}
-
-.time-machine-label {
-  min-width: 278px;
-  color: #12b886;
-}
-
-.time-machine-step {
-  height: 28px;
-  padding-right: 10px;
-  padding-left: 10px;
-  color: #009978;
-  border: 0;
-  border-radius: 999px;
-  background: #dff8f1;
-}
-
-.time-machine-step:hover {
-  color: #087f5b;
-  background: #c8f4eb;
-}
-
-.time-machine-input {
-  width: 164px;
-}
-
-.time-machine-input input {
-  height: 36px;
-  color: #111827;
-  font-size: 14px;
-  border-color: #ccd7d4;
-  border-radius: 9px;
-  background: #fbfcfc;
-}
-
-@media (max-width: 1120px) {
-  .time-machine-bar {
-    order: 3;
-    flex-basis: 100%;
-    max-width: none;
-    min-width: 0;
-    margin-bottom: 8px;
-  }
-
-  .app-header {
-    height: auto;
-    min-height: 112px;
-  }
-}
-
-@media (max-width: 760px) {
-  .time-machine-bar {
-    align-items: stretch;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  .time-machine-label {
-    min-width: 0;
-  }
-
-  .time-machine-input {
-    width: 100%;
-  }
-}
-
 .app-header-content {
   min-height: 64px;
   row-gap: 8px;
-}
-
-@media (max-width: 1200px) {
-  .app-header-content {
-    min-height: 112px;
-    padding-top: 10px;
-    padding-bottom: 10px;
-  }
-}
-
-@media (max-width: 760px) {
-  .app-header-content {
-    min-height: 152px;
-  }
 }
 
 

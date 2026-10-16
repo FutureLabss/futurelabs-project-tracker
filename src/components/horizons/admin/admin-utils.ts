@@ -16,12 +16,13 @@ export function eligiblePeople(data: AdminWorkspace, projectId: string) {
       .map((member) => member.personId),
   );
 
-  // Administrators are never task owners: only the project's manager and members.
+  // Admins (who may take work themselves), the project's manager and its members.
   return data.people.filter(
     (p) =>
       p.status !== "inactive" &&
-      p.role !== "admin" &&
-      (p.id === project.managerId || projectMemberIds.has(p.id)),
+      (p.role === "admin" ||
+        p.id === project.managerId ||
+        projectMemberIds.has(p.id)),
   );
 }
 // Quote every cell, escape CSV quotes, and neutralize spreadsheet formula input.

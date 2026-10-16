@@ -3,6 +3,7 @@ import { IconAlertCircle } from "@tabler/icons-react";
 import { useState } from "react";
 import { ReusableModal } from "../../../modal/ReuseableModal";
 import { useRescheduleTask } from "../../../../api/hooks/use-tasks";
+import { isPastDueDate, PAST_DUE_DATE_MESSAGE, todayIso } from "../../../../domain/calculations/due-dates";
 
 interface RescheduleTaskModalProps {
   opened: boolean;
@@ -27,7 +28,7 @@ export function RescheduleTaskModal({
   const { mutate: rescheduleTask, isPending } = useRescheduleTask();
 
   const handleReschedule = () => {
-    if (!newDueDate || !reason.trim()) return;
+    if (!newDueDate || !reason.trim() || isPastDueDate(newDueDate)) return;
 
     rescheduleTask(
       {
@@ -46,7 +47,8 @@ export function RescheduleTaskModal({
     );
   };
 
-  const isSubmitDisabled = !newDueDate || !reason.trim();
+  const dueDateInPast = isPastDueDate(newDueDate);
+  const isSubmitDisabled = !newDueDate || !reason.trim() || dueDateInPast;
   const showReasonError = reason.length > 0 && reason.trim() === "";
 
   return (
@@ -77,6 +79,8 @@ export function RescheduleTaskModal({
         type="date"
         label="New Due Date"
         withAsterisk
+        min={todayIso()}
+        error={dueDateInPast ? PAST_DUE_DATE_MESSAGE : undefined}
         value={newDueDate}
         onChange={(e) => setNewDueDate(e.currentTarget.value)}
         mb="md"
