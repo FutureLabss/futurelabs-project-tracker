@@ -266,8 +266,8 @@ export function TaskLifecycleInspectorModal({
                 </>
               )}
 
-              {/* Reschedule Button (Image 1 & Image 2) */}
-              {!isClosed && (
+              {/* A reschedule counts as a slip, so unassigned work gets an owner first. */}
+              {!isClosed && task.assigneeId && (
                 <Button
                   variant="outline"
                   color="orange"
