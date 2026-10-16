@@ -185,7 +185,12 @@ export default function MemberDashboard({
             onTaskClick={setDrawerTaskId}
           />
 
-          <LinkedWorkPanel personId={personId} date={date} onTaskClick={setDrawerTaskId} />
+          <LinkedWorkPanel
+            personId={personId}
+            date={date}
+            onTaskClick={setDrawerTaskId}
+            onClearBlocker={(request) => setMemberAction({ kind: 'clear', ...request })}
+          />
 
           <Paper withBorder radius="md" p="md">
             <Stack gap="md">

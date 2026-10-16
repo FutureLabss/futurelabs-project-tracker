@@ -4,6 +4,7 @@ import {
   Group,
   Stack,
   Text,
+  TextInput,
 } from '@mantine/core';
 import { useState } from 'react';
 
@@ -11,6 +12,7 @@ import {
   IconAlertCircle,
   IconCalendarEvent,
   IconPlayerPlay,
+  IconSearch,
   IconSend,
 } from '@tabler/icons-react';
 
@@ -289,6 +291,8 @@ const handleSubmit = (taskId: string) => {
   const [rescheduleOpened, setRescheduleOpened] = useState(false);
   const [selectedTaskForReschedule, setSelectedTaskForReschedule] = useState<{ id: string; title: string; dueDate: string } | null>(null);
 
+  const [search, setSearch] = useState('');
+
   const [clearBlockerOpened, setClearBlockerOpened] = useState(false);
   const [selectedTaskForClearBlocker, setSelectedTaskForClearBlocker] = useState<{ id: string; title: string; projectId: string; taskOwnerId: string; activeBlockerId?: string } | null>(null);
 
@@ -345,7 +349,17 @@ const handleSubmit = (taskId: string) => {
     .filter((task) => task.status !== 'accepted' && task.status !== 'cancelled')
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
-  const mappedTasks: PersonalTask[] = openTasks.map((task) => {
+  const query = search.trim().toLowerCase();
+  const projectName = (id: string) => projects.find((p) => p.id === id)?.name ?? '';
+  const matchingTasks = query
+    ? openTasks.filter((task) =>
+        [task.title, task.description ?? '', projectName(task.projectId)].some((text) =>
+          text.toLowerCase().includes(query),
+        ),
+      )
+    : openTasks;
+
+  const mappedTasks: PersonalTask[] = matchingTasks.map((task) => {
     const project = projects.find((p) => p.id === task.projectId);
     
     let complexity: PersonalTask['complexity'] = 'LOW (1 PT)';
@@ -381,6 +395,19 @@ const handleSubmit = (taskId: string) => {
 
   return (
     <>
+      <TextInput
+        placeholder="Search by title, description or project"
+        leftSection={<IconSearch size={15} />}
+        value={search}
+        onChange={(e) => setSearch(e.currentTarget.value)}
+        mb="sm"
+        maw={360}
+      />
+      {query && mappedTasks.length === 0 && (
+        <Text size="sm" c="dimmed" mb="sm">
+          No open tasks match "{search.trim()}".
+        </Text>
+      )}
       <ReusableTable
         columns={personalTaskColumns}
         data={mappedTasks}
