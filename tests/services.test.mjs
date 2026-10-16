@@ -99,22 +99,26 @@ test("rescheduling requires a reason, persists, and records the change", async (
   const { taskService, reportingService, storage } = setup();
   const original = await taskService.getTaskById("task-1");
   await assert.rejects(
-    taskService.rescheduleTask("task-1", "2026-10-01", " ", "p-david"),
+    taskService.rescheduleTask("task-1", "2099-10-01", " ", "p-david"),
   );
   assert.equal(
     (await taskService.getTaskById("task-1")).dueDate,
     original.dueDate,
   );
+  await assert.rejects(
+    taskService.rescheduleTask("task-1", "2020-01-01", "Too late", "p-david"),
+    /cannot be in the past/,
+  );
   await taskService.rescheduleTask(
     "task-1",
-    "2026-10-01",
+    "2099-10-01",
     "Dependency delayed",
     "p-david",
   );
   const reloaded = createTrackerServices(new MockLocalStorageApi(storage));
   assert.equal(
     (await reloaded.taskService.getTaskById("task-1")).dueDate,
-    "2026-10-01",
+    "2099-10-01",
   );
   const ledger = await reportingService.getLedger({ subjectId: "task-1" });
   assert.ok(
@@ -238,7 +242,7 @@ test("admin project membership persists, blocks unsafe removal, and closes only 
     assigneeId: "p-alex",
     complexity: "low",
     origin: "planned",
-    dueDate: "2026-09-20",
+    dueDate: "2099-09-20",
     actorId: "p-sarah",
   });
   await assert.rejects(

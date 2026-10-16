@@ -152,7 +152,7 @@ test("admin lifecycle, project membership, audit, and session authorization", as
       assignee_id: member,
       complexity: "mid",
       origin: "planned",
-      due_date: "2026-09-20",
+      due_date: "2099-09-20",
     });
     await assert.rejects(
       govern("close_project", { project_id: project.id }),
@@ -179,10 +179,36 @@ test("admin lifecycle, project membership, audit, and session authorization", as
       /Only the task's assignee/,
     );
     const blocker = await mutate("raise_blocker", blockerInput, member);
-    // Administrators are never task owners; the project manager takes it over.
+    // Administrators may own work (20261020000100); here the project manager takes it over.
+    const adminOwned = await mutate("assign_task", { task_id: task.id, assignee_id: admin });
+    assert.equal(adminOwned.assignee_id, admin);
+    // An admin works on their own task like any assignee.
+    const ownWork = await mutate("create_task", {
+      project_id: project.id,
+      title: "Admin's own work",
+      assignee_id: admin,
+      complexity: "low",
+      origin: "planned",
+      due_date: "2099-09-21",
+    });
+    await mutate("update_task_status", { task_id: ownWork.id, status: "in_progress" });
+    await mutate("submit_task", { task_id: ownWork.id, notes: "Done" });
+    await mutate("accept_task", { task_id: ownWork.id });
+    // Due dates cannot be set in the past, on create or reschedule.
     await assert.rejects(
-      mutate("assign_task", { task_id: task.id, assignee_id: admin }),
-      /Administrators cannot be assigned tasks/,
+      mutate("create_task", {
+        project_id: project.id,
+        title: "Already late",
+        assignee_id: admin,
+        complexity: "low",
+        origin: "planned",
+        due_date: "2020-01-01",
+      }),
+      /cannot be in the past/,
+    );
+    await assert.rejects(
+      mutate("reschedule_task", { task_id: task.id, due_date: "2020-01-01", reason: "Too late" }),
+      /cannot be in the past/,
     );
     await mutate("assign_task", { task_id: task.id, assignee_id: manager });
     await assert.rejects(
@@ -192,7 +218,7 @@ test("admin lifecycle, project membership, audit, and session authorization", as
     await mutate("clear_blocker", { blocker_id: blocker.id });
     await mutate("reschedule_task", {
       task_id: task.id,
-      due_date: "2026-09-25",
+      due_date: "2099-09-25",
       reason: "Provider delay",
     });
     await mutate(
@@ -229,7 +255,7 @@ test("admin lifecycle, project membership, audit, and session authorization", as
         assignee_id: manager,
         complexity: "low",
         origin: "planned",
-        due_date: "2026-09-25",
+        due_date: "2099-09-25",
       }),
       /active project/,
     );

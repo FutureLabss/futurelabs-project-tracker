@@ -59,6 +59,7 @@ import type { TaskComplexity, TaskOrigin } from "../../../entities/task.entity";
 import type { BlockerCategory } from "../../../entities/blocker.entity";
 import type { UserRole } from "../../../entities/person.entity";
 import { eligiblePeople } from "./admin-utils";
+import { isPastDueDate, PAST_DUE_DATE_MESSAGE } from "../../../domain/calculations/due-dates";
 
 export type AdminAction = {
   kind:
@@ -252,6 +253,10 @@ export function AdminActionDialog({
     }
     if (action.kind === "task" && !projectId) {
       setValidation("Select a project.");
+      return;
+    }
+    if (["task", "reschedule"].includes(action.kind) && isPastDueDate(value("due"), date)) {
+      setValidation(PAST_DUE_DATE_MESSAGE);
       return;
     }
     if (["member", "blocker", "leave"].includes(action.kind) && !person) {
@@ -637,7 +642,7 @@ export function AdminActionDialog({
                 {personField(
                   eligible,
                   "Assignee (optional)",
-                  undefined,
+                  action.personId,
                   false,
                   "Select an assignee",
                 )}
@@ -674,6 +679,7 @@ export function AdminActionDialog({
                 name="due"
                 label="Due date"
                 type="date"
+                min={date}
                 value={fieldValue("due", date)}
                 onChange={(event) =>
                   updateField("due", event.currentTarget.value)
@@ -723,6 +729,7 @@ export function AdminActionDialog({
                 name="due"
                 type="date"
                 label="New due date"
+                min={date}
                 value={fieldValue("due", task?.dueDate ?? "")}
                 onChange={(event) =>
                   updateField("due", event.currentTarget.value)

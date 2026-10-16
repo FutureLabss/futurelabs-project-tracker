@@ -110,7 +110,7 @@ test("manager workflows in the database: create/close project, complexity, reope
       title: "Build the thing",
       complexity: "mid",
       origin: "planned",
-      due_date: "2026-10-01",
+      due_date: "2099-10-01",
       assignee_id: manager,
     });
 
@@ -120,7 +120,7 @@ test("manager workflows in the database: create/close project, complexity, reope
       title: "Member work",
       complexity: "low",
       origin: "planned",
-      due_date: "2026-10-01",
+      due_date: "2099-10-01",
       assignee_id: member,
     };
     await assert.rejects(mutate("create_task", memberTaskInput), /no project access/);
@@ -163,20 +163,20 @@ test("manager workflows in the database: create/close project, complexity, reope
 
     // FR-12 / FR-13: the assignee reschedules their own work, with a reason.
     await assert.rejects(
-      mutate("reschedule_task", { task_id: ownTask.id, due_date: "2026-10-05" }, member),
+      mutate("reschedule_task", { task_id: ownTask.id, due_date: "2099-10-05" }, member),
       /reason is required/,
     );
     const moved = await mutate(
       "reschedule_task",
-      { task_id: ownTask.id, due_date: "2026-10-05", reason: "Waiting on design" },
+      { task_id: ownTask.id, due_date: "2099-10-05", reason: "Waiting on design" },
       member,
     );
-    assert.equal(moved.due_date, "2026-10-05");
+    assert.equal(moved.due_date, "2099-10-05");
     assert.deepEqual(await ledger(ownTask.id, "task_redated"), [
-      { actor_id: member, from_value: "2026-10-01", to_value: "2026-10-05", reason: "Waiting on design" },
+      { actor_id: member, from_value: "2099-10-01", to_value: "2099-10-05", reason: "Waiting on design" },
     ]);
     await assert.rejects(
-      mutate("reschedule_task", { task_id: task.id, due_date: "2026-10-09", reason: "x" }, member),
+      mutate("reschedule_task", { task_id: task.id, due_date: "2099-10-09", reason: "x" }, member),
       /project manager|another member/,
       "members cannot move other people's dates",
     );
@@ -314,7 +314,7 @@ test("member rules in the local demo adapter: own tasks, origin, reschedule (FR-
   const { taskService } = createTrackerServices(
     new MockLocalStorageApi({ getItem: (k) => values.get(k) ?? null, setItem: (k, v) => values.set(k, v) }),
   );
-  const base = { projectId: "proj-iam", title: "Mine", description: "", complexity: "low", dueDate: "2026-09-20" };
+  const base = { projectId: "proj-iam", title: "Mine", description: "", complexity: "low", dueDate: "2099-09-20" };
 
   const own = await taskService.createTask({ ...base, assigneeId: "p-alex", origin: "planned", actorId: "p-alex" });
   assert.equal(own.origin, "unplanned", "self-assigned is unplanned whatever the client sends");
@@ -325,9 +325,9 @@ test("member rules in the local demo adapter: own tasks, origin, reschedule (FR-
     /not permitted/,
   );
 
-  const moved = await taskService.rescheduleTask(own.id, "2026-09-25", "Waiting on design", "p-alex");
-  assert.equal(moved.dueDate, "2026-09-25");
-  await assert.rejects(taskService.rescheduleTask(own.id, "2026-09-26", "x", "p-maya"), /project manager/);
+  const moved = await taskService.rescheduleTask(own.id, "2099-09-25", "Waiting on design", "p-alex");
+  assert.equal(moved.dueDate, "2099-09-25");
+  await assert.rejects(taskService.rescheduleTask(own.id, "2099-09-26", "x", "p-maya"), /project manager/);
   const titles = await taskService.getProjectTaskTitles("proj-iam");
   assert.ok(titles.some((t) => t.title === "Mine") && titles.every((t) => Object.keys(t).length === 2));
 });

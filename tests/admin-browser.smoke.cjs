@@ -124,27 +124,43 @@ const fs = require("node:fs");
         `Admin must not see "${name}" on another person's task`,
       );
     }
-    // Administrators are never task owners: they oversee, the manager does the work.
+    // Admins may take work themselves; here the manager does it.
     await dialog("Browser verified task")
       .getByRole("button", { name: "Reassign owner", exact: true })
       .click();
     await dialog("Reassign task").getByLabel("Task owner").click();
     assert.equal(
       await page.getByRole("option", { name: "Sarah Connor (admin)", exact: true }).count(),
-      0,
-      "Admins must not be offered as task owners",
+      1,
+      "Admins are offered as task owners",
     );
     await page.getByRole("option", { name: "David Kim (manager)", exact: true }).click();
     await confirm("Reassign task");
     await dialog("Browser verified task")
       .getByRole("button", { name: "Reschedule", exact: true })
       .click();
+    // A due date in the past is refused.
     await dialog("Reschedule task")
       .getByLabel("New due date")
-      .fill("2026-09-25");
+      .fill("2020-01-01");
     await dialog("Reschedule task")
       .getByLabel("Reason for rescheduling")
       .fill("Provider delay");
+    await dialog("Reschedule task")
+      .getByRole("button", { name: "Reschedule task", exact: true })
+      .click();
+    // The picker's min date makes the browser refuse to submit it.
+    assert.equal(
+      await dialog("Reschedule task")
+        .getByLabel("New due date")
+        .evaluate((input) => input.validity.rangeUnderflow),
+      true,
+      "A past due date must be refused",
+    );
+    assert.equal(await dialog("Reschedule task").count(), 1, "Dialog stays open");
+    await dialog("Reschedule task")
+      .getByLabel("New due date")
+      .fill("2099-09-25");
     await confirm("Reschedule task");
 
     // Switch between the admin and the manager who owns the task.

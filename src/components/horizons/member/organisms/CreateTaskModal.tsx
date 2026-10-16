@@ -6,6 +6,7 @@ import { useCreateTask } from '../../../../api/hooks/use-tasks';
 import { useProjects } from '../../../../api/hooks/use-projects';
 import type { TaskComplexity } from '../../../../entities/task.entity';
 import { ReusableModal } from '../../../modal/ReuseableModal';
+import { isPastDueDate, PAST_DUE_DATE_MESSAGE } from '../../../../domain/calculations/due-dates';
 
 type CreateTaskFormValues = {
   project: string;
@@ -150,10 +151,15 @@ export function CreateTaskModal({ opened, onClose, personId }: CreateTaskModalPr
           <Controller
             name="dueDate"
             control={control}
-            rules={{ required: 'Due date is required' }}
+            rules={{
+              required: 'Due date is required',
+              validate: (value) =>
+                !value || !isPastDueDate(dayjs(value).format('YYYY-MM-DD')) || PAST_DUE_DATE_MESSAGE,
+            }}
             render={({ field, fieldState }) => (
               <DateInput
                 label="Due Date"
+                minDate={new Date()}
                 withAsterisk
                 valueFormat="YYYY-MM-DD"
                 placeholder="YYYY-MM-DD"

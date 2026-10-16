@@ -102,6 +102,7 @@ export const roleDashboards: Record<UserRole, DashboardLayoutConfig> = {
         adminView: "portfolio",
         active: true,
       },
+      { label: "My Work", icon: IconUser, adminView: "my_work" },
       { label: "Analytics", icon: IconChartBar, adminView: "analytics" },
       { label: "Governance", icon: IconShieldCheck, adminView: "governance" },
       { label: "Risks", icon: IconAlertTriangle, adminView: "risks" },
