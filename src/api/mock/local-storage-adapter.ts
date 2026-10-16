@@ -20,7 +20,11 @@ import {
 } from "../../dtos/manage-person.dto";
 import { getInitialSeedDataset } from "../../domain/seed/initial-dataset";
 import { calculateOperationalSignals } from "../../domain/calculations/derived-signals";
-import { isPastDueDate, PAST_DUE_DATE_MESSAGE } from "../../domain/calculations/due-dates";
+import {
+  isPastDueDate,
+  PAST_DUE_DATE_MESSAGE,
+  UNASSIGNED_RESCHEDULE_MESSAGE,
+} from "../../domain/calculations/due-dates";
 
 export class MockLocalStorageApi implements ITrackerApi {
   async getProjectMembers(): Promise<
@@ -530,6 +534,7 @@ export class MockLocalStorageApi implements ITrackerApi {
     const tasks = this.getCollection<Task>(STORAGE_KEYS.TASKS);
     const index = tasks.findIndex((t) => t.id === taskId);
     if (index === -1) throw new Error(`Task ${taskId} not found`);
+    if (!tasks[index].assigneeId) throw new Error(UNASSIGNED_RESCHEDULE_MESSAGE);
     // FR-12 / FR-25: the assignee or the project's manager (or an admin).
     if (tasks[index].assigneeId !== actorId && !this.canManageProject(tasks[index].projectId, actorId))
       throw new Error("This operation requires the project manager.");

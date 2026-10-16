@@ -129,6 +129,27 @@ test("rescheduling requires a reason, persists, and records the change", async (
   );
 });
 
+test("an unassigned task cannot be rescheduled until it has an owner", async () => {
+  const { taskService } = setup();
+  const task = await taskService.createTask({
+    projectId: "proj-web",
+    title: "Nobody yet",
+    description: "",
+    assigneeId: null,
+    complexity: "low",
+    origin: "planned",
+    dueDate: "2099-09-20",
+    actorId: "p-sarah",
+  });
+  await assert.rejects(
+    taskService.rescheduleTask(task.id, "2099-09-30", "Plan change", "p-sarah"),
+    /Assign an owner/,
+  );
+  await taskService.assignTask(task.id, "p-alex", "p-sarah");
+  const moved = await taskService.rescheduleTask(task.id, "2099-09-30", "Plan change", "p-sarah");
+  assert.equal(moved.dueDate, "2099-09-30");
+});
+
 test("raising and clearing a blocker updates its task", async () => {
   const { blockerService, taskService } = setup();
   const blocker = await blockerService.raiseBlocker({
