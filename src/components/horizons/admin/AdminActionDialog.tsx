@@ -542,7 +542,7 @@ export function AdminActionDialog({
                 leftSection={<IconFolder size={16} />}
                 required
                 maxLength={200}
-                value={readField("name")}
+                value={fieldValue("name", "")}
                 onChange={(event) =>
                   updateField("name", event.currentTarget.value)
                 }
@@ -554,7 +554,7 @@ export function AdminActionDialog({
                 minRows={3}
                 autosize
                 required
-                value={readField("description")}
+                value={fieldValue("description", "")}
                 onChange={(event) =>
                   updateField("description", event.currentTarget.value)
                 }
@@ -611,7 +611,7 @@ export function AdminActionDialog({
                 label="Task title"
                 required
                 maxLength={200}
-                value={readField("name")}
+                value={fieldValue("name", "")}
                 onChange={(event) =>
                   updateField("name", event.currentTarget.value)
                 }
@@ -620,7 +620,7 @@ export function AdminActionDialog({
               <Textarea
                 name="description"
                 label="Description and acceptance criteria"
-                value={readField("description")}
+                value={fieldValue("description", "")}
                 onChange={(event) =>
                   updateField("description", event.currentTarget.value)
                 }
@@ -727,7 +727,7 @@ export function AdminActionDialog({
               <Textarea
                 name="reason"
                 label="Reason for rescheduling"
-                value={readField("reason")}
+                value={fieldValue("reason", "")}
                 onChange={(event) =>
                   updateField("reason", event.currentTarget.value)
                 }
@@ -782,7 +782,7 @@ export function AdminActionDialog({
             <Textarea
               name="reason"
               label="Required changes"
-              value={readField("reason")}
+              value={fieldValue("reason", "")}
               onChange={(event) =>
                 updateField("reason", event.currentTarget.value)
               }
@@ -819,7 +819,7 @@ export function AdminActionDialog({
               <Textarea
                 name="reason"
                 label="What is blocking delivery?"
-                value={readField("reason")}
+                value={fieldValue("reason", "")}
                 onChange={(event) =>
                   updateField("reason", event.currentTarget.value)
                 }
@@ -871,7 +871,7 @@ export function AdminActionDialog({
                 label="Note"
                 minRows={2}
                 autosize
-                value={readField("description")}
+                value={fieldValue("description", "")}
                 onChange={(event) =>
                   updateField("description", event.currentTarget.value)
                 }
