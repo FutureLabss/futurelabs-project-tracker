@@ -86,6 +86,11 @@ export function PortfolioCard({
           </Box>
           <RagBadge status={summary?.ragStatus} closed={isClosed} />
         </Group>
+        {!isClosed && summary?.ragStatus !== "green" && summary?.ragReasons.length ? (
+          <Text size="xs" c="dimmed" lineClamp={3}>
+            {summary.ragReasons.join(" · ")}
+          </Text>
+        ) : null}
 
         {/* Progress Bar */}
         <Box mt={4}>

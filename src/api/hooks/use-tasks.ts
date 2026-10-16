@@ -24,6 +24,15 @@ export function useTaskById(taskId: string) {
   });
 }
 
+/** Open task titles in a project, for picking a blocker's cause (FR-10). */
+export function useProjectTaskTitles(projectId: string | undefined) {
+  return useQuery({
+    queryKey: [...queryKeys.tasks.all, "titles", projectId],
+    queryFn: () => taskService.getProjectTaskTitles(projectId!),
+    enabled: !!projectId,
+  });
+}
+
 export function useCreateTask() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -136,6 +145,7 @@ export function useAcceptTask() {
       queryClient.invalidateQueries({ queryKey: queryKeys.blockers.all });
       queryClient.invalidateQueries({ queryKey: ["signals"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all });
+      queryClient.invalidateQueries({ queryKey: ["manager-workspace"] });
     },
   });
 }
@@ -157,6 +167,7 @@ export function useReturnTask() {
       queryClient.invalidateQueries({ queryKey: queryKeys.blockers.all });
       queryClient.invalidateQueries({ queryKey: ["signals"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.ledger.all });
+      queryClient.invalidateQueries({ queryKey: ["manager-workspace"] });
     },
   });
 }

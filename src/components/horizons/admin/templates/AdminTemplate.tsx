@@ -8,7 +8,7 @@ interface AdminTemplateProps {
   isFetching: boolean;
   onRefresh: () => void;
   onExport: () => void;
-  onNewProject: () => void;
+  onNewProject?: () => void;
   onResetDemo?: () => void;
   canResetDemo?: boolean;
   queryError?: string;
