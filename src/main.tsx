@@ -2,6 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import "@mantine/core/styles.css";
+// Date pickers (DateInput in History, Record Leave, Create Task) need their own styles.
+import "@mantine/dates/styles.css";
 import { App } from "./App";
 import { AppProviders } from "./app/AppProviders";
 import "./styles.css";
