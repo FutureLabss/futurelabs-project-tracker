@@ -33,6 +33,7 @@ import {
   IconUserOff,
 } from "@tabler/icons-react";
 import type { AdminWorkspace } from "../../../api/hooks/use-admin-workspace";
+import { peopleService } from "../../../services";
 import type { AdminAction } from "./AdminActionDialog";
 import type { LedgerRecord } from "../../../entities/ledger-record.entity";
 import type { Task } from "../../../entities/task.entity";
@@ -744,17 +745,19 @@ export function AdminDetails({
                 >
                   Edit profile
                 </Button>
-                <Button
-                  size="xs"
-                  variant="light"
-                  color="blue"
-                  leftSection={<IconShieldCheck size={13} />}
-                  onClick={() =>
-                    onAction({ kind: "change-role", personId: person.id })
-                  }
-                >
-                  Change role
-                </Button>
+                {!peopleService.managedExternally && (
+                  <Button
+                    size="xs"
+                    variant="light"
+                    color="blue"
+                    leftSection={<IconShieldCheck size={13} />}
+                    onClick={() =>
+                      onAction({ kind: "change-role", personId: person.id })
+                    }
+                  >
+                    Change role
+                  </Button>
+                )}
                 <Button
                   size="xs"
                   variant="light"
@@ -767,30 +770,32 @@ export function AdminDetails({
                 >
                   Record leave
                 </Button>
-                <Button
-                  size="xs"
-                  variant="subtle"
-                  color={person.status === "inactive" ? "teal" : "orange"}
-                  leftSection={
-                    person.status === "inactive" ? (
-                      <IconUserCheck size={13} />
-                    ) : (
-                      <IconUserOff size={13} />
-                    )
-                  }
-                  onClick={() =>
-                    onAction({
-                      kind: "set-person-status",
-                      personId: person.id,
-                      targetStatus:
-                        person.status === "inactive" ? "active" : "inactive",
-                    })
-                  }
-                >
-                  {person.status === "inactive"
-                    ? "Activate account"
-                    : "Deactivate account"}
-                </Button>
+                {!peopleService.managedExternally && (
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    color={person.status === "inactive" ? "teal" : "orange"}
+                    leftSection={
+                      person.status === "inactive" ? (
+                        <IconUserCheck size={13} />
+                      ) : (
+                        <IconUserOff size={13} />
+                      )
+                    }
+                    onClick={() =>
+                      onAction({
+                        kind: "set-person-status",
+                        personId: person.id,
+                        targetStatus:
+                          person.status === "inactive" ? "active" : "inactive",
+                      })
+                    }
+                  >
+                    {person.status === "inactive"
+                      ? "Activate account"
+                      : "Deactivate account"}
+                  </Button>
+                )}
                 <Button
                   size="xs"
                   variant="subtle"

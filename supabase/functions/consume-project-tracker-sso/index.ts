@@ -1,6 +1,6 @@
 import { signingJwk } from "../_shared/signing-key.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
-import { importJWK, SignJWT } from "npm:jose@6.1.3";
+import { importJWK, jwtVerify, SignJWT } from "npm:jose@6.1.3";
 import { consumeIdentity, validCode } from "../_shared/sso.ts";
 
 const required = (name: string) => {
@@ -50,21 +50,22 @@ Deno.serve(async (request: Request) => {
       }
       raw += decoder.decode(value, { stream: true });
     }
-    let body: { code?: unknown; access_token?: unknown };
+    let body: { code?: unknown; refresh?: unknown };
     try {
       body = JSON.parse(raw + decoder.decode());
     } catch {
       return respond(400, { error: "Invalid request" });
     }
-    const passwordLogin =
-      typeof body?.access_token === "string" &&
-      body.access_token.length > 0 &&
-      body.access_token.length <= 3500;
+    // A renewal presents the current Tracker session in Authorization instead of a code.
+    const renewal = body?.refresh === true;
+    const bearer = request.headers
+      .get("authorization")
+      ?.match(/^Bearer ([^\s]{1,3500})$/i)?.[1];
     if (
       !body ||
-      (passwordLogin
-        ? body.code !== undefined
-        : !validCode(body.code) || body.access_token !== undefined)
+      (renewal
+        ? body.code !== undefined || !bearer
+        : !validCode(body.code) || body.refresh !== undefined)
     )
       return respond(400, { error: "Provide one sign-in proof" });
     // Validate signing configuration before spending the single-use code.
@@ -116,64 +117,119 @@ Deno.serve(async (request: Request) => {
         auth: { persistSession: false, autoRefreshToken: false },
       },
     );
-    let identity: { id: string } | null = null;
-    if (passwordLogin) {
-      stage = "verify_password_identity";
-      const { data, error } = await client.auth.getUser(
-        body.access_token as string,
-      );
-      if (error || !data.user || !data.user.email_confirmed_at)
+    let profileId: string;
+    if (renewal) {
+      stage = "verify_current_session";
+      const claims = await jwtVerify(
+        bearer as string,
+        await importJWK(
+          { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y },
+          "ES256",
+        ),
+        { issuer: "project-tracker", audience: "authenticated" },
+      )
+        .then(({ payload }) => payload)
+        .catch(() => null);
+      const { data: current, error: currentError } =
+        claims?.sub && claims.jti
+          ? await client
+              .from("tracker_sessions")
+              .select("id,lms_user_id,expires_at,revoked_at")
+              .eq("id", claims.jti)
+              .maybeSingle()
+          : { data: null, error: null };
+      if (currentError) throw new Error("Session lookup unavailable");
+      if (
+        !current ||
+        current.lms_user_id !== claims?.sub ||
+        current.revoked_at ||
+        Date.parse(current.expires_at) <= Date.now()
+      )
         return respond(401, {
-          error: "Your login could not be verified. Please sign in again.",
-        });
-      stage = "lookup_account_link";
-      const { data: link, error: linkError } = await client
-        .from("tracker_auth_links")
-        .select("profile_id")
-        .eq("auth_user_id", data.user.id)
-        .maybeSingle();
-      if (linkError) throw new Error("Account lookup unavailable");
-      if (!link)
-        return respond(403, {
           error:
-            "Your account has not been granted Project Tracker access. Contact your administrator.",
+            "Your Tracker session expired. Return to the LMS and open Project Tracker again.",
         });
-      identity = { id: link.profile_id };
+      profileId = current.lms_user_id;
+      stage = "revoke_renewed_session";
+      // Only the request that revokes the old session may renew it.
+      const { data: revoked, error: revokeError } = await client
+        .from("tracker_sessions")
+        .update({ revoked_at: new Date().toISOString() })
+        .eq("id", current.id)
+        .is("revoked_at", null)
+        .select("id");
+      if (revokeError) throw new Error("Session unavailable");
+      if (revoked?.length !== 1)
+        return respond(401, {
+          error:
+            "Your Tracker session expired. Return to the LMS and open Project Tracker again.",
+        });
     } else {
       stage = "exchange_lms_code";
       const endpoint = new URL(required("LMS_SSO_CONSUME_URL"));
       if (endpoint.protocol !== "https:")
         throw new Error("Invalid server configuration");
-      identity = await consumeIdentity(
+      const identity = await consumeIdentity(
         body.code as string,
         endpoint.href,
         required("LMS_SSO_CONSUME_SECRET"),
       );
-    }
-    if (!identity) {
-      console.info(
-        JSON.stringify({
-          event: "tracker_sso_failure",
-          reason: "invalid_handoff",
-        }),
-      );
-      return respond(401, {
-        error:
-          "Your sign-in link is invalid, expired, or already used. Return to the LMS and open Project Tracker again.",
+      if (!identity) {
+        console.info(
+          JSON.stringify({
+            event: "tracker_sso_failure",
+            reason: "invalid_handoff",
+          }),
+        );
+        return respond(401, {
+          error:
+            "Your sign-in link is invalid, expired, or already used. Return to the LMS and open Project Tracker again.",
+        });
+      }
+      stage = "apply_lms_access";
+      if ("denied" in identity) {
+        // Catch up on a revocation the LMS could not push earlier.
+        await client.rpc("apply_lms_access", {
+          p_lms_user_id: identity.id,
+          p_name: null,
+          p_email: null,
+          p_role: null,
+          p_active: false,
+        });
+        console.info(
+          JSON.stringify({
+            event: "tracker_access_denied",
+            lms_user_id: identity.id,
+          }),
+        );
+        return respond(403, {
+          error:
+            "You have not been granted Project Tracker access. Contact your administrator.",
+        });
+      }
+      const { data: profile, error } = await client.rpc("apply_lms_access", {
+        p_lms_user_id: identity.id,
+        p_name: identity.name,
+        p_email: identity.email,
+        p_role: identity.role,
+        p_active: true,
       });
+      if (error || typeof profile?.id !== "string")
+        throw new Error("Membership update unavailable");
+      profileId = profile.id;
     }
     stage = "lookup_membership";
     const { data: profile, error } = await client
       .from("profiles")
       .select("id,status")
-      .eq("id", identity.id)
+      .eq("id", profileId)
       .maybeSingle();
     if (error) throw new Error("Membership lookup unavailable");
     if (!profile || profile.status !== "active") {
       console.info(
         JSON.stringify({
           event: "tracker_access_denied",
-          lms_user_id: identity.id,
+          profile_id: profileId,
         }),
       );
       return respond(403, {
@@ -186,7 +242,7 @@ Deno.serve(async (request: Request) => {
     stage = "sign_tracker_token";
     const token = await new SignJWT({ role: "authenticated" })
       .setProtectedHeader({ alg: "ES256", kid: jwk.kid, typ: "JWT" })
-      .setSubject(identity.id)
+      .setSubject(profileId)
       .setIssuer("project-tracker")
       .setAudience("authenticated")
       .setJti(id)
@@ -198,20 +254,14 @@ Deno.serve(async (request: Request) => {
       .from("tracker_sessions")
       .insert({
         id,
-        lms_user_id: identity.id,
+        lms_user_id: profileId,
         expires_at: new Date(expires * 1000).toISOString(),
       });
     if (sessionError) throw new Error("Session unavailable");
     console.info(
       JSON.stringify({
-        event: "tracker_sso_success",
-        lms_user_id: identity.id,
-      }),
-    );
-    console.info(
-      JSON.stringify({
-        event: "tracker_session_created",
-        lms_user_id: identity.id,
+        event: renewal ? "tracker_session_renewed" : "tracker_sso_success",
+        profile_id: profileId,
       }),
     );
     return respond(200, { token, expires_at: expires });
