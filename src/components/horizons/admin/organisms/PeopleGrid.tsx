@@ -5,6 +5,7 @@ import {
   Group,
   SimpleGrid,
   Stack,
+  Text,
 } from "@mantine/core";
 import {
   IconCalendarOff,
@@ -26,6 +27,8 @@ interface PeopleGridProps {
   onPerson: (id: string) => void;
   onRecordLeave: () => void;
   onAddPerson?: () => void;
+  /** People, roles and account access are set in the LMS, not here. */
+  managedExternally?: boolean;
 }
 
 export function PeopleGrid({
@@ -36,6 +39,7 @@ export function PeopleGrid({
   onPerson,
   onRecordLeave,
   onAddPerson,
+  managedExternally = false,
 }: PeopleGridProps) {
   const onLeaveCount = people.filter((p) =>
     availability.some(
@@ -75,7 +79,12 @@ export function PeopleGrid({
           </Group>
 
           <Group gap="xs">
-            {onAddPerson && (
+            {managedExternally && (
+              <Text size="xs" c="dimmed">
+                Team members and roles are managed in the LMS
+              </Text>
+            )}
+            {onAddPerson && !managedExternally && (
               <Button
                 color="teal"
                 size="xs"

@@ -24,7 +24,7 @@ import {
   useAdminAction,
 } from "../../../api/hooks/use-admin-workspace";
 import { useCanResetDemo, useResetToSeed } from "../../../api/hooks/use-signals";
-import { taskService } from "../../../services";
+import { peopleService, taskService } from "../../../services";
 import { TaskBoard } from "../../task-board";
 import type { AdminView } from "../../../types/dashboard";
 import type { LedgerRecord } from "../../../entities/ledger-record.entity";
@@ -851,6 +851,7 @@ export default function AdminDashboard({
             date={date}
             onPerson={onPerson}
             onAddPerson={() => setAction({ kind: "create-person" })}
+            managedExternally={peopleService.managedExternally}
             onRecordLeave={() => setAction({ kind: "leave" })}
           />
         </>

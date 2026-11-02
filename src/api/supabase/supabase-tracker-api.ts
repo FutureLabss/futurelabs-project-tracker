@@ -19,6 +19,8 @@ import {
 import { calculateOperationalSignals } from "../../domain/calculations/derived-signals";
 
 export class SupabaseTrackerApi implements ITrackerApi {
+  // The LMS superadmin grants access and roles; see apply_lms_access.
+  readonly peopleManagedExternally = true;
   constructor(private readonly client: SupabaseClient<Database>) {}
   async getProjectMembers() {
     return (

@@ -22,6 +22,7 @@ import { getInitialSeedDataset } from "../../domain/seed/initial-dataset";
 import { calculateOperationalSignals } from "../../domain/calculations/derived-signals";
 
 export class MockLocalStorageApi implements ITrackerApi {
+  readonly peopleManagedExternally = false;
   async getProjectMembers(): Promise<
     import("../../entities/project-member.entity").ProjectMember[]
   > {

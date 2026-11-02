@@ -2,6 +2,7 @@ import type { ITrackerApi } from "../api/tracker-api.interface";
 
 type Backend = Pick<
   ITrackerApi,
+  | "peopleManagedExternally"
   | "getPersons"
   | "getAvailability"
   | "recordAvailability"
@@ -14,6 +15,10 @@ type Backend = Pick<
 
 export class PeopleService {
   constructor(private readonly api: Backend) {}
+
+  get managedExternally(): boolean {
+    return this.api.peopleManagedExternally;
+  }
 
   getPersons(
     ...args: Parameters<Backend["getPersons"]>

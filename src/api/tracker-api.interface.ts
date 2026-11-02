@@ -112,6 +112,8 @@ export interface ITrackerApi {
   clearBlocker(blockerId: string, actorId: string): Promise<Blocker>;
 
   // Availability & People
+  // True when people, roles and account access are set outside the Tracker (the LMS).
+  readonly peopleManagedExternally: boolean;
   getPersons(): Promise<Person[]>;
   getAvailability(personId?: string): Promise<Availability[]>;
   recordAvailability(dto: RecordLeaveDto): Promise<Availability>;
