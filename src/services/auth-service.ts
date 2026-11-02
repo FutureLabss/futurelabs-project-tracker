@@ -3,9 +3,7 @@ import type { Database } from "../lib/supabase/database.types";
 import { mapProfile } from "../api/supabase/mappers";
 import {
   clearTrackerSession,
-  getTrackerRefreshToken,
   getTrackerToken,
-  setTrackerRefreshToken,
   setTrackerToken,
 } from "../lib/supabase/tracker-session";
 
@@ -19,44 +17,28 @@ export class AuthService {
   >();
   private exchange: Promise<TrackerSession> | null = null;
   private refreshing: Promise<TrackerSession | null> | null = null;
-  constructor(
-    private readonly client: SupabaseClient<Database>,
-    private readonly passwordClient?: SupabaseClient<Database> | null,
-  ) {}
+  constructor(private readonly client: SupabaseClient<Database>) {}
   private notify(session: TrackerSession | null) {
     this.listeners.forEach((callback) => callback("SESSION_CHANGED", session));
   }
-  async signInWithPassword(email: string, password: string) {
-    const passwordClient = this.passwordClient;
-    if (!passwordClient) throw new Error("Supabase is not configured.");
-    const { data, error } = await passwordClient.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    if (error) throw new Error(error.message);
-    if (data.session?.refresh_token) {
-      setTrackerRefreshToken(data.session.refresh_token);
-    }
-    try {
-      return await this.exchangeProof({
-        access_token: data.session.access_token,
-      });
-    } finally {
-      await passwordClient.auth.signOut({ scope: "local" });
-    }
-  }
   async consumeCode(code: string) {
     // Share the single-use exchange across StrictMode effect replays.
-    if (!this.exchange) this.exchange = this.exchangeProof({ code });
+    if (!this.exchange) {
+      setTrackerToken(null);
+      this.exchange = this.exchangeProof({ code });
+    }
     return this.exchange;
   }
+  // A renewal presents the current session; the old one is revoked server-side.
   private async exchangeProof(
-    body: { code: string } | { access_token: string },
+    body: { code: string } | { refresh: true },
+    authorization?: string,
   ) {
-    setTrackerToken(null);
     const { data, error } = await this.client.functions.invoke(
       "consume-project-tracker-sso",
-      { body },
+      authorization
+        ? { body, headers: { Authorization: `Bearer ${authorization}` } }
+        : { body },
     );
     if (error) {
       const response = "context" in error ? error.context : null;
@@ -94,41 +76,14 @@ export class AuthService {
     }
   }
   async refreshSession(): Promise<TrackerSession | null> {
-    const refreshToken = getTrackerRefreshToken();
-    const passwordClient = this.passwordClient;
-    if (
-      !refreshToken ||
-      !passwordClient ||
-      typeof passwordClient.auth?.refreshSession !== "function"
-    ) {
-      return null;
-    }
+    const current = getTrackerToken();
+    if (!current) return null;
     if (this.refreshing) return this.refreshing;
-    this.refreshing = (async () => {
-      try {
-        const { data, error } = await passwordClient.auth.refreshSession({
-          refresh_token: refreshToken,
-        });
-        if (error || !data.session?.access_token) {
-          return null;
-        }
-        if (data.session.refresh_token) {
-          setTrackerRefreshToken(data.session.refresh_token);
-        }
-        return await this.exchangeProof({
-          access_token: data.session.access_token,
-        });
-      } catch {
-        return null;
-      } finally {
+    this.refreshing = this.exchangeProof({ refresh: true }, current)
+      .catch(() => null)
+      .finally(() => {
         this.refreshing = null;
-        try {
-          await passwordClient.auth.signOut?.({ scope: "local" });
-        } catch {
-          // ignore cleanup failures
-        }
-      }
-    })();
+      });
     return this.refreshing;
   }
   async getSession(): Promise<TrackerSession | null> {

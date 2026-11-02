@@ -25,14 +25,3 @@ export const trackerClient =
 // Compatibility alias for the established data service adapter.
 export const supabase = trackerClient;
 
-// Only verifies credentials; data requests continue using revocable Tracker sessions.
-export const passwordClient =
-  backendConfig.backend === "supabase"
-    ? createClient<Database>(backendConfig.url, backendConfig.key, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-        },
-      })
-    : null;

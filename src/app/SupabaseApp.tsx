@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Alert, Button, Stack, Text } from "@mantine/core";
 import { useQuery } from "@tanstack/react-query";
 import { authService } from "../services";
-import { SupabaseLoginScreen } from "../features/auth/SupabaseLoginScreen";
+import { OpenFromLmsScreen } from "../features/auth/OpenFromLmsScreen";
 import { useSupabaseSession } from "../features/auth/use-supabase-session";
 import { RoleDashboardLayout } from "../components/RoleDashboardLayout";
 import { roleDashboards } from "../data/dashboard-layouts";
@@ -39,15 +39,10 @@ export function SupabaseApp() {
     );
   if (!session)
     return (
-      <>
-        <SupabaseLoginScreen
-          onSignIn={(email, password) =>
-            auth.signInWithPassword(email, password)
-          }
-        />
+      <OpenFromLmsScreen>
         {error && <Alert color="red">{error.message}</Alert>}
         {logoutError && <Alert color="red">{logoutError}</Alert>}
-      </>
+      </OpenFromLmsScreen>
     );
   if (profile.isError)
     return (
