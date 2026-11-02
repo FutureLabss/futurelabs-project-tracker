@@ -282,36 +282,19 @@ test("admin lifecycle, project membership, audit, and session authorization", as
       ),
       /permission denied/,
     );
-    const bootstrap = readFileSync(
-      new URL("../supabase/bootstrap-admin.sql", import.meta.url),
-      "utf8",
-    ).replace("REPLACE_WITH_TRACKER_AUTH_USER_UUID", admin);
-    await db.query(
-      "insert into auth.users(id,email,email_confirmed_at) values($1,'admin@example.test',now())",
-      [admin],
-    );
-    await db.exec(bootstrap);
-    await db.exec(bootstrap);
-    const link = await db.query(
-      "select profile_id from tracker_auth_links where auth_user_id=$1",
-      [admin],
-    );
-    assert.equal(link.rows[0].profile_id, admin);
-    const profile = await db.query(
-      "select role,status from profiles where id=$1",
-      [admin],
-    );
-    assert.deepEqual(profile.rows[0], { role: "admin", status: "active" });
   } finally {
     await db.close();
   }
 });
 
-test("people administration: create, update profile, role change, status, last-admin guard, session revocation", async () => {
+test("people administration: LMS-managed grants, adoption, roles, revocation, last-admin guard, sessions", async () => {
   const db = new PGlite();
   const admin = "10000000-0000-4000-8000-000000000001";
   const member = "10000000-0000-4000-8000-000000000002";
   const manager = "10000000-0000-4000-8000-000000000003";
+  const lmsAdmin = "40000000-0000-4000-8000-000000000001";
+  const lmsNewcomer = "40000000-0000-4000-8000-000000000002";
+  const lmsManager = "40000000-0000-4000-8000-000000000003";
   const sessions = {
     [admin]: "20000000-0000-4000-8000-000000000001",
     [member]: "20000000-0000-4000-8000-000000000002",
@@ -341,6 +324,26 @@ test("people administration: create, update profile, role change, status, last-a
     rpc(id, "tracker_mutate", operation, payload);
   const govern = (operation, payload, id = admin) =>
     rpc(id, "tracker_admin_mutate", operation, payload);
+  // What the sync-lms-access and SSO functions run with the service role.
+  const sync = async (lmsId, active, name = null, email = null, role = null) =>
+    (
+      await db.query("select (apply_lms_access($1,$2,$3,$4,$5)).*", [
+        lmsId,
+        name,
+        email,
+        role,
+        active,
+      ])
+    ).rows[0];
+  const liveSessions = async (id) =>
+    Number(
+      (
+        await db.query(
+          "select count(*) as count from tracker_sessions where lms_user_id = $1 and revoked_at is null",
+          [id],
+        )
+      ).rows[0].count,
+    );
 
   try {
     await db.exec(
@@ -350,13 +353,19 @@ test("people administration: create, update profile, role change, status, last-a
       "alter default privileges grant execute on functions to anon, authenticated;",
     );
     const directory = new URL("../supabase/migrations/", import.meta.url);
-    for (const file of readdirSync(directory)
+    const files = readdirSync(directory)
       .filter((f) => f.endsWith(".sql"))
-      .sort())
-      await db.transaction(async (tx) => {
-        await tx.exec(readFileSync(new URL(file, directory), "utf8"));
-      });
+      .sort();
+    const managed = files.indexOf("20261030000100_lms_managed_access.sql");
+    const apply = async (batch) => {
+      for (const file of batch)
+        await db.transaction(async (tx) => {
+          await tx.exec(readFileSync(new URL(file, directory), "utf8"));
+        });
+    };
+    await apply(files.slice(0, managed));
 
+    // People created in the Tracker before the LMS took over, signed in by password.
     for (const [id, role] of [
       [admin, "admin"],
       [member, "member"],
@@ -371,59 +380,89 @@ test("people administration: create, update profile, role change, status, last-a
         [sessions[id], id],
       );
     }
+    await apply(files.slice(managed));
 
-    // 1. Non-admin cannot create a person
+    // 1. The cut-over ends every password-era session and removes password links.
+    assert.equal(await liveSessions(admin), 0);
+    assert.equal(
+      (await db.query("select to_regclass('public.tracker_auth_links') as t"))
+        .rows[0].t,
+      null,
+    );
+    await db.query("update tracker_sessions set revoked_at = null");
+
+    // 2. People, roles and account status can no longer be changed in the Tracker.
+    for (const [operation, payload] of [
+      ["create_person", { name: "Bob", email: "bob@example.test", role: "member" }],
+      ["change_role", { person_id: member, role: "manager" }],
+      ["set_person_status", { person_id: member, status: "inactive" }],
+    ])
+      await assert.rejects(govern(operation, payload), /managed in the LMS/);
+
+    // 3. API roles cannot apply LMS access themselves.
     await assert.rejects(
-      govern("create_person", { name: "Bob", email: "bob@example.test", role: "member" }, member),
-      /Administrator/,
+      asUser(admin, (tx) =>
+        tx.query(
+          "select apply_lms_access($1,'X','x@example.test','admin',true)",
+          [admin],
+        ),
+      ),
+      /permission denied/,
     );
 
+    // 4. A first grant for an existing email adopts that profile and its history.
+    const adopted = await sync(
+      lmsAdmin,
+      true,
+      "Admin From LMS",
+      " Admin@Example.Test ",
+      "admin",
+    );
+    assert.equal(adopted.id, admin);
+    assert.equal(adopted.name, "Admin From LMS");
+    assert.equal(adopted.email, "admin@example.test");
+    assert.equal(
+      (await sync(lmsAdmin, true, "Admin From LMS", "admin@example.test", "admin"))
+        .id,
+      admin,
+    );
 
-    // 2. Admin creates a person
-    const created = await govern("create_person", {
-      name: "Bob Builder",
-      email: "bob@example.test",
-      role: "member",
-      title: "Core Engineer",
-    });
-    assert.equal(created.name, "Bob Builder");
-    assert.equal(created.email, "bob@example.test");
+    // 5. A grant for someone new creates their profile under their LMS id.
+    const created = await sync(
+      lmsNewcomer,
+      true,
+      "Bob Builder",
+      "bob@example.test",
+      "member",
+    );
+    assert.equal(created.id, lmsNewcomer);
     assert.equal(created.role, "member");
     assert.equal(created.status, "active");
-
     const personEvent = await db.query(
       "select type, subject_type, actor_id from ledger_records where subject_id = $1 order by occurred_at desc limit 1",
       [created.id],
     );
+    assert.deepEqual(personEvent.rows[0], {
+      type: "person_created",
+      subject_type: "person",
+      actor_id: created.id,
+    });
 
-
-    assert.equal(personEvent.rows[0].type, "person_created");
-    assert.equal(personEvent.rows[0].subject_type, "person");
-    assert.equal(personEvent.rows[0].actor_id, admin);
-
-    // 3. Admin updates person profile
+    // 6. Profile details stay editable in the Tracker.
     const updated = await govern("update_profile", {
       person_id: created.id,
-      name: "Robert Builder",
       title: "Lead Engineer",
     });
-    assert.equal(updated.name, "Robert Builder");
     assert.equal(updated.title, "Lead Engineer");
 
-    // 4. Last active admin protection: cannot demote the only active admin
+    // 7. The last active administrator cannot be demoted or revoked from the LMS.
     await assert.rejects(
-      govern("change_role", { person_id: admin, role: "member" }),
-      /Cannot demote the last active administrator/,
+      sync(lmsAdmin, true, "Admin From LMS", "admin@example.test", "member"),
+      /last active administrator/,
     );
+    await assert.rejects(sync(lmsAdmin, false), /last active administrator/);
 
-    // 5. Last active admin protection: cannot deactivate the only active admin
-    await assert.rejects(
-      govern("set_person_status", { person_id: admin, status: "inactive" }),
-      /Cannot deactivate the last active administrator/,
-    );
-
-
-    // 6. Demoting a manager to member unassigns project lead
+    // 8. Demoting a manager in the LMS keeps them on their projects as a member.
     const project = await mutate("create_project", {
       name: "Managed project",
       goal: "Test manager unassignment",
@@ -431,44 +470,71 @@ test("people administration: create, update profile, role change, status, last-a
       target_date: "2026-10-01",
       manager_id: manager,
     });
-    const projBefore = await db.query("select manager_id from projects where id = $1", [project.id]);
-    assert.equal(projBefore.rows[0].manager_id, manager);
-
-    await govern("change_role", { person_id: manager, role: "member" });
-    const projAfter = await db.query("select manager_id from projects where id = $1", [project.id]);
+    assert.equal(
+      (await sync(lmsManager, true, "Manager", "manager@example.test", "manager"))
+        .id,
+      manager,
+    );
+    const demoted = await sync(
+      lmsManager,
+      true,
+      "Manager",
+      "manager@example.test",
+      "member",
+    );
+    assert.equal(demoted.role, "member");
+    const projAfter = await db.query(
+      "select manager_id from projects where id = $1",
+      [project.id],
+    );
     assert.equal(projAfter.rows[0].manager_id, null);
+    assert.equal(
+      (
+        await db.query(
+          "select 1 from project_members where project_id=$1 and lms_user_id=$2",
+          [project.id, manager],
+        )
+      ).rows.length,
+      1,
+    );
+    const roleEvent = await db.query(
+      "select from_value, to_value from ledger_records where subject_id = $1 and type = 'role_changed'",
+      [manager],
+    );
+    assert.deepEqual(roleEvent.rows[0], {
+      from_value: "manager",
+      to_value: "member",
+    });
 
-    // 7. Deactivating member revokes their active sessions
+    // 9. Revoking in the LMS deactivates the profile and ends its sessions; a regrant restores it.
     await db.query(
       "insert into tracker_sessions(id,lms_user_id,expires_at) values($1,$2,now()+interval '15 minutes')",
       ["30000000-0000-4000-8000-000000000001", created.id],
     );
-    const activeSessionsBefore = await db.query(
-      "select count(*) as count from tracker_sessions where lms_user_id = $1 and revoked_at is null",
-      [created.id],
+    assert.equal(await liveSessions(created.id), 1);
+    assert.equal((await sync(lmsNewcomer, false)).status, "inactive");
+    assert.equal(await liveSessions(created.id), 0);
+    assert.equal((await sync(lmsNewcomer, false)).status, "inactive");
+    assert.equal(
+      (await sync(lmsNewcomer, true, "Bob Builder", "bob@example.test", "manager"))
+        .status,
+      "active",
     );
-    assert.equal(Number(activeSessionsBefore.rows[0].count), 1);
 
-    await govern("set_person_status", { person_id: created.id, status: "inactive" });
-    const activeSessionsAfter = await db.query(
-      "select count(*) as count from tracker_sessions where lms_user_id = $1 and revoked_at is null",
-      [created.id],
+    // 10. Revoking someone the Tracker never knew is a no-op.
+    assert.equal(
+      (
+        await db.query("select apply_lms_access($1,null,null,null,false) as p", [
+          "40000000-0000-4000-8000-0000000000ff",
+        ])
+      ).rows[0].p,
+      null,
     );
-    assert.equal(Number(activeSessionsAfter.rows[0].count), 0);
 
-    // 8. Explicit session revocation
-    await db.query(
-      "insert into tracker_sessions(id,lms_user_id,expires_at) values($1,$2,now()+interval '15 minutes')",
-      ["30000000-0000-4000-8000-000000000002", member],
-    );
+    // 11. Explicit session revocation stays a Tracker admin action.
     await govern("revoke_sessions", { person_id: member });
-    const memberActiveSessions = await db.query(
-      "select count(*) as count from tracker_sessions where lms_user_id = $1 and revoked_at is null",
-      [member],
-    );
-    assert.equal(Number(memberActiveSessions.rows[0].count), 0);
+    assert.equal(await liveSessions(member), 0);
   } finally {
     await db.close();
   }
 });
-

@@ -30,19 +30,29 @@ const sid = "00000000-0000-4000-8000-000000000003";
 const response = (body, status = 200) =>
   new globalThis.Response(JSON.stringify(body), { status });
 
-test("LMS contract: valid, invalid, expired, used, malformed and unavailable", async () => {
+test("LMS contract: identity, denial, invalid, expired, used, malformed and unavailable", async () => {
   assert.equal(validCode(""), false);
   assert.equal(validCode({}), false);
   assert.equal(validCode("opaque"), true);
+  const identity = {
+    id: user,
+    name: "Member",
+    email: "member@example.test",
+    role: "manager",
+  };
   let consumed = false;
   const upstream = async (_url, options) => {
     assert.equal(options.redirect, "error");
     assert.equal(options.headers.Authorization, "Bearer test-server-secret");
     const { code } = JSON.parse(options.body);
     if (code === "expired") return response({}, 410);
+    if (code === "ungranted")
+      return response({ error: "no_access", user: { id: other } }, 403);
+    if (code === "ungranted-forged")
+      return response({ error: "no_access", user: { id: "forged" } }, 403);
     if (code !== "valid" || consumed) return response({}, 401);
     consumed = true;
-    return response({ success: true, user: { id: user } });
+    return response({ success: true, user: identity });
   };
   const consume = (code) =>
     consumeIdentity(
@@ -53,11 +63,18 @@ test("LMS contract: valid, invalid, expired, used, malformed and unavailable", a
     );
   assert.equal(await consume("invalid"), null);
   assert.equal(await consume("expired"), null);
+  assert.deepEqual(await consume("ungranted"), { denied: true, id: other });
+  assert.equal(await consume("ungranted-forged"), null);
   const results = await Promise.all([consume("valid"), consume("valid")]);
-  assert.deepEqual(results, [{ id: user }, null]);
+  assert.deepEqual(results, [identity, null]);
   await assert.rejects(
     consumeIdentity("x", "https://lms.example", "secret", async () =>
-      response({ success: true, user: { id: "forged" } }),
+      response({ success: true, user: { ...identity, id: "forged" } }),
+    ),
+  );
+  await assert.rejects(
+    consumeIdentity("x", "https://lms.example", "secret", async () =>
+      response({ success: true, user: { ...identity, role: "owner" } }),
     ),
   );
   await assert.rejects(
@@ -257,43 +274,20 @@ test("SSO migration: active session, project authorization, revocation and canon
       /permission denied/,
     );
     assert.equal((await db.query("select * from auth.users")).rows.length, 0);
-    await db.query("insert into auth.users(id) values ($1)", [other]);
-    await db.query(
-      "insert into tracker_auth_links(auth_user_id,profile_id) values ($1,$2)",
-      [other, user],
-    );
-    await assert.rejects(
-      asUser(user, sid, (tx) => tx.query("select * from tracker_auth_links")),
-      /permission denied/,
-    );
-    await assert.rejects(
-      asUser(user, sid, (tx) =>
-        tx.query("update tracker_auth_links set profile_id=$1", [other]),
-      ),
-      /permission denied/,
-    );
-    await db.query("delete from auth.users where id=$1", [other]);
-    assert.equal(
-      (await db.query("select * from tracker_auth_links")).rows.length,
-      0,
-    );
-    assert.equal(
-      (await db.query("select * from profiles where id=$1", [user])).rows
-        .length,
-      1,
-    );
   } finally {
     await db.close();
   }
 });
 
-test("Edge handler rejects invalid requests and inactive/missing membership before issuing sessions", async () => {
+test("Edge handler applies LMS access, rejects denied or inactive people and renews only live sessions", async () => {
   const { Module } = await import("node:module");
   let handler;
   let membership = null;
-  let linked = false;
-  let verified = false;
+  let current = null;
+  let revokedRows = [];
+  let applyError = null;
   let inserts = 0;
+  const applied = [];
   const env = {
     TRACKER_ALLOWED_ORIGINS: "https://tracker.example",
     LMS_SSO_CONSUME_URL: "https://lms.example/consume",
@@ -353,65 +347,82 @@ test("Edge handler rejects invalid requests and inactive/missing membership befo
       return "test-signed-token";
     }
   }
+  const sessionsTable = {
+    select: () => ({
+      eq: (column, id) => {
+        assert.equal(column, "id");
+        assert.equal(id, sid);
+        return { maybeSingle: async () => ({ data: current, error: null }) };
+      },
+    }),
+    update: (values) => {
+      assert.ok(values.revoked_at);
+      return {
+        eq: () => ({
+          is: () => ({
+            select: async () => ({ data: revokedRows, error: null }),
+          }),
+        }),
+      };
+    },
+    insert: async (row) => {
+      assert.equal(row.lms_user_id, user);
+      inserts++;
+      return { error: null };
+    },
+  };
   module.require = (name) => {
     if (name.includes("_shared/signing-key"))
       return require("../supabase/functions/_shared/signing-key.ts");
     if (name.startsWith("npm:jose"))
-      return { SignJWT, importJWK: async () => ({}) };
+      return {
+        SignJWT,
+        importJWK: async () => ({}),
+        jwtVerify: async (token, _key, options) => {
+          assert.equal(options.issuer, "project-tracker");
+          if (token !== "live-token") throw new Error("bad signature");
+          return { payload: { sub: user, jti: sid } };
+        },
+      };
     if (name.startsWith("npm:@supabase"))
       return {
         createClient: () => ({
-          auth: {
-            getUser: async (token) => ({
-              data: {
-                user:
-                  verified && token === "verified-token"
-                    ? { id: other, email_confirmed_at: "2026-09-11" }
-                    : null,
-              },
-              error: null,
-            }),
+          rpc: async (fn, args) => {
+            assert.equal(fn, "apply_lms_access");
+            applied.push(args);
+            return applyError
+              ? { data: null, error: applyError }
+              : { data: { id: user, status: "active" }, error: null };
           },
           from: (table) =>
-            table === "tracker_auth_links"
+            table === "profiles"
               ? {
                   select: () => ({
-                    eq: (column, id) => {
-                      assert.equal(column, "auth_user_id");
-                      assert.equal(id, other);
-                      return {
-                        maybeSingle: async () => ({
-                          data: linked ? { profile_id: user } : null,
-                          error: null,
-                        }),
-                      };
-                    },
-                  }),
-                }
-              : table === "profiles"
-                ? {
-                    select: () => ({
-                      eq: () => ({
-                        maybeSingle: async () => ({
-                          data: membership,
-                          error: null,
-                        }),
+                    eq: () => ({
+                      maybeSingle: async () => ({
+                        data: membership,
+                        error: null,
                       }),
                     }),
-                  }
-                : {
-                    insert: async () => {
-                      inserts++;
-                      return { error: null };
-                    },
-                  },
+                  }),
+                }
+              : sessionsTable,
         }),
       };
     if (name.includes("_shared/sso"))
       return {
         validCode,
         consumeIdentity: async (code) =>
-          code === "valid" ? { id: user } : null,
+          code === "valid"
+            ? {
+                id: other,
+                name: "Member",
+                email: "member@example.test",
+                role: "member",
+              }
+            : code === "ungranted"
+              ? { denied: true, id: other }
+              : null,
       };
     throw new Error("Unexpected dependency");
   };
@@ -434,92 +445,118 @@ test("Edge handler rejects invalid requests and inactive/missing membership befo
       ).outputText,
       filename,
     );
-    const request = (body, origin = "https://tracker.example") =>
+    const request = (body, { origin = "https://tracker.example", token } = {}) =>
       new globalThis.Request(
         "https://tracker.example/functions/v1/consume-project-tracker-sso",
         {
           method: "POST",
-          headers: { origin, "content-type": "application/json" },
+          headers: {
+            origin,
+            "content-type": "application/json",
+            ...(token ? { authorization: `Bearer ${token}` } : {}),
+          },
           body: typeof body === "string" ? body : JSON.stringify(body),
         },
       );
     assert.equal(
-      (await handler(request({ code: "valid" }, "https://attacker.example")))
-        .status,
+      (
+        await handler(
+          request({ code: "valid" }, { origin: "https://attacker.example" }),
+        )
+      ).status,
       403,
     );
     assert.equal((await handler(request("{"))).status, 400);
     assert.equal((await handler(request({}))).status, 400);
     assert.equal((await handler(request("x".repeat(5000)))).status, 413);
     assert.equal((await handler(request({ code: "invalid" }))).status, 401);
-    assert.equal((await handler(request({ code: "valid" }))).status, 403);
+    assert.equal(applied.length, 0);
+
+    // Not granted in the LMS: the profile is switched off and no session is issued.
+    assert.equal((await handler(request({ code: "ungranted" }))).status, 403);
+    assert.deepEqual(applied.pop(), {
+      p_lms_user_id: other,
+      p_name: null,
+      p_email: null,
+      p_role: null,
+      p_active: false,
+    });
+    assert.equal(inserts, 0);
+
+    // Granted: the LMS identity and role are applied before the session is signed.
     membership = { id: user, status: "inactive" };
     assert.equal((await handler(request({ code: "valid" }))).status, 403);
     assert.equal(inserts, 0);
     membership = { id: user, status: "active" };
-    const success = await handler(
-      request({ code: "valid", user_id: other, role: "admin" }),
+    applied.length = 0;
+    // Caller-supplied identity or role fields are ignored; only the LMS's answer counts.
+    const granted = await handler(
+      request({ code: "valid", user_id: user, role: "admin" }),
     );
-    assert.equal(success.status, 200);
+    assert.equal(granted.status, 200);
+    assert.deepEqual(applied.pop(), {
+      p_lms_user_id: other,
+      p_name: "Member",
+      p_email: "member@example.test",
+      p_role: "member",
+      p_active: true,
+    });
     assert.equal(inserts, 1);
-    assert.equal(success.headers.get("cache-control"), "no-store");
-    assert.equal((await success.json()).token, "test-signed-token");
+    assert.equal(granted.headers.get("cache-control"), "no-store");
+    assert.equal((await granted.json()).token, "test-signed-token");
+    applyError = { message: "Cannot remove the last active administrator" };
+    assert.equal((await handler(request({ code: "valid" }))).status, 503);
+    applyError = null;
+    applied.length = 0;
+
+    // Renewal needs the current session and nothing else.
     assert.equal(
-      (await handler(request({ access_token: "verified-token" }))).status,
-      401,
-    );
-    verified = true;
-    assert.equal(
-      (await handler(request({ access_token: "verified-token" }))).status,
-      403,
-    );
-    linked = true;
-    membership.status = "inactive";
-    assert.equal(
-      (await handler(request({ access_token: "verified-token" }))).status,
-      403,
-    );
-    membership.status = "active";
-    assert.equal(
-      (
-        await handler(
-          request({ access_token: "verified-token", code: "valid" }),
-        )
-      ).status,
+      (await handler(request({ code: "valid", refresh: true }, { token: "live-token" })))
+        .status,
       400,
     );
+    assert.equal((await handler(request({ refresh: true }))).status, 400);
     assert.equal(
-      (await handler(request({ access_token: "forged-token", user_id: user })))
-        .status,
+      (await handler(request({ refresh: true }, { token: "forged-token" }))).status,
       401,
     );
-    delete env.LMS_SSO_CONSUME_URL;
-    delete env.LMS_SSO_CONSUME_SECRET;
+    const future = new Date(Date.now() + 60_000).toISOString();
+    current = { id: sid, lms_user_id: user, expires_at: future, revoked_at: future };
     assert.equal(
-      (
-        await handler(
-          request({
-            access_token: "verified-token",
-            user_id: other,
-            role: "admin",
-          }),
-        )
-      ).status,
-      200,
+      (await handler(request({ refresh: true }, { token: "live-token" }))).status,
+      401,
     );
+    current = { id: sid, lms_user_id: user, expires_at: future, revoked_at: null };
+    revokedRows = [];
+    assert.equal(
+      (await handler(request({ refresh: true }, { token: "live-token" }))).status,
+      401,
+    );
+    revokedRows = [{ id: sid }];
+    membership = { id: user, status: "inactive" };
+    assert.equal(
+      (await handler(request({ refresh: true }, { token: "live-token" }))).status,
+      403,
+    );
+    membership = { id: user, status: "active" };
+    const renewed = await handler(
+      request({ refresh: true }, { token: "live-token" }),
+    );
+    assert.equal(renewed.status, 200);
     assert.equal(inserts, 2);
+    assert.equal(applied.length, 0);
   } finally {
     globalThis.Deno = originalDeno;
   }
 });
 
-test("direct Tracker visit renders password login and LMS action", async () => {
+test("direct Tracker visit offers only the LMS, with no password form", async () => {
   const { Module } = await import("node:module");
   const React = require("react");
   const { renderToStaticMarkup } = require("react-dom/server");
   const { MantineProvider } = require("@mantine/core");
   const source = readFileSync(
-    new URL("../src/features/auth/SupabaseLoginScreen.tsx", import.meta.url),
+    new URL("../src/features/auth/OpenFromLmsScreen.tsx", import.meta.url),
     "utf8",
   ).replaceAll(
     "import.meta.env",
@@ -528,7 +565,7 @@ test("direct Tracker visit renders password login and LMS action", async () => {
       DEV: false,
     }),
   );
-  const module = new Module("login-test");
+  const module = new Module("lms-screen-test");
   module.require = require;
   module._compile(
     ts.transpileModule(source, {
@@ -538,95 +575,74 @@ test("direct Tracker visit renders password login and LMS action", async () => {
         jsx: ts.JsxEmit.ReactJSX,
       },
     }).outputText,
-    "login-test",
+    "lms-screen-test",
   );
   const html = renderToStaticMarkup(
     React.createElement(
       MantineProvider,
       {},
-      React.createElement(module.exports.SupabaseLoginScreen, {
-        onSignIn: async () => {},
-      }),
+      React.createElement(module.exports.OpenFromLmsScreen, {}),
     ),
   );
-  assert.match(html, /Login with LMS/);
+  assert.match(html, /Go to the LMS/);
   assert.match(html, /href="https:\/\/lms.example\/launch"/);
-  assert.match(html, /type="password"/);
-  assert.match(html, /type="email"/);
+  assert.doesNotMatch(html, /type="password"/);
+  assert.doesNotMatch(html, /type="email"/);
 });
 
-test("password login exchanges verified proof, clears credential session and rejects bad credentials", async () => {
+test("session renewal presents the current session and keeps it when renewal fails", async () => {
   const storage = new Map();
   globalThis.sessionStorage = {
     getItem: (key) => storage.get(key) ?? null,
     setItem: (key, value) => storage.set(key, value),
     removeItem: (key) => storage.delete(key),
   };
-  const token =
+  const tokenFor = (n) =>
     "header." +
     Buffer.from(
-      JSON.stringify({ sub: user, exp: Math.floor(Date.now() / 1000) + 900 }),
+      JSON.stringify({ sub: user, n, exp: Math.floor(Date.now() / 1000) + 900 }),
     ).toString("base64url") +
     ".signature";
-  let exchanges = 0;
-  let cleanups = 0;
-  let invalid = false;
-  const auth = new AuthService(
-    {
-      functions: {
-        invoke: async (_name, { body }) => {
-          exchanges++;
-          assert.deepEqual(body, { access_token: "verified-proof" });
-          return { data: { token }, error: null };
-        },
+  let fail = false;
+  let calls = 0;
+  const auth = new AuthService({
+    functions: {
+      invoke: async (name, options) => {
+        calls++;
+        assert.equal(name, "consume-project-tracker-sso");
+        assert.deepEqual(options.body, { refresh: true });
+        assert.equal(options.headers.Authorization, `Bearer ${tokenFor(1)}`);
+        return fail
+          ? {
+              data: null,
+              error: { context: new globalThis.Response("{}", { status: 401 }) },
+            }
+          : { data: { token: tokenFor(2) }, error: null };
       },
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({
-              data: {
-                id: user,
-                name: "Member",
-                email: "member@example.com",
-                role: "member",
-                status: "active",
-              },
-              error: null,
-            }),
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: async () => ({
+            data: { id: user, name: "Member", email: "", role: "member" },
+            error: null,
           }),
         }),
       }),
-    },
-    {
-      auth: {
-        signInWithPassword: async (credentials) => {
-          assert.equal(credentials.email, "member@example.com");
-          return invalid
-            ? { error: new Error("Invalid login credentials") }
-            : {
-                data: { session: { access_token: "verified-proof" } },
-                error: null,
-              };
-        },
-        signOut: async () => {
-          cleanups++;
-          return { error: null };
-        },
-      },
-    },
-  );
-  assert.equal(
-    (await auth.signInWithPassword(" member@example.com ", "secret")).user.id,
-    user,
-  );
-  assert.equal(exchanges, 1);
-  assert.equal(cleanups, 1);
-  invalid = true;
-  await assert.rejects(
-    auth.signInWithPassword("member@example.com", "wrong"),
-    /Invalid login/,
-  );
-  assert.equal(exchanges, 1);
+    }),
+  });
+  assert.equal(await auth.refreshSession(), null);
+  assert.equal(calls, 0);
+  storage.set("tracker.application-session", tokenFor(1));
+  fail = true;
+  assert.equal(await auth.refreshSession(), null);
+  assert.equal(storage.get("tracker.application-session"), tokenFor(1));
+  fail = false;
+  const [a, b] = await Promise.all([auth.refreshSession(), auth.refreshSession()]);
+  assert.equal(calls, 2);
+  assert.equal(a.user.id, user);
+  assert.deepEqual(a, b);
+  assert.equal(storage.get("tracker.application-session"), tokenFor(2));
 });
 
 test("private signing key restricts combined operations and signs verifiable data", async () => {
