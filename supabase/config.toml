@@ -27,3 +27,6 @@ enable_confirmations = true
 
 [functions.consume-project-tracker-sso]
 verify_jwt = false
+
+[functions.sync-lms-access]
+verify_jwt = false
