@@ -58,6 +58,10 @@ Whenever implementing or modifying any feature, you **MUST** strictly adhere to 
   - `tracker_admin_mutate(action, payload)`: Used for admin workflows (project membership, closing projects).
 - **Identity security**: In Supabase mode, the database derives the caller's identity strictly from `auth.uid()` in the JWT session claims. **Never pass caller-supplied actor IDs directly to database mutations.**
 
+### Invariant 3a: People and Access Belong to the LMS
+- In Supabase mode the LMS superadmin decides who may use the Tracker and with which role. The LMS pushes changes to `sync-lms-access`, and every SSO sign-in re-applies them through `public.apply_lms_access`.
+- `tracker_admin_mutate` refuses `create_person`, `change_role` and `set_person_status`; the admin UI hides those actions when `peopleService.managedExternally` is true. Do not reintroduce Tracker-side logins or role changes.
+
 ### Invariant 4: React Query Cache Invalidation
 - Direct service calls do **NOT** invalidate React Query caches.
 - Whenever triggering mutations from UI components, always use the mutation hooks (e.g., `useCreateTask`, `useAdminAction`) or explicitly call `queryClient.invalidateQueries`.
